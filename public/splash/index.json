@@ -1,0 +1,58 @@
+[
+  {
+    "w": 1170,
+    "h": 2532,
+    "cssW": 390,
+    "cssH": 844,
+    "ratio": 3,
+    "name": "splash-1170x2532.png"
+  },
+  {
+    "w": 1179,
+    "h": 2556,
+    "cssW": 393,
+    "cssH": 852,
+    "ratio": 3,
+    "name": "splash-1179x2556.png"
+  },
+  {
+    "w": 1284,
+    "h": 2778,
+    "cssW": 428,
+    "cssH": 926,
+    "ratio": 3,
+    "name": "splash-1284x2778.png"
+  },
+  {
+    "w": 1290,
+    "h": 2796,
+    "cssW": 430,
+    "cssH": 932,
+    "ratio": 3,
+    "name": "splash-1290x2796.png"
+  },
+  {
+    "w": 1125,
+    "h": 2436,
+    "cssW": 375,
+    "cssH": 812,
+    "ratio": 3,
+    "name": "splash-1125x2436.png"
+  },
+  {
+    "w": 828,
+    "h": 1792,
+    "cssW": 414,
+    "cssH": 896,
+    "ratio": 2,
+    "name": "splash-828x1792.png"
+  },
+  {
+    "w": 750,
+    "h": 1334,
+    "cssW": 375,
+    "cssH": 667,
+    "ratio": 2,
+    "name": "splash-750x1334.png"
+  }
+]

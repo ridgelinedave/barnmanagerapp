@@ -24,8 +24,11 @@ export function GET() {
       scope: "/",
       display: "standalone",
       orientation: "portrait",
-      background_color: barn.brand.cream,
-      theme_color: barn.brand.gold,
+      // The launch field, not the app surface: this is what fills the screen
+      // before the first paint, so it must match the splash images or the
+      // launch flashes cream then jumps to charcoal.
+      background_color: barn.pwa.launchBackground,
+      theme_color: barn.pwa.launchBackground,
       icons: [
         { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
         { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },

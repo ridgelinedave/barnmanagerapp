@@ -106,10 +106,16 @@ export const barn = {
     shop: false,
   } satisfies Record<BarnFeatureFlag, boolean>,
 
-  /** PWA install-prompt copy. Kept here so a clone can reword it. */
+  /** PWA install-prompt and launch-screen copy. Kept here so a clone can reword it. */
   pwa: {
     installTitle: "Add to your home screen",
     installBody: "Install the app for one-tap access from your phone.",
+    /**
+     * The launch screen sits on the crest's own dark field rather than the
+     * app's cream, so the gold mark reads the way it does on the sign — and so
+     * the splash does not flash white before the first paint.
+     */
+    launchBackground: "#2B2B2B",
   },
 } as const;
 
