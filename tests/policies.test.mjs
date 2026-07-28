@@ -656,6 +656,11 @@ async function main() {
     console.log("\n═══ announcements — notification fan-out ═══\n");
 
     {
+      // `author` is set explicitly because that is what the app does
+      // (createAnnouncement passes the caller's profile id). Leaving it null
+      // here would make the "author is not notified" assertion vacuous: the
+      // trigger excludes `p.id is distinct from new.author`, and against a null
+      // author that excludes nobody.
       const { data: posted, error } = await admin
         .from("announcements")
         .insert({
@@ -663,6 +668,7 @@ async function main() {
           body_md: "Should notify admin and staff, never the parent.",
           audience: "staff",
           notify: true,
+          author: users.admin.profileId,
         })
         .select()
         .single();
@@ -716,6 +722,49 @@ async function main() {
           "editing the announcement does NOT re-notify",
           (staffAfterEdit.data?.length ?? 0) === 1,
           `saw ${staffAfterEdit.data?.length}`,
+        );
+
+        await admin.from("announcements").delete().eq("id", posted.id);
+      }
+    }
+
+    // An announcement with no author — e.g. posted straight from the SQL
+    // Editor, or by a future scheduled job — has nobody to exclude, so the
+    // whole audience is notified. Asserted so the behaviour is a decision on
+    // the record rather than an accident of `is distinct from null`.
+    {
+      const { data: posted, error } = await admin
+        .from("announcements")
+        .insert({
+          title: "Fan-out test — no author",
+          body_md: "Authorless announcements notify the entire audience.",
+          audience: "staff",
+          notify: true,
+        })
+        .select()
+        .single();
+
+      check("admin can post an authorless announcement", !error && Boolean(posted), error?.message);
+
+      if (posted) {
+        const adminNotifs = await admin
+          .from("notifications")
+          .select("id")
+          .eq("type", "announcement");
+        check(
+          "an authorless announcement notifies the whole audience, admin included",
+          (adminNotifs.data?.length ?? 0) === 1,
+          `saw ${adminNotifs.data?.length}`,
+        );
+
+        const parentNotifs = await parent
+          .from("notifications")
+          .select("id")
+          .eq("type", "announcement");
+        check(
+          "audience still holds — the parent is not notified of a staff-only post",
+          (parentNotifs.data?.length ?? 0) === 0,
+          `saw ${parentNotifs.data?.length}`,
         );
 
         await admin.from("announcements").delete().eq("id", posted.id);
