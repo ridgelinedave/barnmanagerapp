@@ -88,7 +88,12 @@ export const barn = {
     // Phase 1 slice 1 — shipped. Migration 0005 applied, policy suite green
     // (106 passed / 0 failed / 0 skipped).
     announcements: true,
-    clockIn: false,
+    /**
+     * Phase 1 slice 4 — shipped. Migration 0009 applied (including the
+     * punched_at hardening from the audit), policy suite green
+     * (281 passed / 0 failed / 0 skipped).
+     */
+    clockIn: true,
     // Phase 1 slice 2 — shipped. Migration 0006 applied, policy suite green
     // (137 passed / 0 failed / 0 skipped).
     tasks: true,

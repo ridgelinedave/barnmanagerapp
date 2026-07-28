@@ -2183,7 +2183,83 @@ async function main() {
         );
       }
 
-      // (2) Staff cannot punch for anyone else, or forge a correction.
+      // (2) Staff cannot choose WHEN their punch happened.
+      //
+      // Paid hours must not be client-assertable: without this, anyone holding
+      // the publishable key could POST a punch dated to last Tuesday.
+      {
+        const backdated = new Date(Date.now() - 3 * 86_400_000).toISOString();
+
+        // POSITIVE CONTROL — punched_at really is settable, and a supplied time
+        // really does survive. Without this, "staff cannot backdate" would pass
+        // just as happily against a column that ignored the field for everyone.
+        const adminBackdated = await admin
+          .from("punches")
+          .insert({
+            profile_id: users.staff.profileId,
+            direction: "in",
+            punched_at: backdated,
+            source: "admin_adjustment",
+            adjusts_punch_id: inPunch.data.id,
+            note: "Backdated correction — the whole point of an adjustment",
+          })
+          .select()
+          .single();
+        check(
+          "POSITIVE CONTROL — an admin correction keeps the time it was given",
+          !adminBackdated.error &&
+            Math.abs(Date.parse(adminBackdated.data.punched_at) - Date.parse(backdated)) < 1000,
+          adminBackdated.error?.message ?? `got ${adminBackdated.data?.punched_at}`,
+        );
+        if (adminBackdated.data) madePunches.push(adminBackdated.data.id);
+
+        // The same field, from staff: silently overwritten with now().
+        const staffBackdated = await staff
+          .from("punches")
+          .insert({
+            profile_id: users.staff.profileId,
+            direction: "out",
+            punched_at: backdated,
+          })
+          .select()
+          .single();
+        check(
+          "staff CAN still punch when they send a bogus time",
+          !staffBackdated.error,
+          staffBackdated.error?.message,
+        );
+        if (staffBackdated.data) madePunches.push(staffBackdated.data.id);
+
+        const drift = staffBackdated.data
+          ? Math.abs(Date.parse(staffBackdated.data.punched_at) - Date.now())
+          : Infinity;
+        check(
+          "a backdated staff punch is recorded at ~now(), not the time it claimed",
+          drift < 60_000,
+          `recorded ${staffBackdated.data?.punched_at} — ${Math.round(drift / 1000)}s from now`,
+        );
+
+        // And forward, which is the direction that inflates a timesheet.
+        const future = new Date(Date.now() + 6 * 3600_000).toISOString();
+        const staffFuture = await staff
+          .from("punches")
+          .insert({
+            profile_id: users.staff.profileId,
+            direction: "in",
+            punched_at: future,
+          })
+          .select()
+          .single();
+        if (staffFuture.data) madePunches.push(staffFuture.data.id);
+        check(
+          "a forward-dated staff punch is also recorded at ~now()",
+          Boolean(staffFuture.data) &&
+            Math.abs(Date.parse(staffFuture.data.punched_at) - Date.now()) < 60_000,
+          `recorded ${staffFuture.data?.punched_at}`,
+        );
+      }
+
+      // (3) Staff cannot punch for anyone else, or forge a correction.
       check(
         "POSITIVE CONTROL — another profile exists to attempt against",
         Boolean(users.admin.profileId) && users.admin.profileId !== users.staff.profileId,
@@ -2232,7 +2308,7 @@ async function main() {
         check("staff CANNOT attach adjusts_punch_id to their own punch", !mode.startsWith("ALLOWED"), mode);
       }
 
-      // (3) One employee's hours are not another's business.
+      // (4) One employee's hours are not another's business.
       {
         const adminPunch = await admin
           .from("punches")
@@ -2261,7 +2337,7 @@ async function main() {
         );
       }
 
-      // (4) Pay periods and approvals are the barn's to manage.
+      // (5) Pay periods and approvals are the barn's to manage.
       const staffWrites = [
         ["INSERT a pay period", staff.from("pay_periods").insert({ start_date: "2026-02-02", end_date: "2026-02-08" }).select()],
         ["UPDATE a pay period", staff.from("pay_periods").update({ status: "approved" }).eq("id", period.data.id).select()],
@@ -2295,7 +2371,7 @@ async function main() {
         );
       }
 
-      // (5) Parents and anon have no business in payroll at all.
+      // (6) Parents and anon have no business in payroll at all.
       for (const table of ["punches", "pay_periods", "timesheet_approvals"]) {
         check(`parent sees 0 rows in ${table}`, (await visibleIds(parent, table)).ids.length === 0);
         check(`anon sees 0 rows in ${table}`, (await visibleIds(anon, table)).ids.length === 0);

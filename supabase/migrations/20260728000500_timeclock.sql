@@ -248,6 +248,27 @@ begin
       using errcode = '42501';
   end if;
 
+  -- A self-punch happens NOW, whatever the client says.
+  --
+  -- Until this, punched_at was whatever the caller supplied. The app sends the
+  -- real time, but the app is not the only way in: a staff member with their
+  -- own publishable key could POST a punch dated to last Tuesday, or three
+  -- hours from now, and the row would be indistinguishable from a real one.
+  -- Paid hours must not be client-assertable.
+  --
+  -- Overwritten rather than rejected, so a few seconds of clock skew or network
+  -- latency is not an error the person on the yard has to understand.
+  --
+  -- Admin adjustments deliberately keep their supplied time: correcting a
+  -- forgotten clock-out to 5pm yesterday is the entire point of an adjustment,
+  -- and that path is admin-only and carries a mandatory note.
+  --
+  -- NOTE for a future offline queue: if punches are ever recorded while the
+  -- phone has no signal and posted later, this has to become "trust the client
+  -- time, but only within a tolerance", or every queued punch lands at sync
+  -- time. Not a problem today — nothing queues.
+  new.punched_at := now();
+
   return new;
 end;
 $$;
