@@ -44,7 +44,10 @@ export default async function HomePage() {
   // An offered seat is time-sensitive and someone else may be about to take it,
   // so it sits above everything else on Home. RLS scopes offers to this
   // family's riders, so this is empty for staff and admin.
-  const offers = featureEnabled("lessons") && role === "parent" ? await listOffers({ outstandingOnly: true }) : [];
+  const offers =
+    featureEnabled("lessons") && role === "parent"
+      ? await listOffers({ outstandingOnly: true, recentlyAnsweredMinutes: 10 })
+      : [];
   const offerInstances = offers.length
     ? await listUpcomingInstances(barnToday(), addBarnDays(barnToday(), 28))
     : [];
@@ -52,9 +55,13 @@ export default async function HomePage() {
   const offerRiderNames = new Map(offerRiders.map((r) => [r.id, r.name]));
   const offerInstanceById = new Map(offerInstances.map((i) => [i.id, i]));
 
-  const liveOffers = offers
-    .map((offer) => ({ offer, instance: offerInstanceById.get(offer.instance_id) }))
-    .filter((entry) => entry.instance && entry.instance.status === "scheduled");
+  const offerCards = offers.map((offer) => {
+    const instance = offerInstanceById.get(offer.instance_id) ?? null;
+    return {
+      offer,
+      instance: instance && instance.status === "scheduled" ? instance : null,
+    };
+  });
 
   return (
     <TabPage title="Home">
@@ -62,11 +69,12 @@ export default async function HomePage() {
         Signed in to {barn.name} as <span className="font-semibold capitalize">{role}</span>.
       </p>
 
-      {liveOffers.map(({ offer, instance }) => (
+      {offerCards.map(({ offer, instance }) => (
         <BackfillOfferCard
           key={offer.id}
           offerId={offer.id}
-          instance={instance!}
+          status={offer.status}
+          instance={instance}
           riderName={offerRiderNames.get(offer.rider_id) ?? "Your rider"}
         />
       ))}

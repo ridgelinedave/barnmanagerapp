@@ -3,23 +3,53 @@
 import { useActionState } from "react";
 import { respondToOffer, type OfferState } from "@/app/(app)/lessons/actions";
 import { formatBarnDayLabel, formatTime } from "@/lib/dates";
-import type { LessonInstance } from "@/lib/types";
+import type { BackfillOfferStatus, LessonInstance } from "@/lib/types";
 
 /**
- * "A spot opened — Accept or Decline."
+ * "A spot opened — Accept or Decline", and afterwards, what happened.
  *
- * Two buttons, one decision, nothing else on the card (SPEC §7: one decision
- * per screen). The outcome text comes back from the database, because whether
- * the parent actually got the seat is only known after the race is resolved.
+ * The resolved outcome is rendered IN PLACE rather than the card disappearing.
+ * Two things make that work together:
+ *
+ *  - the server keeps recently-answered offers in the list for a few minutes,
+ *    so a re-render or a refresh still shows the result; and
+ *  - the outcome text is derived from the offer's own status, falling back to
+ *    the action's message for the instant right after the tap.
+ *
+ * The result is therefore real state, not a toast that vanishes on the next
+ * render. A parent who accepts and immediately pulls to refresh still sees
+ * "You got the spot".
  */
+const OUTCOME: Record<Exclude<BackfillOfferStatus, "sent">, { title: string; body: string }> = {
+  accepted: {
+    title: "You got the spot",
+    body: "It's confirmed and added to your lessons.",
+  },
+  declined: {
+    title: "You declined this spot",
+    body: "No problem — we'll let you know when the next one opens.",
+  },
+  expired: {
+    title: "That spot has gone",
+    body: "Another rider accepted first. We'll offer you the next one.",
+  },
+};
+
 export function BackfillOfferCard({
   offerId,
+  status,
   instance,
   riderName,
   instructorName,
 }: {
   offerId: string;
-  instance: LessonInstance;
+  status: BackfillOfferStatus;
+  /**
+   * Null once an offer is declined or expired: the family's sight of the
+   * lesson lasts only while the offer is outstanding, so the card renders the
+   * outcome without the details it can no longer read.
+   */
+  instance: LessonInstance | null;
   riderName: string;
   instructorName?: string;
 }) {
@@ -28,23 +58,45 @@ export function BackfillOfferCard({
     message: null,
   });
 
+  const resolved = status !== "sent";
+  const outcome = resolved ? OUTCOME[status] : null;
+
   return (
-    <article className="rounded-2xl border-2 border-brand-gold bg-white p-4">
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-brand-gold-deep">
-        A spot opened up
+    <article
+      className={`rounded-2xl border-2 p-4 ${
+        resolved ? "border-brand-ink/15 bg-white" : "border-brand-gold bg-white"
+      }`}
+    >
+      <p
+        className={`text-[11px] font-semibold uppercase tracking-wide ${
+          resolved ? "text-brand-ink/50" : "text-brand-gold-deep"
+        }`}
+      >
+        {resolved ? "Backfill spot" : "A spot opened up"}
       </p>
 
       <h3 className="mt-1 text-base font-semibold">{riderName}</h3>
-      <p className="mt-0.5 text-sm text-brand-ink/75">
-        {formatBarnDayLabel(instance.date)} · {formatTime(instance.start_time)} ·{" "}
-        {instance.duration_min} min {instance.type === "private" ? "private" : "group"}
-      </p>
-      {instructorName && <p className="text-sm text-brand-ink/60">with {instructorName}</p>}
 
-      {state.message ? (
-        <p role="status" className="mt-3 rounded-xl bg-green-50 p-3 text-sm text-green-900">
-          {state.message}
-        </p>
+      {instance ? (
+        <>
+          <p className="mt-0.5 text-sm text-brand-ink/75">
+            {formatBarnDayLabel(instance.date)} · {formatTime(instance.start_time)} ·{" "}
+            {instance.duration_min} min {instance.type === "private" ? "private" : "group"}
+          </p>
+          {instructorName && <p className="text-sm text-brand-ink/60">with {instructorName}</p>}
+        </>
+      ) : null}
+
+      {resolved ? (
+        <div
+          role="status"
+          className={`mt-3 rounded-xl p-3 text-sm ${
+            status === "accepted" ? "bg-green-50 text-green-900" : "bg-brand-ink/5 text-brand-ink/80"
+          }`}
+        >
+          <span className="block font-semibold">{state.message ?? outcome?.title}</span>
+          {!state.message && outcome && <span className="block">{outcome.body}</span>}
+        </div>
       ) : (
         <>
           {state.error && (

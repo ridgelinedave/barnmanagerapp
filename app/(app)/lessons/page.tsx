@@ -12,7 +12,6 @@ import {
 import { listAssignableProfiles, nameMap } from "@/lib/tasks";
 import { addBarnDays, barnToday, isInsideBackfillCutoff } from "@/lib/dates";
 import { barn, featureEnabled } from "@/config/barn";
-import type { LessonInstance } from "@/lib/types";
 
 export const metadata = { title: "Lessons" };
 
@@ -60,25 +59,30 @@ export default async function LessonsPage() {
   const cancelled = cards.filter(({ booking }) => booking.status === "cancelled");
 
   // Outstanding offers first — they are time-sensitive and someone else may be
-  // about to take the seat. RLS scopes these to this family's riders.
-  const outstandingOffers = await listOffers({ outstandingOnly: true });
-  const liveOffers = outstandingOffers
-    .map((offer) => ({ offer, instance: instanceById.get(offer.instance_id) }))
-    .filter(
-      (entry): entry is { offer: (typeof outstandingOffers)[number]; instance: LessonInstance } =>
-        Boolean(entry.instance) && entry.instance!.status === "scheduled",
-    );
+  // about to take the seat. Recently-answered ones ride along so the outcome
+  // stays on screen instead of the card vanishing; see listOffers().
+  const offers = await listOffers({ outstandingOnly: true, recentlyAnsweredMinutes: 10 });
+  const offerCards = offers.map((offer) => {
+    const instance = instanceById.get(offer.instance_id) ?? null;
+    return {
+      offer,
+      // A cancelled lesson is not worth offering; a resolved offer keeps its
+      // card even when the lesson is no longer readable.
+      instance: instance && instance.status === "scheduled" ? instance : null,
+    };
+  });
 
   return (
     <TabPage title="Lessons">
-      {liveOffers.map(({ offer, instance }) => (
+      {offerCards.map(({ offer, instance }) => (
         <BackfillOfferCard
           key={offer.id}
           offerId={offer.id}
+          status={offer.status}
           instance={instance}
           riderName={riderNames.get(offer.rider_id) ?? "Your rider"}
           instructorName={
-            instance.instructor_id ? instructorNames.get(instance.instructor_id) : undefined
+            instance?.instructor_id ? instructorNames.get(instance.instructor_id) : undefined
           }
         />
       ))}

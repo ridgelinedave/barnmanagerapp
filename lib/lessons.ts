@@ -89,6 +89,18 @@ export async function listLessonTemplates(): Promise<LessonTemplate[]> {
 export async function listOffers(options?: {
   instanceIds?: string[];
   outstandingOnly?: boolean;
+  /**
+   * Also include offers answered in the last N minutes.
+   *
+   * Without this, answering an offer makes the card vanish: the page
+   * revalidates, the offer is no longer 'sent', the component unmounts and
+   * takes its confirmation message with it. The parent taps Accept and watches
+   * the thing disappear, which reads as "did that work?" on the one screen
+   * where it matters most. Carrying the answered offer for a few minutes turns
+   * the outcome into real state that survives a refresh, rather than a toast
+   * that lives only in React.
+   */
+  recentlyAnsweredMinutes?: number;
 }): Promise<BackfillOffer[]> {
   if (!supabaseConfigured()) return [];
 
@@ -99,7 +111,15 @@ export async function listOffers(options?: {
     if (options.instanceIds.length === 0) return [];
     query = query.in("instance_id", options.instanceIds);
   }
-  if (options?.outstandingOnly) query = query.eq("status", "sent");
+
+  if (options?.outstandingOnly) {
+    const since = options.recentlyAnsweredMinutes
+      ? new Date(Date.now() - options.recentlyAnsweredMinutes * 60_000).toISOString()
+      : null;
+    query = since
+      ? query.or(`status.eq.sent,responded_at.gte.${since}`)
+      : query.eq("status", "sent");
+  }
 
   const { data, error } = await query.order("created_at", { ascending: false });
   if (error) return [];
