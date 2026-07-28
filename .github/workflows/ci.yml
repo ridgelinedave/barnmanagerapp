@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    name: Typecheck, lint, build, leak check
+    runs-on: ubuntu-latest
+
+    env:
+      # Placeholder values so `next build` can compile. CI never touches a real
+      # database — nothing here grants access to anything.
+      NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      # Runs AFTER the build so it can scan the real client bundle, not just
+      # the source. Fails if the service role key is reachable from a browser.
+      - name: Service-key leak check
+        run: npm run check:leak
+
+  policy-tests:
+    name: RLS policy tests
+    runs-on: ubuntu-latest
+    # Only runs where a Supabase project is configured. Add these repository
+    # secrets once Part 2 is done, then drop the `if:` guard.
+    if: ${{ vars.SUPABASE_CONFIGURED == 'true' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Write env
+        run: |
+          cat > .env.local <<'EOF'
+          NEXT_PUBLIC_SUPABASE_URL=${{ secrets.SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          EOF
+
+      - name: Seed fixtures
+        run: npm run db:seed
+
+      - name: Policy tests
+        run: npm run test:policies
