@@ -804,6 +804,17 @@ async function main() {
       const today = new Date().toISOString().slice(0, 10);
       const created = [];
 
+      // Paused on purpose: the generator ignores inactive templates, so this one
+      // exists solely to give the staff task something to be detached FROM.
+      // Without a template attached, "staff cannot detach it from its template"
+      // is a no-op update that the trigger has no reason to block — the
+      // assertion would pass while testing nothing.
+      const pausedTemplate = await admin
+        .from("task_templates")
+        .insert({ title: "Policy test template (paused)", recurrence: "daily", active: false })
+        .select()
+        .single();
+
       // A task belonging to the staff fixture, and one belonging to the admin.
       const mine = await admin
         .from("tasks")
@@ -811,10 +822,16 @@ async function main() {
           title: "Policy test — staff's own task",
           date: today,
           assignee: users.staff.profileId,
+          template_id: pausedTemplate.data?.id ?? null,
         })
         .select()
         .single();
       check("admin can create a task", !mine.error && Boolean(mine.data), mine.error?.message);
+      check(
+        "the staff fixture task IS attached to a template (keeps the detach case real)",
+        Boolean(mine.data?.template_id),
+        "template_id is null — the detach assertion below would be vacuous",
+      );
       if (mine.data) created.push(mine.data.id);
 
       const theirs = await admin
@@ -1000,10 +1017,11 @@ async function main() {
       }
 
       // Clean up: remove the fixtures this section made, including any tasks the
-      // generator produced from the test template.
-      if (template.data) {
-        await admin.from("tasks").delete().eq("template_id", template.data.id);
-        await admin.from("task_templates").delete().eq("id", template.data.id);
+      // generator produced from the test templates.
+      for (const tpl of [template.data, pausedTemplate.data]) {
+        if (!tpl) continue;
+        await admin.from("tasks").delete().eq("template_id", tpl.id);
+        await admin.from("task_templates").delete().eq("id", tpl.id);
       }
       for (const id of created) await admin.from("tasks").delete().eq("id", id);
     }
