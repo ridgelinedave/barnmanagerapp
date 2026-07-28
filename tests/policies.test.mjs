@@ -1400,6 +1400,486 @@ async function main() {
     }
   }
 
+  // ===========================================================================
+  // backfill engine (Phase 1, slice 3b)
+  //
+  // The seat race is the reason this lives in the database. The concurrency
+  // case below fires two accepts for one seat SIMULTANEOUSLY (Promise.all, not
+  // sequentially) — run them one after the other and the test passes against a
+  // completely unlocked implementation, which is the trap this whole slice was
+  // split out to avoid.
+  // ===========================================================================
+  {
+    const probe = await admin.from("backfill_offers").select("id").limit(1);
+
+    if (probe.error && /schema cache|does not exist/i.test(probe.error.message)) {
+      console.log("\n\n═══ backfill — SKIPPED ═══");
+      console.log("  Migration 0008 is not applied yet.");
+      console.log("  Paste supabase/migrations/20260728000400_backfill.sql, then re-run.");
+      skipped += 1;
+    } else {
+      console.log("\n\n═══ backfill — ALLOW ═══\n");
+
+      const today = new Date().toISOString().slice(0, 10);
+      const madeInstances = [];
+
+      // Level the two fixture riders onto the same rung so both are eligible.
+      const { data: levels } = await admin.from("levels").select("id, name").order("sort");
+      const levelId = levels?.[1]?.id ?? levels?.[0]?.id ?? null;
+      await admin.from("riders").update({ level_id: levelId }).eq("id", riderId);
+      await admin.from("riders").update({ level_id: levelId }).eq("id", controlRiderId);
+
+      const newInstance = async (startTime, seats = 1) => {
+        const { data } = await admin
+          .from("lesson_instances")
+          .insert({
+            template_id: null,
+            date: today,
+            start_time: startTime,
+            duration_min: 45,
+            type: "private",
+            level_id: levelId,
+            max_riders: seats,
+          })
+          .select()
+          .single();
+        if (data) madeInstances.push(data.id);
+        return data;
+      };
+
+      // --- eligibility ------------------------------------------------------
+      const elig = await newInstance("14:00:00");
+      {
+        const { data, error } = await admin.rpc("eligible_backfill_riders", {
+          instance: elig.id,
+        });
+        const ids = (data ?? []).map((r) => r.id);
+        check(
+          "eligibility includes both same-level riders on an empty lesson",
+          !error && ids.includes(riderId) && ids.includes(controlRiderId),
+          error?.message ?? `saw ${ids.length}`,
+        );
+      }
+      {
+        // Booking one of them must remove them from the eligible list.
+        await admin
+          .from("lesson_riders")
+          .insert({ instance_id: elig.id, rider_id: riderId, status: "booked" });
+        const { data } = await admin.rpc("eligible_backfill_riders", { instance: elig.id });
+        const ids = (data ?? []).map((r) => r.id);
+        check(
+          "a rider already in the lesson is NOT eligible",
+          !ids.includes(riderId) && ids.includes(controlRiderId),
+        );
+      }
+      {
+        // A different level must exclude a rider.
+        const otherLevel = levels?.find((l) => l.id !== levelId)?.id ?? null;
+        if (otherLevel) {
+          await admin.from("riders").update({ level_id: otherLevel }).eq("id", controlRiderId);
+          const { data } = await admin.rpc("eligible_backfill_riders", { instance: elig.id });
+          check(
+            "a rider at a different level is NOT eligible",
+            !(data ?? []).map((r) => r.id).includes(controlRiderId),
+          );
+          await admin.from("riders").update({ level_id: levelId }).eq("id", controlRiderId);
+        }
+      }
+
+      // --- a parent accepts their own offer ---------------------------------
+      const solo = await newInstance("15:00:00");
+      {
+        const sent = await admin.rpc("send_backfill_offers", {
+          instance: solo.id,
+          rider_ids: [riderId],
+        });
+        check("admin can send a backfill offer", !sent.error && sent.data === 1, sent.error?.message);
+
+        const { data: offer } = await admin
+          .from("backfill_offers")
+          .select("*")
+          .eq("instance_id", solo.id)
+          .eq("rider_id", riderId)
+          .maybeSingle();
+        check(
+          "POSITIVE CONTROL — the offer exists and is 'sent'",
+          offer?.status === "sent",
+          `saw ${offer?.status ?? "nothing"}`,
+        );
+
+        const parentSees = await parent
+          .from("backfill_offers")
+          .select("id")
+          .eq("id", offer?.id)
+          .maybeSingle();
+        check("parent CAN see their own offer", Boolean(parentSees.data));
+
+        const parentSeesLesson = await parent
+          .from("lesson_instances")
+          .select("id")
+          .eq("id", solo.id)
+          .maybeSingle();
+        check(
+          "parent CAN see the offered lesson (offer grants visibility)",
+          Boolean(parentSeesLesson.data),
+        );
+
+        const res = await parent.rpc("respond_to_backfill_offer", {
+          offer: offer?.id,
+          accept: true,
+        });
+        check("parent CAN accept their own offer", res.data === "accepted", res.error?.message ?? String(res.data));
+
+        const { data: booking } = await admin
+          .from("lesson_riders")
+          .select("status")
+          .eq("instance_id", solo.id)
+          .eq("rider_id", riderId)
+          .maybeSingle();
+        check(
+          "accepting books the rider as 'backfilled'",
+          booking?.status === "backfilled",
+          `saw ${booking?.status ?? "nothing"}`,
+        );
+
+        const { data: after } = await admin
+          .from("backfill_offers")
+          .select("status, responded_at")
+          .eq("id", offer?.id)
+          .maybeSingle();
+        check("the offer is marked 'accepted' with a timestamp",
+          after?.status === "accepted" && Boolean(after?.responded_at));
+      }
+
+      // --- decline ----------------------------------------------------------
+      const declineInstance = await newInstance("16:00:00");
+      {
+        await admin.rpc("send_backfill_offers", {
+          instance: declineInstance.id,
+          rider_ids: [riderId],
+        });
+        const { data: offer } = await admin
+          .from("backfill_offers")
+          .select("id")
+          .eq("instance_id", declineInstance.id)
+          .maybeSingle();
+
+        const res = await parent.rpc("respond_to_backfill_offer", {
+          offer: offer?.id,
+          accept: false,
+        });
+        check("parent CAN decline an offer", res.data === "declined", res.error?.message);
+
+        const { data: seats } = await admin
+          .from("lesson_riders")
+          .select("id")
+          .eq("instance_id", declineInstance.id);
+        check("declining books nobody", (seats?.length ?? 0) === 0);
+      }
+
+      console.log("\n═══ backfill — RACE: two accepts, one seat ═══\n");
+
+      // The heart of the slice. One seat, two outstanding offers, both accepted
+      // at the same instant.
+      {
+        const contested = await newInstance("17:00:00", 1);
+
+        const sent = await admin.rpc("send_backfill_offers", {
+          instance: contested.id,
+          rider_ids: [riderId, controlRiderId],
+        });
+        check("two offers went out for one seat", sent.data === 2, `sent ${sent.data}`);
+
+        const { data: offers } = await admin
+          .from("backfill_offers")
+          .select("id, rider_id, status")
+          .eq("instance_id", contested.id);
+        check(
+          "POSITIVE CONTROL — the seat is open and both offers are 'sent'",
+          (offers ?? []).length === 2 &&
+            (offers ?? []).every((o) => o.status === "sent") &&
+            (await admin.rpc("instance_taken_seats", { instance: contested.id })).data === 0,
+        );
+
+        const offerMine = offers.find((o) => o.rider_id === riderId);
+        const offerTheirs = offers.find((o) => o.rider_id === controlRiderId);
+
+        // Fired together, not one after the other — sequential calls would pass
+        // even with no locking at all.
+        const [resA, resB] = await Promise.all([
+          parent.rpc("respond_to_backfill_offer", { offer: offerMine.id, accept: true }),
+          admin.rpc("respond_to_backfill_offer", { offer: offerTheirs.id, accept: true }),
+        ]);
+
+        const outcomes = [resA.data, resB.data].sort();
+        check(
+          "exactly one accept succeeds; the other is told the seat is gone",
+          outcomes.length === 2 &&
+            outcomes.includes("accepted") &&
+            (outcomes.includes("full") || outcomes.includes("expired")),
+          `outcomes: ${JSON.stringify([resA.data, resB.data])} errors: ${resA.error?.message ?? ""} ${resB.error?.message ?? ""}`,
+        );
+
+        const { data: seated } = await admin
+          .from("lesson_riders")
+          .select("rider_id, status")
+          .eq("instance_id", contested.id)
+          .in("status", ["booked", "backfilled"]);
+        check(
+          "max_riders is never exceeded — exactly one rider is seated",
+          (seated?.length ?? 0) === 1,
+          `seated ${seated?.length}`,
+        );
+
+        const { data: finalOffers } = await admin
+          .from("backfill_offers")
+          .select("status")
+          .eq("instance_id", contested.id);
+        const statuses = (finalOffers ?? []).map((o) => o.status).sort();
+        check(
+          "the losing offer is closed out, not left dangling as 'sent'",
+          statuses.length === 2 && statuses.includes("accepted") && !statuses.includes("sent"),
+          `statuses: ${JSON.stringify(statuses)}`,
+        );
+      }
+
+      console.log("\n═══ backfill — DENY (adversarial, each with a positive control) ═══\n");
+
+      // (1) Another family's offer.
+      const foreign = await newInstance("18:00:00");
+      {
+        await admin.rpc("send_backfill_offers", {
+          instance: foreign.id,
+          rider_ids: [controlRiderId],
+        });
+        const { data: offer } = await admin
+          .from("backfill_offers")
+          .select("id, status")
+          .eq("instance_id", foreign.id)
+          .maybeSingle();
+        check(
+          "POSITIVE CONTROL — the other family's offer exists and is 'sent'",
+          offer?.status === "sent",
+          `saw ${offer?.status ?? "nothing"}`,
+        );
+
+        await assertCannotSee(
+          "parent CANNOT see another family's offer",
+          parent,
+          "backfill_offers",
+          offer.id,
+        );
+
+        for (const [label, accept] of [
+          ["accept another family's offer", true],
+          ["decline another family's offer", false],
+        ]) {
+          const { error } = await parent.rpc("respond_to_backfill_offer", {
+            offer: offer.id,
+            accept,
+          });
+          check(`parent CANNOT ${label}`, Boolean(error), "no error raised");
+        }
+
+        const { data: untouched } = await admin
+          .from("backfill_offers")
+          .select("status")
+          .eq("id", offer.id)
+          .maybeSingle();
+        check(
+          "that offer is still 'sent' after the attempts",
+          untouched?.status === "sent",
+          `saw ${untouched?.status}`,
+        );
+      }
+
+      // (2) Direct table writes on offers.
+      {
+        const { data: myOffer } = await admin
+          .from("backfill_offers")
+          .select("id")
+          .eq("rider_id", riderId)
+          .limit(1)
+          .maybeSingle();
+        check("POSITIVE CONTROL — a real offer row for this family exists", Boolean(myOffer));
+
+        const mode = await refusalMode(
+          parent.from("backfill_offers").update({ status: "accepted" }).eq("id", myOffer.id).select(),
+        );
+        check("parent CANNOT directly UPDATE an offer to 'accepted'", !mode.startsWith("ALLOWED"), mode);
+
+        const forge = await refusalMode(
+          parent
+            .from("backfill_offers")
+            .insert({ instance_id: elig.id, rider_id: riderId, status: "sent" })
+            .select(),
+        );
+        check("parent CANNOT forge an offer", !forge.startsWith("ALLOWED"), forge);
+
+        const del = await refusalMode(
+          parent.from("backfill_offers").delete().eq("id", myOffer.id).select(),
+        );
+        check("parent CANNOT delete an offer", !del.startsWith("ALLOWED"), del);
+      }
+
+      // (3) The guard bypass must not be reachable from outside the engine.
+      {
+        const openSeat = await newInstance("19:00:00");
+        check("POSITIVE CONTROL — a lesson with a free seat exists", Boolean(openSeat));
+
+        const direct = await refusalMode(
+          parent
+            .from("lesson_riders")
+            .insert({ instance_id: openSeat.id, rider_id: riderId, status: "backfilled" })
+            .select(),
+        );
+        check(
+          "parent CANNOT insert a 'backfilled' booking directly",
+          !direct.startsWith("ALLOWED"),
+          direct,
+        );
+
+        // And via the update path on a row they DO own.
+        await admin
+          .from("lesson_riders")
+          .insert({ instance_id: openSeat.id, rider_id: riderId, status: "booked" });
+        const { data: own } = await admin
+          .from("lesson_riders")
+          .select("id, status")
+          .eq("instance_id", openSeat.id)
+          .eq("rider_id", riderId)
+          .maybeSingle();
+        check(
+          "POSITIVE CONTROL — the parent owns a real booking on that lesson",
+          own?.status === "booked",
+        );
+        const promote = await refusalMode(
+          parent.from("lesson_riders").update({ status: "backfilled" }).eq("id", own.id).select(),
+        );
+        check(
+          "parent CANNOT promote their own booking to 'backfilled'",
+          !promote.startsWith("ALLOWED"),
+          promote,
+        );
+      }
+
+      // (4) Capacity cannot be exceeded, and a closed offer cannot be revived.
+      {
+        const full = await newInstance("20:00:00", 1);
+        await admin
+          .from("lesson_riders")
+          .insert({ instance_id: full.id, rider_id: controlRiderId, status: "booked" });
+        check(
+          "POSITIVE CONTROL — the lesson is now at capacity",
+          (await admin.rpc("instance_taken_seats", { instance: full.id })).data === 1,
+        );
+
+        const { error } = await admin.rpc("admin_assign_backfill", {
+          instance: full.id,
+          rider: riderId,
+        });
+        check("even an admin CANNOT overfill a lesson", Boolean(error), "no error raised");
+      }
+      {
+        const { data: declined } = await admin
+          .from("backfill_offers")
+          .select("id, status")
+          .eq("status", "declined")
+          .limit(1)
+          .maybeSingle();
+        check(
+          "POSITIVE CONTROL — a declined offer exists to attempt against",
+          declined?.status === "declined",
+        );
+        const res = await parent.rpc("respond_to_backfill_offer", {
+          offer: declined.id,
+          accept: true,
+        });
+        check(
+          "a declined offer CANNOT be accepted later",
+          res.data === "declined",
+          `returned ${JSON.stringify(res.data)}`,
+        );
+      }
+
+      // (5) Staff and anon.
+      {
+        const mode = await refusalMode(
+          staff
+            .from("backfill_offers")
+            .insert({ instance_id: elig.id, rider_id: riderId, status: "sent" })
+            .select(),
+        );
+        check("staff CANNOT create an offer", !mode.startsWith("ALLOWED"), mode);
+      }
+      {
+        const { error } = await staff.rpc("send_backfill_offers", {
+          instance: elig.id,
+          rider_ids: [controlRiderId],
+        });
+        check("staff CANNOT call send_backfill_offers", Boolean(error), "no error raised");
+      }
+      {
+        const { error } = await parent.rpc("admin_assign_backfill", {
+          instance: elig.id,
+          rider: riderId,
+        });
+        check("parent CANNOT call admin_assign_backfill", Boolean(error), "no error raised");
+      }
+      {
+        const { error } = await staff.rpc("enqueue_lesson_reminders", { target_date: today });
+        check("staff CANNOT call enqueue_lesson_reminders", Boolean(error), "no error raised");
+      }
+      check("anon sees 0 backfill offers", (await visibleIds(anon, "backfill_offers")).ids.length === 0);
+
+      // (5b) The internal primitives must not be reachable as RPC endpoints.
+      // Postgres grants EXECUTE to PUBLIC by default and PostgREST exposes
+      // every function in `public`, so forgetting to revoke these would let a
+      // parent seat any rider anywhere with one HTTP call.
+      {
+        const openSeat = await newInstance("21:00:00");
+        const { error } = await parent.rpc("backfill_book_rider", {
+          instance: openSeat.id,
+          rider: riderId,
+        });
+        check(
+          "parent CANNOT call backfill_book_rider directly (internal primitive)",
+          Boolean(error),
+          "no error raised — the primitive is exposed",
+        );
+        const { data: seated } = await admin
+          .from("lesson_riders")
+          .select("id")
+          .eq("instance_id", openSeat.id);
+        check("nobody was seated by that attempt", (seated?.length ?? 0) === 0);
+      }
+      {
+        const { error } = await parent.rpc("notify_admins", {
+          kind: "forged",
+          title: "Forged",
+          body: "x",
+          link_path: "/",
+        });
+        check("parent CANNOT call notify_admins directly", Boolean(error), "no error raised");
+      }
+
+      // (6) Reminders are idempotent.
+      {
+        const first = await admin.rpc("enqueue_lesson_reminders", { target_date: today });
+        check("admin CAN enqueue lesson reminders", !first.error, first.error?.message);
+        const second = await admin.rpc("enqueue_lesson_reminders", { target_date: today });
+        check(
+          "running reminders twice sends nothing the second time",
+          second.data === 0,
+          `second run created ${second.data}`,
+        );
+      }
+
+      // --- clean up ---------------------------------------------------------
+      for (const id of madeInstances) await admin.from("lesson_instances").delete().eq("id", id);
+    }
+  }
+
   // ---------------------------------------------------------------------------
   console.log(`\n\n${passed} passed, ${failures.length} failed${skipped ? `, ${skipped} section(s) skipped` : ""}`);
   if (failures.length > 0) {

@@ -1,15 +1,18 @@
 import { TabPage } from "@/components/TabPage";
 import { StubScreen } from "@/components/StubScreen";
 import { ParentLessonCard } from "@/components/ParentLessonCard";
+import { BackfillOfferCard } from "@/components/BackfillOfferCard";
 import { requireTab } from "@/lib/guard";
 import {
   listUpcomingInstances,
   listLessonRidersForInstances,
   listVisibleRiders,
+  listOffers,
 } from "@/lib/lessons";
 import { listAssignableProfiles, nameMap } from "@/lib/tasks";
 import { addBarnDays, barnToday, isInsideBackfillCutoff } from "@/lib/dates";
 import { barn, featureEnabled } from "@/config/barn";
+import type { LessonInstance } from "@/lib/types";
 
 export const metadata = { title: "Lessons" };
 
@@ -56,8 +59,30 @@ export default async function LessonsPage() {
   const upcoming = cards.filter(({ booking }) => booking.status !== "cancelled");
   const cancelled = cards.filter(({ booking }) => booking.status === "cancelled");
 
+  // Outstanding offers first — they are time-sensitive and someone else may be
+  // about to take the seat. RLS scopes these to this family's riders.
+  const outstandingOffers = await listOffers({ outstandingOnly: true });
+  const liveOffers = outstandingOffers
+    .map((offer) => ({ offer, instance: instanceById.get(offer.instance_id) }))
+    .filter(
+      (entry): entry is { offer: (typeof outstandingOffers)[number]; instance: LessonInstance } =>
+        Boolean(entry.instance) && entry.instance!.status === "scheduled",
+    );
+
   return (
     <TabPage title="Lessons">
+      {liveOffers.map(({ offer, instance }) => (
+        <BackfillOfferCard
+          key={offer.id}
+          offerId={offer.id}
+          instance={instance}
+          riderName={riderNames.get(offer.rider_id) ?? "Your rider"}
+          instructorName={
+            instance.instructor_id ? instructorNames.get(instance.instructor_id) : undefined
+          }
+        />
+      ))}
+
       <h2 className="text-base font-semibold">Next 4 weeks</h2>
 
       {upcoming.length === 0 ? (

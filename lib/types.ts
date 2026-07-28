@@ -138,6 +138,30 @@ export type LessonInstance = {
   instructor_id: string | null;
   status: LessonInstanceStatus;
   notes: string;
+  /** Backfill eligibility filter. Null means any level may fill a seat. */
+  level_id: string | null;
+  /** Seat count, copied from the template so a later template edit can't rewrite history. */
+  max_riders: number;
+};
+
+export type BackfillOfferStatus = "sent" | "accepted" | "declined" | "expired";
+
+export type BackfillOffer = {
+  id: string;
+  created_at: string;
+  instance_id: string;
+  rider_id: string;
+  offered_by: string | null;
+  status: BackfillOfferStatus;
+  responded_at: string | null;
+};
+
+/** Row shape returned by the eligible_backfill_riders() RPC. */
+export type EligibleRider = {
+  id: string;
+  name: string;
+  level_id: string | null;
+  family_id: string;
 };
 
 export type LessonRiderStatus = "booked" | "cancelled" | "backfilled";

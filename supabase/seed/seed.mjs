@@ -210,6 +210,23 @@ async function main() {
   const controlRider = await ensureRider(controlFamily.id, CONTROL_RIDER_NAME);
   console.log(`  riders        ${rider.name}, ${controlRider.name}`);
 
+  // --- clear generated notifications ------------------------------------------
+  //
+  // Every notification type a feature or a test run can produce. Clearing these
+  // keeps per-user counts predictable and stops the table growing on every run;
+  // only the seeded 'phase0_fixture' rows are meant to persist. Runs
+  // unconditionally, so it still tidies up when a later table is missing.
+  for (const type of [
+    "announcement",
+    "lesson_cancelled",
+    "backfill_offer",
+    "backfill_result",
+    "lesson_reminder",
+  ]) {
+    const { error } = await supabase.from("notifications").delete().eq("type", type);
+    if (error) fail(`Could not clear '${type}' notifications`, error);
+  }
+
   // --- one notification per fixture user, so the tests can prove isolation -----
   for (const key of Object.keys(created)) {
     const { profileId } = created[key];
@@ -255,14 +272,6 @@ async function main() {
     } else if (probe.error) {
       fail("Could not read announcements", probe.error);
     } else {
-      // Clear fan-out notifications left by a previous test run so the
-      // per-user notification counts start from a known state.
-      const { error: clearError } = await supabase
-        .from("notifications")
-        .delete()
-        .eq("type", "announcement");
-      if (clearError) fail("Could not clear announcement notifications", clearError);
-
       const FIXTURES = [
         {
           key: "all",

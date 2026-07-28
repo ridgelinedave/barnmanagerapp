@@ -58,3 +58,53 @@ export async function cancelBooking(
       : "Cancelled, and the spot has been released for another rider.",
   };
 }
+
+/**
+ * Accept or decline an offered seat.
+ *
+ * All of the hard parts — who may answer, whether a seat is still free, and
+ * what happens to everybody else's outstanding offers — are decided inside
+ * respond_to_backfill_offer(), which serialises on the lesson row. Two parents
+ * tapping Accept at the same instant is the case that function exists for, so
+ * this action deliberately does no checking of its own; it would only be a
+ * second, weaker opinion.
+ */
+export type OfferState = { error: string | null; message: string | null };
+
+export async function respondToOffer(
+  _prev: OfferState,
+  formData: FormData,
+): Promise<OfferState> {
+  const offerId = String(formData.get("offer_id") ?? "");
+  const accept = formData.get("accept") === "true";
+  if (!offerId) return { error: "Missing offer.", message: null };
+
+  const state = await getViewer();
+  if (state.status !== "viewer") return { error: "You're not signed in.", message: null };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("respond_to_backfill_offer", {
+    offer: offerId,
+    accept,
+  });
+
+  if (error) return { error: error.message, message: null };
+
+  revalidatePath("/lessons");
+  revalidatePath("/home");
+  revalidatePath("/schedule");
+
+  switch (data) {
+    case "accepted":
+      return { error: null, message: "You've got the spot — see you there." };
+    case "declined":
+      return { error: null, message: "Thanks for letting us know." };
+    case "full":
+      return { error: null, message: "Another rider accepted first. We'll offer you the next one." };
+    case "unavailable":
+      return { error: null, message: "The barn cancelled that lesson, so the spot is gone." };
+    default:
+      // 'accepted'/'declined'/'expired' returned for an already-answered offer.
+      return { error: null, message: "That offer has already been answered." };
+  }
+}

@@ -102,9 +102,12 @@ export function BookRiderForm({
 export function OneOffLessonForm({
   date,
   instructors,
+  levels,
 }: {
   date: string;
   instructors: Option[];
+  /** Optional: a one-off with no level is open to any rider for backfill. */
+  levels: Option[];
 }) {
   const [state, formAction, pending] = useActionState(createOneOffInstance, EMPTY);
 
@@ -172,6 +175,42 @@ export function OneOffLessonForm({
             </option>
           ))}
         </select>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="oneoff-level" className="text-sm font-medium">
+          Level <span className="font-normal text-brand-ink/50">(optional)</span>
+        </label>
+        <select
+          id="oneoff-level"
+          name="level_id"
+          className="min-h-12 rounded-xl border border-brand-ink/20 bg-white px-3 text-base"
+        >
+          <option value="">Any level</option>
+          {levels.map((level) => (
+            <option key={level.id} value={level.id}>
+              {level.name}
+            </option>
+          ))}
+        </select>
+        <p className="text-xs text-brand-ink/55">
+          Limits who can be offered the spot if it opens up. Leave as Any to allow everyone.
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="oneoff-max" className="text-sm font-medium">
+          Maximum riders
+        </label>
+        <input
+          id="oneoff-max"
+          name="max_riders"
+          type="number"
+          min={1}
+          defaultValue={1}
+          className="min-h-12 rounded-xl border border-brand-ink/20 bg-white px-3 text-base"
+        />
+        <p className="text-xs text-brand-ink/55">Ignored for a private lesson, which is always one.</p>
       </div>
 
       <Feedback state={state} />

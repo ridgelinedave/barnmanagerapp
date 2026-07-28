@@ -3,8 +3,11 @@ import { TabPage } from "@/components/TabPage";
 import { StubScreen } from "@/components/StubScreen";
 import { InstallPrompt } from "@/components/InstallPrompt";
 import { AnnouncementCard } from "@/components/AnnouncementCard";
+import { BackfillOfferCard } from "@/components/BackfillOfferCard";
 import { currentRole } from "@/lib/guard";
 import { listAnnouncements } from "@/lib/announcements";
+import { listOffers, listUpcomingInstances, listVisibleRiders } from "@/lib/lessons";
+import { addBarnDays, barnToday } from "@/lib/dates";
 import { barn, featureEnabled } from "@/config/barn";
 
 export const metadata = { title: "Home" };
@@ -38,11 +41,35 @@ export default async function HomePage() {
   // lib/announcements.ts.
   const announcements = featureEnabled("announcements") ? await listAnnouncements(10) : [];
 
+  // An offered seat is time-sensitive and someone else may be about to take it,
+  // so it sits above everything else on Home. RLS scopes offers to this
+  // family's riders, so this is empty for staff and admin.
+  const offers = featureEnabled("lessons") && role === "parent" ? await listOffers({ outstandingOnly: true }) : [];
+  const offerInstances = offers.length
+    ? await listUpcomingInstances(barnToday(), addBarnDays(barnToday(), 28))
+    : [];
+  const offerRiders = offers.length ? await listVisibleRiders() : [];
+  const offerRiderNames = new Map(offerRiders.map((r) => [r.id, r.name]));
+  const offerInstanceById = new Map(offerInstances.map((i) => [i.id, i]));
+
+  const liveOffers = offers
+    .map((offer) => ({ offer, instance: offerInstanceById.get(offer.instance_id) }))
+    .filter((entry) => entry.instance && entry.instance.status === "scheduled");
+
   return (
     <TabPage title="Home">
       <p className="text-sm text-brand-ink/70">
         Signed in to {barn.name} as <span className="font-semibold capitalize">{role}</span>.
       </p>
+
+      {liveOffers.map(({ offer, instance }) => (
+        <BackfillOfferCard
+          key={offer.id}
+          offerId={offer.id}
+          instance={instance!}
+          riderName={offerRiderNames.get(offer.rider_id) ?? "Your rider"}
+        />
+      ))}
 
       <InstallPrompt />
 

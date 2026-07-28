@@ -2,22 +2,12 @@ import Link from "next/link";
 import { TabPage } from "@/components/TabPage";
 import { LessonTemplateForm } from "@/components/LessonTemplateForm";
 import { requireTab } from "@/lib/guard";
-import { listLessonTemplates } from "@/lib/lessons";
+import { listLessonTemplates, listLevels } from "@/lib/lessons";
 import { listAssignableProfiles, nameMap } from "@/lib/tasks";
-import { createClient } from "@/lib/supabase/server";
-import { supabaseConfigured } from "@/lib/env";
 import { formatTime, WEEKDAY_NAMES } from "@/lib/dates";
-import type { Level } from "@/lib/types";
 import { deleteLessonTemplate, setTemplateActive } from "./actions";
 
 export const metadata = { title: "Weekly schedule" };
-
-async function listLevels(): Promise<Level[]> {
-  if (!supabaseConfigured()) return [];
-  const supabase = await createClient();
-  const { data } = await supabase.from("levels").select("*").order("sort");
-  return (data ?? []) as Level[];
-}
 
 export default async function LessonTemplatesPage() {
   await requireTab("/manage");

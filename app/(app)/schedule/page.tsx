@@ -3,11 +3,15 @@ import { TabPage } from "@/components/TabPage";
 import { StubScreen } from "@/components/StubScreen";
 import { LessonCard } from "@/components/LessonCard";
 import { BookRiderForm, GenerateInstancesButton, OneOffLessonForm } from "@/components/ScheduleAdmin";
+import { FillSlotForm, SendRemindersButton } from "@/components/FillSlotForm";
 import { requireTab, currentRole } from "@/lib/guard";
 import {
   listInstancesForDate,
   listLessonRidersForInstances,
   listVisibleRiders,
+  listOffers,
+  listEligibleRiders,
+  listLevels,
 } from "@/lib/lessons";
 import { listAssignableProfiles, nameMap } from "@/lib/tasks";
 import { addBarnDays, barnToday, formatBarnDayLabel } from "@/lib/dates";
@@ -45,7 +49,12 @@ export default async function SchedulePage({
   const instances = await listInstancesForDate(date);
   const bookings = await listLessonRidersForInstances(instances.map((i) => i.id));
 
-  const [people, riders] = await Promise.all([listAssignableProfiles(), listVisibleRiders()]);
+  const [people, riders, levels] = await Promise.all([
+    listAssignableProfiles(),
+    listVisibleRiders(),
+    listLevels(),
+  ]);
+  const levelOptions = levels.map((l) => ({ id: l.id, name: l.name }));
   const instructorNames = nameMap(people);
   const riderNames = new Map(riders.map((r) => [r.id, r.name]));
   const riderOptions = riders.map((r) => ({ id: r.id, name: r.name }));
@@ -59,6 +68,32 @@ export default async function SchedulePage({
   }
 
   const isAdmin = role === "admin";
+
+  // Offers and eligibility are admin-only surfaces, and eligibility costs one
+  // round trip per lesson, so only fetch them for lessons that actually have a
+  // free seat.
+  const offers = isAdmin ? await listOffers({ instanceIds: instances.map((i) => i.id) }) : [];
+  const offersByInstance = new Map<string, typeof offers>();
+  for (const offer of offers) {
+    const list = offersByInstance.get(offer.instance_id) ?? [];
+    list.push(offer);
+    offersByInstance.set(offer.instance_id, list);
+  }
+
+  const takenSeats = (instanceId: string) =>
+    (bookingsByInstance.get(instanceId) ?? []).filter(
+      (b) => b.status === "booked" || b.status === "backfilled",
+    ).length;
+
+  const fillable = isAdmin
+    ? instances.filter((i) => i.status === "scheduled" && takenSeats(i.id) < i.max_riders)
+    : [];
+
+  const eligibleByInstance = new Map(
+    await Promise.all(
+      fillable.map(async (instance) => [instance.id, await listEligibleRiders(instance.id)] as const),
+    ),
+  );
 
   return (
     <TabPage title="Schedule">
@@ -105,6 +140,15 @@ export default async function SchedulePage({
           >
             {isAdmin && (
               <div className="flex flex-col gap-2">
+                {eligibleByInstance.has(instance.id) && (
+                  <FillSlotForm
+                    instanceId={instance.id}
+                    openSeats={instance.max_riders - takenSeats(instance.id)}
+                    eligible={eligibleByInstance.get(instance.id) ?? []}
+                    offers={offersByInstance.get(instance.id) ?? []}
+                    riderNames={riderNames}
+                  />
+                )}
                 <BookRiderForm instanceId={instance.id} riders={riderOptions} />
                 <form action={instance.status === "cancelled" ? restoreInstance : cancelInstance}>
                   <input type="hidden" name="id" value={instance.id} />
@@ -126,6 +170,7 @@ export default async function SchedulePage({
           <section className="flex flex-col gap-3 rounded-2xl border border-brand-ink/10 bg-white p-4">
             <h2 className="text-base font-semibold">Build the schedule</h2>
             <GenerateInstancesButton />
+            <SendRemindersButton date={date} />
             <Link
               href="/manage/lesson-templates"
               className="flex min-h-11 items-center justify-center rounded-xl border border-brand-ink/20 px-4 text-sm font-semibold"
@@ -136,7 +181,7 @@ export default async function SchedulePage({
 
           <section className="flex flex-col gap-3 rounded-2xl border border-brand-ink/10 bg-white p-4">
             <h2 className="text-base font-semibold">One-off on {formatBarnDayLabel(date)}</h2>
-            <OneOffLessonForm date={date} instructors={instructorOptions} />
+            <OneOffLessonForm date={date} instructors={instructorOptions} levels={levelOptions} />
           </section>
         </>
       )}
