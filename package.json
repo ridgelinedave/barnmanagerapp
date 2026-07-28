@@ -15,7 +15,8 @@
     "db:seed": "node --env-file=.env.local supabase/seed/seed.mjs",
     "test:policies": "node --env-file=.env.local tests/policies.test.mjs",
     "verify": "npm run typecheck && npm run lint && npm run build && npm run check:leak",
-    "db:verify": "node --env-file=.env.local scripts/db-verify.mjs"
+    "db:verify": "node --env-file=.env.local scripts/db-verify.mjs",
+    "db:apply": "node --env-file=.env.local scripts/db-apply.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "0.12.3",

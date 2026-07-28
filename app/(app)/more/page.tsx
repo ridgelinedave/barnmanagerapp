@@ -1,8 +1,9 @@
+import Link from "next/link";
 import { TabPage } from "@/components/TabPage";
 import { StubScreen } from "@/components/StubScreen";
 import { InstallPrompt } from "@/components/InstallPrompt";
 import { currentRole } from "@/lib/guard";
-import { barn } from "@/config/barn";
+import { barn, featureEnabled } from "@/config/barn";
 
 export const metadata = { title: "More" };
 
@@ -21,6 +22,23 @@ export default async function MorePage() {
       <StubScreen heading="More" phase="Phases 1–3">
         <p className="text-sm text-brand-ink/70">{MORE_BY_ROLE[role]}</p>
       </StubScreen>
+
+      {featureEnabled("clockIn") && role !== "parent" && (
+        <Link
+          href="/more/timesheet"
+          className="flex min-h-16 items-center gap-3 rounded-2xl border border-brand-ink/10 bg-white p-4"
+        >
+          <span className="flex-1">
+            <span className="block text-base font-semibold">My timesheet</span>
+            <span className="block text-sm text-brand-ink/60">
+              Your punches and approved hours.
+            </span>
+          </span>
+          <span aria-hidden="true" className="text-brand-ink/40">
+            ›
+          </span>
+        </Link>
+      )}
 
       <InstallPrompt />
 

@@ -210,6 +210,19 @@ async function main() {
   const controlRider = await ensureRider(controlFamily.id, CONTROL_RIDER_NAME);
   console.log(`  riders        ${rider.name}, ${controlRider.name}`);
 
+  // --- clear the time-clock ledger --------------------------------------------
+  //
+  // `punches` has no DELETE policy for any role — that immutability is the
+  // point of the table. The seed uses the service role, which is the one thing
+  // that legitimately sits outside RLS, so this is the only place fixture
+  // punches can be cleared between test runs.
+  for (const table of ["timesheet_approvals", "pay_periods", "punches"]) {
+    const probe = await supabase.from(table).select("id").limit(1);
+    if (probe.error && /schema cache|does not exist/i.test(probe.error.message)) continue;
+    const { error } = await supabase.from(table).delete().not("id", "is", null);
+    if (error) fail(`Could not clear ${table}`, error);
+  }
+
   // --- clear generated notifications ------------------------------------------
   //
   // Every notification type a feature or a test run can produce. Clearing these

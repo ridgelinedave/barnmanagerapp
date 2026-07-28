@@ -175,6 +175,43 @@ export type LessonRider = {
   cancelled_at: string | null;
 };
 
+export type PunchDirection = "in" | "out";
+export type PunchSource = "self" | "admin_adjustment";
+
+export type Punch = {
+  id: string;
+  created_at: string;
+  profile_id: string;
+  direction: PunchDirection;
+  punched_at: string;
+  lat: number | null;
+  lng: number | null;
+  source: PunchSource;
+  adjusts_punch_id: string | null;
+  note: string;
+};
+
+export type PayPeriodStatus = "open" | "approved" | "synced";
+
+export type PayPeriod = {
+  id: string;
+  created_at: string;
+  start_date: string;
+  end_date: string;
+  status: PayPeriodStatus;
+};
+
+export type TimesheetApproval = {
+  id: string;
+  created_at: string;
+  period_id: string;
+  profile_id: string;
+  total_minutes: number;
+  approved_by: string | null;
+  approved_at: string | null;
+  external_ref: unknown;
+};
+
 export type Notification = {
   id: string;
   profile_id: string;

@@ -2003,6 +2003,332 @@ async function main() {
   }
 
   // ===========================================================================
+  // time clock (Phase 1, slice 4)
+  //
+  // punches is an append-only ledger: it decides what people are paid, so the
+  // absence of any UPDATE or DELETE policy — for EVERY role, admin included —
+  // is the property under test. A correction is a new adjusting row; the
+  // original stays. If a later migration ever adds an update path, the deny
+  // cases here go red.
+  // ===========================================================================
+  {
+    const probe = await admin.from("punches").select("id").limit(1);
+
+    if (probe.error && /schema cache|does not exist/i.test(probe.error.message)) {
+      console.log("\n\n═══ time clock — SKIPPED ═══");
+      console.log("  Migration 0009 is not applied yet.");
+      skipped += 1;
+    } else {
+      console.log("\n\n═══ time clock — ALLOW ═══\n");
+
+      const madePunches = [];
+      const madePeriods = [];
+
+      // Staff clocking themselves in and out — the only write they have.
+      const inPunch = await staff
+        .from("punches")
+        .insert({
+          profile_id: users.staff.profileId,
+          direction: "in",
+          punched_at: new Date(Date.now() - 3 * 3600_000).toISOString(),
+        })
+        .select()
+        .single();
+      check("staff CAN clock in", !inPunch.error && Boolean(inPunch.data), inPunch.error?.message);
+      if (inPunch.data) madePunches.push(inPunch.data.id);
+
+      const outPunch = await staff
+        .from("punches")
+        .insert({
+          profile_id: users.staff.profileId,
+          direction: "out",
+          punched_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+      check("staff CAN clock out", !outPunch.error, outPunch.error?.message);
+      if (outPunch.data) madePunches.push(outPunch.data.id);
+
+      // A punch with no location must still be accepted — denying GPS cannot
+      // cost someone their shift.
+      {
+        const { error } = await staff
+          .from("punches")
+          .insert({
+            profile_id: users.staff.profileId,
+            direction: "in",
+            punched_at: new Date(Date.now() - 26 * 3600_000).toISOString(),
+            lat: null,
+            lng: null,
+          })
+          .select();
+        check("a punch with no location is still accepted", !error, error?.message);
+      }
+
+      check(
+        "staff CAN read their own punches",
+        (await visibleIds(staff, "punches")).ids.includes(inPunch.data?.id),
+      );
+      check(
+        "admin CAN read everyone's punches",
+        (await visibleIds(admin, "punches")).ids.includes(inPunch.data?.id),
+      );
+
+      // Admin corrections.
+      const correction = await admin
+        .from("punches")
+        .insert({
+          profile_id: users.staff.profileId,
+          direction: "out",
+          punched_at: new Date().toISOString(),
+          source: "admin_adjustment",
+          adjusts_punch_id: inPunch.data?.id,
+          note: "Forgot to clock out",
+        })
+        .select()
+        .single();
+      check("admin CAN insert a correction", !correction.error, correction.error?.message);
+      if (correction.data) madePunches.push(correction.data.id);
+
+      check(
+        "the corrected punch is still in the ledger",
+        Boolean(
+          (await admin.from("punches").select("id").eq("id", inPunch.data?.id).maybeSingle()).data,
+        ),
+      );
+
+      // Pay periods and approvals.
+      const period = await admin
+        .from("pay_periods")
+        .insert({ start_date: "2026-01-05", end_date: "2026-01-11" })
+        .select()
+        .single();
+      check("admin CAN open a pay period", !period.error, period.error?.message);
+      if (period.data) madePeriods.push(period.data.id);
+
+      const approval = await admin
+        .from("timesheet_approvals")
+        .insert({
+          period_id: period.data?.id,
+          profile_id: users.staff.profileId,
+          total_minutes: 480,
+          approved_by: users.admin.profileId,
+          approved_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+      check("admin CAN approve a timesheet", !approval.error, approval.error?.message);
+
+      check(
+        "staff CAN read their own approval",
+        (await visibleIds(staff, "timesheet_approvals")).ids.includes(approval.data?.id),
+      );
+      check(
+        "staff CAN read pay periods",
+        (await visibleIds(staff, "pay_periods")).ids.includes(period.data?.id),
+      );
+
+      console.log("\n═══ time clock — DENY (adversarial, each with a positive control) ═══\n");
+
+      // (1) The ledger is immutable — for staff AND for admin.
+      {
+        const own = await staff
+          .from("punches")
+          .select("id, punched_at")
+          .eq("id", inPunch.data.id)
+          .maybeSingle();
+        check(
+          "POSITIVE CONTROL — the staff member can see their own punch, so the row is reachable",
+          Boolean(own.data),
+        );
+
+        const edit = await refusalMode(
+          staff
+            .from("punches")
+            .update({ punched_at: new Date().toISOString() })
+            .eq("id", inPunch.data.id)
+            .select(),
+        );
+        check("staff CANNOT edit their own punch", !edit.startsWith("ALLOWED"), edit);
+
+        const del = await refusalMode(
+          staff.from("punches").delete().eq("id", inPunch.data.id).select(),
+        );
+        check("staff CANNOT delete their own punch", !del.startsWith("ALLOWED"), del);
+
+        // The admin is not exempt: this is an audit trail, not an admin's notes.
+        const adminEdit = await refusalMode(
+          admin
+            .from("punches")
+            .update({ note: "rewritten" })
+            .eq("id", inPunch.data.id)
+            .select(),
+        );
+        check("even an ADMIN cannot edit a punch", !adminEdit.startsWith("ALLOWED"), adminEdit);
+
+        const adminDel = await refusalMode(
+          admin.from("punches").delete().eq("id", inPunch.data.id).select(),
+        );
+        check("even an ADMIN cannot delete a punch", !adminDel.startsWith("ALLOWED"), adminDel);
+
+        const stillThere = await admin
+          .from("punches")
+          .select("punched_at, note")
+          .eq("id", inPunch.data.id)
+          .maybeSingle();
+        check(
+          "the punch survived every attempt, unchanged",
+          stillThere.data?.punched_at === inPunch.data.punched_at && stillThere.data?.note === "",
+          JSON.stringify(stillThere.data),
+        );
+      }
+
+      // (2) Staff cannot punch for anyone else, or forge a correction.
+      check(
+        "POSITIVE CONTROL — another profile exists to attempt against",
+        Boolean(users.admin.profileId) && users.admin.profileId !== users.staff.profileId,
+      );
+      {
+        const mode = await refusalMode(
+          staff
+            .from("punches")
+            .insert({
+              profile_id: users.admin.profileId,
+              direction: "in",
+              punched_at: new Date().toISOString(),
+            })
+            .select(),
+        );
+        check("staff CANNOT punch for another profile", !mode.startsWith("ALLOWED"), mode);
+      }
+      {
+        const mode = await refusalMode(
+          staff
+            .from("punches")
+            .insert({
+              profile_id: users.staff.profileId,
+              direction: "out",
+              punched_at: new Date().toISOString(),
+              source: "admin_adjustment",
+              adjusts_punch_id: inPunch.data.id,
+              note: "self-approved",
+            })
+            .select(),
+        );
+        check("staff CANNOT record a punch as an admin_adjustment", !mode.startsWith("ALLOWED"), mode);
+      }
+      {
+        const mode = await refusalMode(
+          staff
+            .from("punches")
+            .insert({
+              profile_id: users.staff.profileId,
+              direction: "in",
+              punched_at: new Date().toISOString(),
+              adjusts_punch_id: inPunch.data.id,
+            })
+            .select(),
+        );
+        check("staff CANNOT attach adjusts_punch_id to their own punch", !mode.startsWith("ALLOWED"), mode);
+      }
+
+      // (3) One employee's hours are not another's business.
+      {
+        const adminPunch = await admin
+          .from("punches")
+          .insert({
+            profile_id: users.admin.profileId,
+            direction: "in",
+            punched_at: new Date().toISOString(),
+            source: "admin_adjustment",
+            adjusts_punch_id: inPunch.data.id,
+            note: "control row on another profile",
+          })
+          .select()
+          .single();
+        check(
+          "POSITIVE CONTROL — a punch belonging to someone else exists and the admin can see it",
+          !adminPunch.error && Boolean(adminPunch.data),
+          adminPunch.error?.message,
+        );
+        if (adminPunch.data) madePunches.push(adminPunch.data.id);
+
+        await assertCannotSee(
+          "staff CANNOT read another employee's punch",
+          staff,
+          "punches",
+          adminPunch.data.id,
+        );
+      }
+
+      // (4) Pay periods and approvals are the barn's to manage.
+      const staffWrites = [
+        ["INSERT a pay period", staff.from("pay_periods").insert({ start_date: "2026-02-02", end_date: "2026-02-08" }).select()],
+        ["UPDATE a pay period", staff.from("pay_periods").update({ status: "approved" }).eq("id", period.data.id).select()],
+        ["DELETE a pay period", staff.from("pay_periods").delete().eq("id", period.data.id).select()],
+        [
+          "approve their own timesheet",
+          staff
+            .from("timesheet_approvals")
+            .insert({ period_id: period.data.id, profile_id: users.staff.profileId, total_minutes: 9999 })
+            .select(),
+        ],
+        [
+          "inflate an existing approval",
+          staff.from("timesheet_approvals").update({ total_minutes: 9999 }).eq("id", approval.data?.id).select(),
+        ],
+      ];
+      for (const [label, query] of staffWrites) {
+        const mode = await refusalMode(query);
+        check(`staff CANNOT ${label}`, !mode.startsWith("ALLOWED"), mode);
+      }
+      {
+        const after = await admin
+          .from("timesheet_approvals")
+          .select("total_minutes")
+          .eq("id", approval.data?.id)
+          .maybeSingle();
+        check(
+          "the approved total is untouched after those attempts",
+          after.data?.total_minutes === 480,
+          `saw ${after.data?.total_minutes}`,
+        );
+      }
+
+      // (5) Parents and anon have no business in payroll at all.
+      for (const table of ["punches", "pay_periods", "timesheet_approvals"]) {
+        check(`parent sees 0 rows in ${table}`, (await visibleIds(parent, table)).ids.length === 0);
+        check(`anon sees 0 rows in ${table}`, (await visibleIds(anon, table)).ids.length === 0);
+      }
+      {
+        const mode = await refusalMode(
+          parent
+            .from("punches")
+            .insert({
+              profile_id: users.parent.profileId,
+              direction: "in",
+              punched_at: new Date().toISOString(),
+            })
+            .select(),
+        );
+        check("parent CANNOT clock in", !mode.startsWith("ALLOWED"), mode);
+      }
+
+      // --- clean up ---------------------------------------------------------
+      // Pay periods and approvals can be removed (admin has a DELETE policy,
+      // and approvals cascade). Punches deliberately CANNOT be: there is no
+      // DELETE policy for anyone, which is the property this section exists to
+      // prove. They are cleared by `npm run db:seed`, which uses the service
+      // role — the one thing that legitimately sits outside RLS.
+      //
+      // That is also why nothing here counts punches absolutely: between two
+      // runs without a re-seed, the previous run's rows are still there.
+      for (const id of madePeriods) await admin.from("pay_periods").delete().eq("id", id);
+      void madePunches;
+    }
+  }
+
+  // ===========================================================================
   // STANDING GUARD — function exposure
   //
   // Data-driven from the migrations, so it covers functions added later without
