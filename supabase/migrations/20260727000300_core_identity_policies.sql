@@ -21,19 +21,23 @@ begin;
 -- =============================================================================
 -- levels — read-all-authenticated lookup; admin writes
 -- =============================================================================
+drop policy if exists "levels: read (all authenticated)" on public.levels;
 create policy "levels: read (all authenticated)"
   on public.levels for select to authenticated
   using (true);
 
+drop policy if exists "levels: admin insert" on public.levels;
 create policy "levels: admin insert"
   on public.levels for insert to authenticated
   with check ((select public."current_role"()) = 'admin');
 
+drop policy if exists "levels: admin update" on public.levels;
 create policy "levels: admin update"
   on public.levels for update to authenticated
   using ((select public."current_role"()) = 'admin')
   with check ((select public."current_role"()) = 'admin');
 
+drop policy if exists "levels: admin delete" on public.levels;
 create policy "levels: admin delete"
   on public.levels for delete to authenticated
   using ((select public."current_role"()) = 'admin');
@@ -44,6 +48,7 @@ create policy "levels: admin delete"
 --   staff  — read all (they work across every family)
 --   parent — read own family only
 -- =============================================================================
+drop policy if exists "families: read (admin/staff all, parent own)" on public.families;
 create policy "families: read (admin/staff all, parent own)"
   on public.families for select to authenticated
   using (
@@ -51,15 +56,18 @@ create policy "families: read (admin/staff all, parent own)"
     or id = (select public.current_family())
   );
 
+drop policy if exists "families: admin insert" on public.families;
 create policy "families: admin insert"
   on public.families for insert to authenticated
   with check ((select public."current_role"()) = 'admin');
 
+drop policy if exists "families: admin update" on public.families;
 create policy "families: admin update"
   on public.families for update to authenticated
   using ((select public."current_role"()) = 'admin')
   with check ((select public."current_role"()) = 'admin');
 
+drop policy if exists "families: admin delete" on public.families;
 create policy "families: admin delete"
   on public.families for delete to authenticated
   using ((select public."current_role"()) = 'admin');
@@ -73,6 +81,7 @@ create policy "families: admin delete"
 -- Parents have no write on riders: rider details are barn-maintained. Parent
 -- writes arrive in Phase 2 via onboarding form_submissions, not here.
 -- =============================================================================
+drop policy if exists "riders: read (admin/staff all, parent own family)" on public.riders;
 create policy "riders: read (admin/staff all, parent own family)"
   on public.riders for select to authenticated
   using (
@@ -80,15 +89,18 @@ create policy "riders: read (admin/staff all, parent own family)"
     or family_id = (select public.current_family())
   );
 
+drop policy if exists "riders: admin insert" on public.riders;
 create policy "riders: admin insert"
   on public.riders for insert to authenticated
   with check ((select public."current_role"()) = 'admin');
 
+drop policy if exists "riders: admin update" on public.riders;
 create policy "riders: admin update"
   on public.riders for update to authenticated
   using ((select public."current_role"()) = 'admin')
   with check ((select public."current_role"()) = 'admin');
 
+drop policy if exists "riders: admin delete" on public.riders;
 create policy "riders: admin delete"
   on public.riders for delete to authenticated
   using ((select public."current_role"()) = 'admin');
@@ -102,6 +114,7 @@ create policy "riders: admin delete"
 -- A parent may edit their own row, but MUST NOT be able to promote themselves.
 -- RLS is row-level, so the column protection is a trigger (below), not a policy.
 -- =============================================================================
+drop policy if exists "profiles: read (self, own family, or admin/staff)" on public.profiles;
 create policy "profiles: read (self, own family, or admin/staff)"
   on public.profiles for select to authenticated
   using (
@@ -110,10 +123,12 @@ create policy "profiles: read (self, own family, or admin/staff)"
     or (family_id is not null and family_id = (select public.current_family()))
   );
 
+drop policy if exists "profiles: admin insert" on public.profiles;
 create policy "profiles: admin insert"
   on public.profiles for insert to authenticated
   with check ((select public."current_role"()) = 'admin');
 
+drop policy if exists "profiles: update own row or admin" on public.profiles;
 create policy "profiles: update own row or admin"
   on public.profiles for update to authenticated
   using (
@@ -125,6 +140,7 @@ create policy "profiles: update own row or admin"
     or (select public."current_role"()) = 'admin'
   );
 
+drop policy if exists "profiles: admin delete" on public.profiles;
 create policy "profiles: admin delete"
   on public.profiles for delete to authenticated
   using ((select public."current_role"()) = 'admin');

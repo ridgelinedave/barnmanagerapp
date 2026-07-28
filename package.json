@@ -10,6 +10,8 @@
     "typecheck": "tsc --noEmit",
     "icons": "node scripts/generate-placeholder-icons.mjs",
     "check:leak": "node scripts/check-service-key-leak.mjs",
+    "db:probe": "node --env-file=.env.local scripts/probe-supabase.mjs",
+    "db:combine": "node scripts/build-combined-migration.mjs",
     "db:seed": "node --env-file=.env.local supabase/seed/seed.mjs",
     "test:policies": "node --env-file=.env.local tests/policies.test.mjs",
     "verify": "npm run typecheck && npm run lint && npm run build && npm run check:leak"

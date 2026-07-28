@@ -143,6 +143,14 @@ function claimsOf(token) {
 
 const JWT_PATTERN = /eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g;
 
+/**
+ * Supabase's current API keys are opaque prefixed strings, not JWTs, so the
+ * `role=service_role` claim check below never fires for them. `sb_secret_*` is
+ * the secret key and must never be shipped; `sb_publishable_*` is the anon key
+ * and is expected in the bundle, so it is deliberately NOT matched here.
+ */
+const SECRET_KEY_PREFIX = /sb_secret_[A-Za-z0-9_-]+/g;
+
 const bundleTargets = [join(root, ".next", "static"), join(root, "public")];
 let scannedFiles = 0;
 
@@ -172,6 +180,10 @@ for (const target of bundleTargets) {
         report(`A JWT claiming role=service_role is embedded in ${rel}.`);
       }
     }
+    if (SECRET_KEY_PREFIX.test(contents)) {
+      report(`A Supabase secret key (sb_secret_*) appears in client-served asset ${rel}.`);
+    }
+    SECRET_KEY_PREFIX.lastIndex = 0; // /g regexes are stateful across .test() calls
   }
 }
 

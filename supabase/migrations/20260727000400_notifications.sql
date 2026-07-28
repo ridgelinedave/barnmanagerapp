@@ -35,15 +35,18 @@ comment on table public.notifications is
 -- create them from a client; in practice they are inserted by server-side jobs
 -- using the service role, which bypasses RLS.
 -- -----------------------------------------------------------------------------
+drop policy if exists "notifications: read own" on public.notifications;
 create policy "notifications: read own"
   on public.notifications for select to authenticated
   using (profile_id = (select public.current_profile()));
 
+drop policy if exists "notifications: mark own read" on public.notifications;
 create policy "notifications: mark own read"
   on public.notifications for update to authenticated
   using (profile_id = (select public.current_profile()))
   with check (profile_id = (select public.current_profile()));
 
+drop policy if exists "notifications: admin insert" on public.notifications;
 create policy "notifications: admin insert"
   on public.notifications for insert to authenticated
   with check ((select public."current_role"()) = 'admin');
