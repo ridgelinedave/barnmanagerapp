@@ -120,7 +120,7 @@ export function AnnouncementForm({
         <button
           type="submit"
           disabled={pending}
-          className="min-h-12 flex-1 rounded-xl bg-brand-gold px-4 text-base font-semibold text-white disabled:opacity-60"
+          className="min-h-12 flex-1 rounded-xl bg-brand-gold px-4 text-base font-semibold text-brand-ink disabled:opacity-60"
         >
           {pending ? "Saving…" : submitLabel}
         </button>

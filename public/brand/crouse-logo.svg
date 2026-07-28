@@ -1,9 +1,0 @@
-<!--
-  PLACEHOLDER logo. Not a Crouse Equestrian brand asset.
-  Replace with Belle's real gold wordmark (transparent SVG or PNG) and keep the
-  path in /config/barn.ts pointing at it.
--->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Crouse Equestrian placeholder mark">
-  <rect width="64" height="64" rx="14" fill="#C7A24A"/>
-  <path d="M42 22a14 14 0 1 0 0 20" fill="none" stroke="#F6F1E7" stroke-width="7" stroke-linecap="round"/>
-</svg>

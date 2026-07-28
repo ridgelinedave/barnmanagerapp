@@ -24,7 +24,7 @@ export function TabBar({ role }: { role: Role }) {
                 href={tab.href}
                 aria-current={active ? "page" : undefined}
                 className={`flex min-h-14 flex-col items-center justify-center gap-1 px-1 py-2 text-[11px] font-medium ${
-                  active ? "text-brand-gold" : "text-brand-ink/60"
+                  active ? "text-brand-gold-deep" : "text-brand-ink/60"
                 }`}
               >
                 <svg

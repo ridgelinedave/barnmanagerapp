@@ -114,7 +114,7 @@ export function SignInForm() {
               setSent(false);
             }}
             className={`min-h-11 flex-1 rounded-lg text-sm font-semibold ${
-              mode === value ? "bg-brand-gold text-white" : "text-brand-ink/70"
+              mode === value ? "bg-brand-gold text-brand-ink" : "text-brand-ink/70"
             }`}
           >
             {label}
@@ -173,7 +173,7 @@ export function SignInForm() {
         <button
           type="submit"
           disabled={busy}
-          className="min-h-12 rounded-xl bg-brand-gold px-4 text-base font-semibold text-white disabled:opacity-60"
+          className="min-h-12 rounded-xl bg-brand-gold px-4 text-base font-semibold text-brand-ink disabled:opacity-60"
         >
           {busy ? "Working…" : mode === "magic" ? "Email me a link" : "Sign in"}
         </button>

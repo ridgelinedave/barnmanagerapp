@@ -15,7 +15,7 @@ export default async function ManageAnnouncementsPage() {
     <TabPage title="Announcements">
       <Link
         href="/manage/announcements/new"
-        className="flex min-h-12 items-center justify-center rounded-xl bg-brand-gold px-4 text-base font-semibold text-white"
+        className="flex min-h-12 items-center justify-center rounded-xl bg-brand-gold px-4 text-base font-semibold text-brand-ink"
       >
         New announcement
       </Link>

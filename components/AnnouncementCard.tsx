@@ -27,7 +27,7 @@ export function AnnouncementCard({
     >
       <div className="flex flex-wrap items-center gap-2">
         {pinned && (
-          <span className="rounded-full bg-brand-gold px-2 py-0.5 text-[11px] font-semibold text-white">
+          <span className="rounded-full bg-brand-gold px-2 py-0.5 text-[11px] font-semibold text-brand-ink">
             Pinned
           </span>
         )}

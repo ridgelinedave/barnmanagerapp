@@ -31,7 +31,7 @@ export function InstallPrompt() {
         <button
           type="button"
           onClick={() => void promptInstall()}
-          className="min-h-11 flex-1 rounded-xl bg-brand-gold px-4 text-sm font-semibold text-white"
+          className="min-h-11 flex-1 rounded-xl bg-brand-gold px-4 text-sm font-semibold text-brand-ink"
         >
           Install
         </button>

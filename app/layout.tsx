@@ -34,6 +34,7 @@ export const viewport: Viewport = {
 /** Brand tokens flow from /config/barn.ts into CSS, not the other way round. */
 const brandVars = {
   "--brand-gold": barn.brand.gold,
+  "--brand-gold-deep": barn.brand.goldDeep,
   "--brand-cream": barn.brand.cream,
   "--brand-ink": barn.brand.ink,
 } as CSSProperties;

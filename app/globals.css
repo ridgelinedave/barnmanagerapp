@@ -7,13 +7,17 @@
  * stylesheet is valid on its own.
  */
 :root {
-  --brand-gold: #c7a24a;
+  --brand-gold: #dabc51;
+  --brand-gold-deep: #776628;
   --brand-cream: #f6f1e7;
   --brand-ink: #2b2b2b;
 }
 
 @theme inline {
+  /* Surface gold — backgrounds and badges. Always pair with ink text. */
   --color-brand-gold: var(--brand-gold);
+  /* Text gold — links, active tab labels. Meets AA on cream and on white. */
+  --color-brand-gold-deep: var(--brand-gold-deep);
   --color-brand-cream: var(--brand-cream);
   --color-brand-ink: var(--brand-ink);
   --font-sans: var(--font-geist-sans);

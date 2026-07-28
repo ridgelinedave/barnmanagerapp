@@ -32,13 +32,35 @@ export const barn = {
   timezone: "America/New_York",
 
   brand: {
-    // PROVISIONAL — confirm exact hex with Belle / official brand assets before Phase 1.
-    // Read from the Squarespace site by eye; these are approximations, not brand values.
-    gold: "#C7A24A",
+    /**
+     * CONFIRMED — sampled from Belle's actual logo, not guessed.
+     *
+     * The mark is a metallic bevel, so its gold is a gradient: hue is locked
+     * around 47° and saturation around 0.63, but value runs 0.26 → 0.90 across
+     * 35 palette entries. `gold` is the single most-used gold pixel in the
+     * image, i.e. the tone the eye reads as "the Crouse gold".
+     */
+    gold: "#dabc51",
+
+    /**
+     * The shadow end of that same gradient — also straight from the logo, not
+     * invented. It exists because `gold` is a light tone: it scores 1.86:1
+     * against white and 1.65:1 on cream, so it is unusable for text. Gold is
+     * therefore a SURFACE colour (button and badge backgrounds, carrying ink
+     * text at 7.61:1) and `goldDeep` is the TEXT colour (5.02:1 on cream,
+     * 5.65:1 on white — both clear of the 4.5:1 AA floor).
+     *
+     * Accessibility outranks the design system when they disagree, so do not
+     * "simplify" this back to one gold.
+     */
+    goldDeep: "#776628",
+
+    // Chosen neutrals for the app surface. The crest itself is gold on
+    // charcoal/black; cream keeps long screens readable on a phone in daylight.
     cream: "#F6F1E7",
     ink: "#2B2B2B",
-    // PLACEHOLDER logo — replace with Belle's real wordmark (transparent SVG/PNG).
-    logoSrc: "/brand/crouse-logo.svg",
+
+    logoSrc: "/brand/crouse-logo.png",
   },
 
   /** Lesson durations offered by the template wizard (Phase 1). */

@@ -53,7 +53,7 @@ export default async function HomePage() {
             {role === "admin" && (
               <Link
                 href="/manage/announcements"
-                className="ml-auto text-sm font-semibold text-brand-gold underline"
+                className="ml-auto text-sm font-semibold text-brand-gold-deep underline"
               >
                 Manage
               </Link>
