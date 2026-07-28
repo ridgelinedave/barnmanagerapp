@@ -16,6 +16,7 @@ export type BarnFeatureFlag =
   | "clockIn"
   | "tasks"
   | "horses"
+  | "lessons"
   | "shows"
   | "invoices"
   | "shop";
@@ -92,6 +93,13 @@ export const barn = {
     // (137 passed / 0 failed / 0 skipped).
     tasks: true,
     horses: false,
+    /**
+     * Phase 1 slice 3a is built but stays dark until 3b lands. Cancelling
+     * currently releases a slot and tells the barn, but nothing offers that
+     * slot to anyone — turning this on now would ship a half-finished
+     * cancellation story to families.
+     */
+    lessons: false,
     shows: false,
     invoices: false,
     shop: false,

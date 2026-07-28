@@ -1027,6 +1027,379 @@ async function main() {
     }
   }
 
+  // ===========================================================================
+  // lessons (Phase 1, slice 3a)
+  //
+  // Every DENY below is preceded by a POSITIVE CONTROL proving the thing being
+  // attacked actually exists and is reachable by somebody. Two assertions in
+  // this suite have already passed while testing nothing — a null author, and a
+  // null template_id — because the attack was a no-op against absent data. A
+  // deny test that cannot distinguish "blocked" from "not there" is worthless.
+  // ===========================================================================
+  {
+    const probe = await admin.from("lesson_instances").select("id").limit(1);
+
+    if (probe.error && /schema cache|does not exist/i.test(probe.error.message)) {
+      console.log("\n\n═══ lessons — SKIPPED ═══");
+      console.log("  Migration 0007 is not applied yet.");
+      console.log("  Paste supabase/migrations/20260728000300_lessons.sql, then re-run.");
+      skipped += 1;
+    } else {
+      console.log("\n\n═══ lessons — ALLOW ═══\n");
+
+      const today = new Date().toISOString().slice(0, 10);
+      const isoDow = ((new Date(`${today}T12:00:00Z`).getUTCDay() + 6) % 7) + 1;
+
+      const madeInstances = [];
+      const madeTemplates = [];
+
+      // --- fixtures ---------------------------------------------------------
+      const template = await admin
+        .from("lesson_templates")
+        .insert({
+          weekday: isoDow,
+          start_time: "09:00:00",
+          duration_min: 45,
+          type: "private",
+          max_riders: 1,
+          active: true,
+        })
+        .select()
+        .single();
+      check("admin can create a lesson template", !template.error, template.error?.message);
+      if (template.data) madeTemplates.push(template.data.id);
+
+      // Instance A holds THIS family's rider. Instance B holds the control
+      // family's rider and is what the parent must never reach.
+      const insertInstance = (startTime) =>
+        admin
+          .from("lesson_instances")
+          .insert({
+            template_id: null,
+            date: today,
+            start_time: startTime,
+            duration_min: 45,
+            type: "private",
+          })
+          .select()
+          .single();
+
+      const instanceA = await insertInstance("10:00:00");
+      const instanceB = await insertInstance("11:00:00");
+      check("admin can create a lesson instance", !instanceA.error, instanceA.error?.message);
+      if (instanceA.data) madeInstances.push(instanceA.data.id);
+      if (instanceB.data) madeInstances.push(instanceB.data.id);
+
+      const bookingMine = await admin
+        .from("lesson_riders")
+        .insert({ instance_id: instanceA.data?.id, rider_id: riderId })
+        .select()
+        .single();
+      check("admin can book a rider into a lesson", !bookingMine.error, bookingMine.error?.message);
+
+      const bookingTheirs = await admin
+        .from("lesson_riders")
+        .insert({ instance_id: instanceB.data?.id, rider_id: controlRiderId })
+        .select()
+        .single();
+      check(
+        "admin can book another family's rider",
+        !bookingTheirs.error,
+        bookingTheirs.error?.message,
+      );
+
+      // Double-booking is a unique-constraint violation, not a policy question.
+      {
+        const { error } = await admin
+          .from("lesson_riders")
+          .insert({ instance_id: instanceA.data?.id, rider_id: riderId })
+          .select();
+        check("the same rider cannot be booked into a lesson twice", Boolean(error), "no error");
+      }
+
+      // --- reads ------------------------------------------------------------
+      check(
+        "staff can read lesson templates",
+        (await visibleIds(staff, "lesson_templates")).ids.length > 0,
+      );
+      if (instanceA.data && instanceB.data) {
+        const { ids: staffIds } = await visibleIds(staff, "lesson_instances");
+        check(
+          "staff can read all lesson instances",
+          staffIds.includes(instanceA.data.id) && staffIds.includes(instanceB.data.id),
+        );
+
+        const { ids: parentIds } = await visibleIds(parent, "lesson_instances");
+        check(
+          "parent CAN see the instance their own rider is in",
+          parentIds.includes(instanceA.data.id),
+        );
+      }
+
+      // --- the one write a parent has ---------------------------------------
+      if (bookingMine.data) {
+        const beforeCancel = await parent
+          .from("lesson_riders")
+          .select("status")
+          .eq("id", bookingMine.data.id)
+          .maybeSingle();
+        check(
+          "POSITIVE CONTROL — the parent can see their own booking, currently 'booked'",
+          beforeCancel.data?.status === "booked",
+          `saw ${beforeCancel.data?.status ?? "nothing"}`,
+        );
+
+        const { error } = await parent
+          .from("lesson_riders")
+          .update({ status: "cancelled", cancelled_at: new Date().toISOString() })
+          .eq("id", bookingMine.data.id)
+          .select();
+        check("parent CAN cancel their own rider's booking", !error, error?.message);
+
+        const afterCancel = await admin
+          .from("lesson_riders")
+          .select("status, cancelled_at")
+          .eq("id", bookingMine.data.id)
+          .maybeSingle();
+        check("the cancellation is recorded with a timestamp", Boolean(afterCancel.data?.cancelled_at));
+      }
+
+      console.log("\n═══ lessons — DENY (adversarial, each with a positive control) ═══\n");
+
+      // (1) Another family's instance must be invisible.
+      if (instanceB.data) {
+        const adminSeesB = await admin
+          .from("lesson_instances")
+          .select("id")
+          .eq("id", instanceB.data.id)
+          .maybeSingle();
+        check(
+          "POSITIVE CONTROL — instance B exists and is visible to the admin",
+          Boolean(adminSeesB.data),
+        );
+        await assertCannotSee(
+          "parent CANNOT see an instance none of their riders are in",
+          parent,
+          "lesson_instances",
+          instanceB.data.id,
+        );
+      }
+
+      // (2) Another family's booking must be invisible and uncancellable.
+      if (bookingTheirs.data) {
+        const adminSeesBooking = await admin
+          .from("lesson_riders")
+          .select("status")
+          .eq("id", bookingTheirs.data.id)
+          .maybeSingle();
+        check(
+          "POSITIVE CONTROL — the other family's booking exists and is 'booked'",
+          adminSeesBooking.data?.status === "booked",
+          `saw ${adminSeesBooking.data?.status ?? "nothing"}`,
+        );
+        await assertCannotSee(
+          "parent CANNOT see another family's booking",
+          parent,
+          "lesson_riders",
+          bookingTheirs.data.id,
+        );
+        {
+          const mode = await refusalMode(
+            parent
+              .from("lesson_riders")
+              .update({ status: "cancelled", cancelled_at: new Date().toISOString() })
+              .eq("id", bookingTheirs.data.id)
+              .select(),
+          );
+          check("parent CANNOT cancel another family's booking", !mode.startsWith("ALLOWED"), mode);
+        }
+        // And it is genuinely untouched afterwards.
+        const stillBooked = await admin
+          .from("lesson_riders")
+          .select("status")
+          .eq("id", bookingTheirs.data.id)
+          .maybeSingle();
+        check(
+          "the other family's booking is still 'booked' after the attempt",
+          stillBooked.data?.status === "booked",
+          `saw ${stillBooked.data?.status}`,
+        );
+      }
+
+      // (3) A released slot must not be re-taken by flipping status back.
+      if (bookingMine.data) {
+        const nowCancelled = await parent
+          .from("lesson_riders")
+          .select("status")
+          .eq("id", bookingMine.data.id)
+          .maybeSingle();
+        check(
+          "POSITIVE CONTROL — the parent's own booking is reachable and now 'cancelled'",
+          nowCancelled.data?.status === "cancelled",
+          `saw ${nowCancelled.data?.status ?? "nothing"}`,
+        );
+
+        for (const [label, status] of [
+          ["re-book a cancelled slot", "booked"],
+          ["promote themselves to a backfill", "backfilled"],
+        ]) {
+          const mode = await refusalMode(
+            parent.from("lesson_riders").update({ status }).eq("id", bookingMine.data.id).select(),
+          );
+          check(`parent CANNOT ${label}`, !mode.startsWith("ALLOWED"), mode);
+        }
+      }
+
+      // (4) A booking must not be moved to another rider or another lesson.
+      if (bookingMine.data && instanceB.data) {
+        const targetsExist = await admin
+          .from("lesson_instances")
+          .select("id")
+          .eq("id", instanceB.data.id)
+          .maybeSingle();
+        check(
+          "POSITIVE CONTROL — the reassignment targets (other instance, other rider) really exist",
+          Boolean(targetsExist.data) && Boolean(controlRiderId),
+        );
+
+        for (const [label, patch] of [
+          ["move their booking to another lesson", { instance_id: instanceB.data.id }],
+          ["reassign their booking to another family's rider", { rider_id: controlRiderId }],
+        ]) {
+          const mode = await refusalMode(
+            parent.from("lesson_riders").update(patch).eq("id", bookingMine.data.id).select(),
+          );
+          check(`parent CANNOT ${label}`, !mode.startsWith("ALLOWED"), mode);
+        }
+      }
+
+      // (5) Parents write nothing else; staff write nothing at all.
+      {
+        const mode = await refusalMode(
+          parent
+            .from("lesson_riders")
+            .insert({ instance_id: instanceA.data?.id, rider_id: riderId })
+            .select(),
+        );
+        check("parent CANNOT book a rider into a lesson", !mode.startsWith("ALLOWED"), mode);
+      }
+      {
+        const mode = await refusalMode(
+          parent.from("lesson_riders").delete().eq("id", bookingMine.data?.id).select(),
+        );
+        check("parent CANNOT delete a booking", !mode.startsWith("ALLOWED"), mode);
+      }
+      check(
+        "parent CANNOT read lesson templates",
+        (await visibleIds(parent, "lesson_templates")).ids.length === 0,
+      );
+
+      const staffWrites = [
+        [
+          "INSERT a lesson template",
+          staff
+            .from("lesson_templates")
+            .insert({ weekday: 1, start_time: "08:00:00", duration_min: 45, type: "private" })
+            .select(),
+        ],
+        [
+          "UPDATE a lesson template",
+          staff.from("lesson_templates").update({ active: false }).eq("id", template.data?.id).select(),
+        ],
+        [
+          "DELETE a lesson template",
+          staff.from("lesson_templates").delete().eq("id", template.data?.id).select(),
+        ],
+        [
+          "INSERT a lesson instance",
+          staff
+            .from("lesson_instances")
+            .insert({ date: today, start_time: "12:00:00", duration_min: 45, type: "private" })
+            .select(),
+        ],
+        [
+          "cancel a lesson instance",
+          staff
+            .from("lesson_instances")
+            .update({ status: "cancelled" })
+            .eq("id", instanceA.data?.id)
+            .select(),
+        ],
+        [
+          "DELETE a lesson instance",
+          staff.from("lesson_instances").delete().eq("id", instanceA.data?.id).select(),
+        ],
+        [
+          "book a rider",
+          staff
+            .from("lesson_riders")
+            .insert({ instance_id: instanceB.data?.id, rider_id: riderId })
+            .select(),
+        ],
+        [
+          "cancel someone's booking",
+          staff
+            .from("lesson_riders")
+            .update({ status: "cancelled" })
+            .eq("id", bookingTheirs.data?.id)
+            .select(),
+        ],
+      ];
+      for (const [label, query] of staffWrites) {
+        const mode = await refusalMode(query);
+        check(`staff CANNOT ${label}`, !mode.startsWith("ALLOWED"), mode);
+      }
+
+      // (6) The generator is admin-only and idempotent.
+      {
+        const { error } = await staff.rpc("generate_lesson_instances", {
+          from_date: today,
+          through_date: today,
+        });
+        check("staff CANNOT call generate_lesson_instances", Boolean(error), "no error raised");
+      }
+      {
+        const { error } = await parent.rpc("generate_lesson_instances", {
+          from_date: today,
+          through_date: today,
+        });
+        check("parent CANNOT call generate_lesson_instances", Boolean(error), "no error raised");
+      }
+      {
+        const first = await admin.rpc("generate_lesson_instances", {
+          from_date: today,
+          through_date: today,
+        });
+        check(
+          "admin CAN generate instances, and the active template produced one",
+          !first.error && (first.data ?? 0) >= 1,
+          first.error?.message ?? `created ${first.data}`,
+        );
+        const second = await admin.rpc("generate_lesson_instances", {
+          from_date: today,
+          through_date: today,
+        });
+        check(
+          "running the generator twice creates no duplicates",
+          second.data === 0,
+          `second run created ${second.data}`,
+        );
+      }
+
+      // (7) Signed out sees nothing anywhere.
+      for (const table of ["lesson_templates", "lesson_instances", "lesson_riders"]) {
+        check(`anon sees 0 rows in ${table}`, (await visibleIds(anon, table)).ids.length === 0);
+      }
+
+      // --- clean up ---------------------------------------------------------
+      for (const id of madeTemplates) {
+        await admin.from("lesson_instances").delete().eq("template_id", id);
+        await admin.from("lesson_templates").delete().eq("id", id);
+      }
+      for (const id of madeInstances) await admin.from("lesson_instances").delete().eq("id", id);
+    }
+  }
+
   // ---------------------------------------------------------------------------
   console.log(`\n\n${passed} passed, ${failures.length} failed${skipped ? `, ${skipped} section(s) skipped` : ""}`);
   if (failures.length > 0) {

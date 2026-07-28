@@ -102,6 +102,55 @@ export type Task = {
   completed_by: string | null;
 };
 
+export const LESSON_TYPES = ["private", "group"] as const;
+export type LessonType = (typeof LESSON_TYPES)[number];
+
+export function isLessonType(value: unknown): value is LessonType {
+  return typeof value === "string" && (LESSON_TYPES as readonly string[]).includes(value);
+}
+
+export type LessonTemplate = {
+  id: string;
+  created_at: string;
+  /** ISO weekday, 1 = Monday … 7 = Sunday. */
+  weekday: number;
+  /** HH:MM:SS, barn-local wall clock. */
+  start_time: string;
+  duration_min: 45 | 60;
+  type: LessonType;
+  instructor_id: string | null;
+  max_riders: number;
+  level_id: string | null;
+  active: boolean;
+};
+
+export type LessonInstanceStatus = "scheduled" | "cancelled";
+
+export type LessonInstance = {
+  id: string;
+  created_at: string;
+  template_id: string | null;
+  /** Barn-local date, YYYY-MM-DD. */
+  date: string;
+  start_time: string;
+  duration_min: number;
+  type: LessonType;
+  instructor_id: string | null;
+  status: LessonInstanceStatus;
+  notes: string;
+};
+
+export type LessonRiderStatus = "booked" | "cancelled" | "backfilled";
+
+export type LessonRider = {
+  id: string;
+  created_at: string;
+  instance_id: string;
+  rider_id: string;
+  status: LessonRiderStatus;
+  cancelled_at: string | null;
+};
+
 export type Notification = {
   id: string;
   profile_id: string;

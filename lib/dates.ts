@@ -43,6 +43,70 @@ export function isoWeekday(isoDate: string): number {
   return day === 0 ? 7 : day;
 }
 
+/** Add days to a barn-local ISO date, staying in ISO form. */
+export function addBarnDays(isoDate: string, days: number): string {
+  const date = new Date(`${isoDate}T12:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+/** "09:00:00" → "9:00 AM". Times are barn-local wall clock; there is no zone to convert. */
+export function formatTime(time: string): string {
+  const [hourText, minuteText] = time.split(":");
+  const hour = Number(hourText);
+  const minute = Number(minuteText);
+  const suffix = hour >= 12 ? "PM" : "AM";
+  const displayHour = hour % 12 === 0 ? 12 : hour % 12;
+  return `${displayHour}:${String(minute).padStart(2, "0")} ${suffix}`;
+}
+
+/** Current barn-local wall clock as {date, minutes-since-midnight}. */
+function barnNowParts(): { date: string; minutes: number } {
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: barn.timezone,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(now);
+  const hour = Number(parts.find((p) => p.type === "hour")?.value ?? "0");
+  const minute = Number(parts.find((p) => p.type === "minute")?.value ?? "0");
+  return { date: formatBarnDate(now), minutes: hour * 60 + minute };
+}
+
+/**
+ * Minutes from now until a barn-local date + time. Negative once it has passed.
+ *
+ * Compares barn wall clock to barn wall clock rather than converting either
+ * side to UTC — both operands are already in the barn's zone, so no offset
+ * arithmetic is needed and no DST conversion can go wrong in the ordinary case.
+ * (A cancellation made during the one ambiguous hour of a DST fall-back can be
+ * off by 60 minutes; that is noted rather than solved, because the cutoff is a
+ * courtesy threshold, not a billing boundary.)
+ */
+export function minutesUntilBarnDateTime(isoDate: string, time: string): number {
+  const now = barnNowParts();
+  const [hourText, minuteText] = time.split(":");
+  const lessonMinutes = Number(hourText) * 60 + Number(minuteText);
+
+  const dayDelta = Math.round(
+    (Date.parse(`${isoDate}T12:00:00Z`) - Date.parse(`${now.date}T12:00:00Z`)) / 86_400_000,
+  );
+
+  return dayDelta * 1440 + (lessonMinutes - now.minutes);
+}
+
+/**
+ * Is a cancellation for this lesson inside the barn's backfill cutoff?
+ *
+ * Inside the cutoff the slot is too late to refill, so the cancellation still
+ * goes through but the barn is simply told. Outside it, the slot is released
+ * for backfill (slice 3b).
+ */
+export function isInsideBackfillCutoff(isoDate: string, time: string): boolean {
+  return minutesUntilBarnDateTime(isoDate, time) < barn.backfillCutoffMinutes;
+}
+
 export const WEEKDAY_NAMES = [
   "Monday",
   "Tuesday",
