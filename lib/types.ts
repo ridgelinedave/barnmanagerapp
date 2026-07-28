@@ -67,6 +67,41 @@ export type Announcement = {
   notified_at: string | null;
 };
 
+export const RECURRENCES = ["daily", "weekday", "weekly"] as const;
+export type Recurrence = (typeof RECURRENCES)[number];
+
+export function isRecurrence(value: unknown): value is Recurrence {
+  return typeof value === "string" && (RECURRENCES as readonly string[]).includes(value);
+}
+
+export type TaskTemplate = {
+  id: string;
+  created_at: string;
+  title: string;
+  description: string;
+  recurrence: Recurrence;
+  /** ISO weekday, 1 = Monday … 7 = Sunday. Only set when recurrence='weekly'. */
+  weekday: number | null;
+  default_assignee: string | null;
+  active: boolean;
+};
+
+export type TaskStatus = "open" | "done";
+
+export type Task = {
+  id: string;
+  created_at: string;
+  template_id: string | null;
+  title: string;
+  description: string;
+  /** Barn-local date, YYYY-MM-DD. */
+  date: string;
+  assignee: string | null;
+  status: TaskStatus;
+  completed_at: string | null;
+  completed_by: string | null;
+};
+
 export type Notification = {
   id: string;
   profile_id: string;

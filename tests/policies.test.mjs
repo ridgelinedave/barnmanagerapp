@@ -232,13 +232,21 @@ async function main() {
   }
 
   console.log("\nnotifications — each user sees only their own");
+  // Scoped to the seeded fixture type on purpose. Counting *all* notifications
+  // would make this assertion depend on whether the announcement fan-out
+  // section has run yet, so the suite would only pass immediately after a
+  // re-seed. Tests that are order-dependent get ignored the first time they go
+  // red for the wrong reason.
   for (const [name, client] of [
     ["admin", admin],
     ["staff", staff],
     ["parent", parent],
   ]) {
-    const { data, error } = await client.from("notifications").select("id, profile_id");
-    check(`${name} sees exactly 1 notification`, !error && data?.length === 1, error?.message);
+    const { data, error } = await client
+      .from("notifications")
+      .select("id, profile_id")
+      .eq("type", "phase0_fixture");
+    check(`${name} sees exactly 1 fixture notification`, !error && data?.length === 1, error?.message);
     check(
       `${name}'s notification belongs to them`,
       data?.every((row) => row.profile_id === users[name].profileId) ?? false,
@@ -655,12 +663,27 @@ async function main() {
     // -------------------------------------------------------------------------
     console.log("\n═══ announcements — notification fan-out ═══\n");
 
+    // Measured as DELTAS, not absolute counts. A client using the anon key
+    // cannot delete notifications (there is deliberately no DELETE policy), so
+    // this section cannot clean up after itself and absolute counts would drift
+    // on every re-run.
+    const announcementNotifs = async (client) => {
+      const { data } = await client.from("notifications").select("id").eq("type", "announcement");
+      return data?.length ?? 0;
+    };
+
     {
       // `author` is set explicitly because that is what the app does
       // (createAnnouncement passes the caller's profile id). Leaving it null
       // here would make the "author is not notified" assertion vacuous: the
       // trigger excludes `p.id is distinct from new.author`, and against a null
       // author that excludes nobody.
+      const before = {
+        admin: await announcementNotifs(admin),
+        staff: await announcementNotifs(staff),
+        parent: await announcementNotifs(parent),
+      };
+
       const { data: posted, error } = await admin
         .from("announcements")
         .insert({
@@ -678,35 +701,22 @@ async function main() {
       if (posted) {
         check("the announcement records notified_at", Boolean(posted.notified_at));
 
-        const staffNotifs = await staff
-          .from("notifications")
-          .select("id")
-          .eq("type", "announcement");
+        const staffDelta = (await announcementNotifs(staff)) - before.staff;
         check(
           "staff received a notification for the staff-only announcement",
-          (staffNotifs.data?.length ?? 0) === 1,
-          `saw ${staffNotifs.data?.length}`,
+          staffDelta === 1,
+          `delta ${staffDelta}`,
         );
 
-        const parentNotifs = await parent
-          .from("notifications")
-          .select("id")
-          .eq("type", "announcement");
+        const parentDelta = (await announcementNotifs(parent)) - before.parent;
         check(
           "parent received NO notification for the staff-only announcement",
-          (parentNotifs.data?.length ?? 0) === 0,
-          `saw ${parentNotifs.data?.length}`,
+          parentDelta === 0,
+          `delta ${parentDelta}`,
         );
 
-        const adminNotifs = await admin
-          .from("notifications")
-          .select("id")
-          .eq("type", "announcement");
-        check(
-          "the author does NOT notify themselves",
-          (adminNotifs.data?.length ?? 0) === 0,
-          `saw ${adminNotifs.data?.length}`,
-        );
+        const adminDelta = (await announcementNotifs(admin)) - before.admin;
+        check("the author does NOT notify themselves", adminDelta === 0, `delta ${adminDelta}`);
 
         // Editing must not re-notify.
         await admin
@@ -714,14 +724,11 @@ async function main() {
           .update({ title: "Fan-out test — edited" })
           .eq("id", posted.id);
 
-        const staffAfterEdit = await staff
-          .from("notifications")
-          .select("id")
-          .eq("type", "announcement");
+        const staffAfterEdit = (await announcementNotifs(staff)) - before.staff;
         check(
           "editing the announcement does NOT re-notify",
-          (staffAfterEdit.data?.length ?? 0) === 1,
-          `saw ${staffAfterEdit.data?.length}`,
+          staffAfterEdit === 1,
+          `delta ${staffAfterEdit}`,
         );
 
         await admin.from("announcements").delete().eq("id", posted.id);
@@ -733,6 +740,11 @@ async function main() {
     // whole audience is notified. Asserted so the behaviour is a decision on
     // the record rather than an accident of `is distinct from null`.
     {
+      const before = {
+        admin: await announcementNotifs(admin),
+        parent: await announcementNotifs(parent),
+      };
+
       const { data: posted, error } = await admin
         .from("announcements")
         .insert({
@@ -747,28 +759,253 @@ async function main() {
       check("admin can post an authorless announcement", !error && Boolean(posted), error?.message);
 
       if (posted) {
-        const adminNotifs = await admin
-          .from("notifications")
-          .select("id")
-          .eq("type", "announcement");
+        const adminDelta = (await announcementNotifs(admin)) - before.admin;
         check(
           "an authorless announcement notifies the whole audience, admin included",
-          (adminNotifs.data?.length ?? 0) === 1,
-          `saw ${adminNotifs.data?.length}`,
+          adminDelta === 1,
+          `delta ${adminDelta}`,
         );
 
-        const parentNotifs = await parent
-          .from("notifications")
-          .select("id")
-          .eq("type", "announcement");
+        const parentDelta = (await announcementNotifs(parent)) - before.parent;
         check(
           "audience still holds — the parent is not notified of a staff-only post",
-          (parentNotifs.data?.length ?? 0) === 0,
-          `saw ${parentNotifs.data?.length}`,
+          parentDelta === 0,
+          `delta ${parentDelta}`,
         );
 
         await admin.from("announcements").delete().eq("id", posted.id);
       }
+    }
+  }
+
+  // ===========================================================================
+  // tasks + task_templates (Phase 1, slice 2)
+  //
+  // The rule under test: a staff member sees ONLY work assigned to them, and
+  // the only thing they may do to it is complete it. Everything else — who owns
+  // it, what it says, when it is due, whether it exists — is the admin's.
+  //
+  // Fixtures are created here rather than in the seed, because the interesting
+  // cases need two staff-owned tasks and there is only one staff fixture user;
+  // the second task is assigned to the ADMIN's profile and stands in for
+  // "somebody else's task".
+  // ===========================================================================
+  {
+    const probe = await admin.from("tasks").select("id").limit(1);
+
+    if (probe.error && /schema cache|does not exist/i.test(probe.error.message)) {
+      console.log("\n\n═══ tasks — SKIPPED ═══");
+      console.log("  Migration 0006 is not applied yet.");
+      console.log("  Paste supabase/migrations/20260728000200_tasks.sql, then re-run.");
+      skipped += 1;
+    } else {
+      console.log("\n\n═══ tasks — ALLOW ═══\n");
+
+      const today = new Date().toISOString().slice(0, 10);
+      const created = [];
+
+      // A task belonging to the staff fixture, and one belonging to the admin.
+      const mine = await admin
+        .from("tasks")
+        .insert({
+          title: "Policy test — staff's own task",
+          date: today,
+          assignee: users.staff.profileId,
+        })
+        .select()
+        .single();
+      check("admin can create a task", !mine.error && Boolean(mine.data), mine.error?.message);
+      if (mine.data) created.push(mine.data.id);
+
+      const theirs = await admin
+        .from("tasks")
+        .insert({
+          title: "Policy test — someone else's task",
+          date: today,
+          assignee: users.admin.profileId,
+        })
+        .select()
+        .single();
+      check("admin can create a task for another person", !theirs.error, theirs.error?.message);
+      if (theirs.data) created.push(theirs.data.id);
+
+      const template = await admin
+        .from("task_templates")
+        .insert({ title: "Policy test template", recurrence: "daily" })
+        .select()
+        .single();
+      check("admin can create a template", !template.error, template.error?.message);
+
+      if (mine.data && theirs.data) {
+        const { ids: adminIds } = await visibleIds(admin, "tasks");
+        check(
+          "admin sees both tasks",
+          adminIds.includes(mine.data.id) && adminIds.includes(theirs.data.id),
+        );
+
+        const { ids: staffIds } = await visibleIds(staff, "tasks");
+        check("staff sees their own task", staffIds.includes(mine.data.id));
+
+        // Staff completing their own task — the one write they have.
+        const { error: doneError } = await staff
+          .from("tasks")
+          .update({
+            status: "done",
+            completed_at: new Date().toISOString(),
+            completed_by: users.staff.profileId,
+          })
+          .eq("id", mine.data.id)
+          .select();
+        check("staff CAN mark their own task done", !doneError, doneError?.message);
+
+        const { error: undoError } = await staff
+          .from("tasks")
+          .update({ status: "open", completed_at: null, completed_by: null })
+          .eq("id", mine.data.id)
+          .select();
+        check("staff CAN un-complete their own task", !undoError, undoError?.message);
+      }
+
+      console.log("\n═══ tasks — DENY (adversarial) ═══\n");
+
+      if (mine.data && theirs.data) {
+        // Somebody else's task must be invisible and untouchable.
+        await assertCannotSee(
+          "staff CANNOT see another person's task",
+          staff,
+          "tasks",
+          theirs.data.id,
+        );
+        {
+          const mode = await refusalMode(
+            staff
+              .from("tasks")
+              .update({ status: "done", completed_at: new Date().toISOString(), completed_by: users.staff.profileId })
+              .eq("id", theirs.data.id)
+              .select(),
+          );
+          check("staff CANNOT mark someone else's task done", !mode.startsWith("ALLOWED"), mode);
+        }
+
+        // Row is theirs, but the columns are not. Each of these would let a
+        // staff member rewrite the work rather than just do it.
+        for (const [label, patch] of [
+          ["retitle their own task", { title: "Rewritten by staff" }],
+          ["rewrite the description", { description: "Rewritten by staff" }],
+          ["move it to another date", { date: "2030-01-01" }],
+          ["hand it to someone else", { assignee: users.admin.profileId }],
+          ["make it unassigned", { assignee: null }],
+          ["detach it from its template", { template_id: null }],
+        ]) {
+          const mode = await refusalMode(
+            staff.from("tasks").update(patch).eq("id", mine.data.id).select(),
+          );
+          check(`staff CANNOT ${label}`, !mode.startsWith("ALLOWED"), mode);
+        }
+
+        // Completions must be attributable to the person who made them.
+        {
+          const mode = await refusalMode(
+            staff
+              .from("tasks")
+              .update({
+                status: "done",
+                completed_at: new Date().toISOString(),
+                completed_by: users.admin.profileId,
+              })
+              .eq("id", mine.data.id)
+              .select(),
+          );
+          check("staff CANNOT credit the completion to someone else", !mode.startsWith("ALLOWED"), mode);
+        }
+
+        {
+          const mode = await refusalMode(
+            staff.from("tasks").delete().eq("id", mine.data.id).select(),
+          );
+          check("staff CANNOT delete their own task", !mode.startsWith("ALLOWED"), mode);
+        }
+      }
+
+      {
+        const mode = await refusalMode(
+          staff
+            .from("tasks")
+            .insert({ title: "Forged by staff", date: today, assignee: users.staff.profileId })
+            .select(),
+        );
+        check("staff CANNOT create a task", !mode.startsWith("ALLOWED"), mode);
+      }
+
+      // Templates are admin-only in every direction, including reads: staff see
+      // the generated work, never the machinery that produced it.
+      check(
+        "staff CANNOT read task templates",
+        (await visibleIds(staff, "task_templates")).ids.length === 0,
+      );
+      {
+        const mode = await refusalMode(
+          staff
+            .from("task_templates")
+            .insert({ title: "Forged template", recurrence: "daily" })
+            .select(),
+        );
+        check("staff CANNOT create a template", !mode.startsWith("ALLOWED"), mode);
+      }
+      if (template.data) {
+        const mode = await refusalMode(
+          staff.from("task_templates").update({ active: false }).eq("id", template.data.id).select(),
+        );
+        check("staff CANNOT edit a template", !mode.startsWith("ALLOWED"), mode);
+
+        const delMode = await refusalMode(
+          staff.from("task_templates").delete().eq("id", template.data.id).select(),
+        );
+        check("staff CANNOT delete a template", !delMode.startsWith("ALLOWED"), delMode);
+      }
+
+      // Only an admin may materialise a day's work.
+      {
+        const { error } = await staff.rpc("generate_tasks_for_date", { target_date: today });
+        check("staff CANNOT call generate_tasks_for_date", Boolean(error), "no error raised");
+      }
+      {
+        const { error } = await parent.rpc("generate_tasks_for_date", { target_date: today });
+        check("parent CANNOT call generate_tasks_for_date", Boolean(error), "no error raised");
+      }
+
+      // Parents and anon have no business here at all.
+      check("parent sees 0 tasks", (await visibleIds(parent, "tasks")).ids.length === 0);
+      check(
+        "parent sees 0 task templates",
+        (await visibleIds(parent, "task_templates")).ids.length === 0,
+      );
+      check("anon sees 0 tasks", (await visibleIds(anon, "tasks")).ids.length === 0);
+      check(
+        "anon sees 0 task templates",
+        (await visibleIds(anon, "task_templates")).ids.length === 0,
+      );
+
+      // Idempotency of the generator, which is the whole reason for the unique
+      // index on (template_id, date).
+      {
+        const first = await admin.rpc("generate_tasks_for_date", { target_date: today });
+        const second = await admin.rpc("generate_tasks_for_date", { target_date: today });
+        check("admin CAN call generate_tasks_for_date", !first.error, first.error?.message);
+        check(
+          "running the generator twice creates no duplicates",
+          second.data === 0,
+          `second run created ${second.data}`,
+        );
+      }
+
+      // Clean up: remove the fixtures this section made, including any tasks the
+      // generator produced from the test template.
+      if (template.data) {
+        await admin.from("tasks").delete().eq("template_id", template.data.id);
+        await admin.from("task_templates").delete().eq("id", template.data.id);
+      }
+      for (const id of created) await admin.from("tasks").delete().eq("id", id);
     }
   }
 
