@@ -1788,6 +1788,16 @@ as $$
 declare
   v_capacity integer;
 begin
+  -- Defence in depth behind the REVOKE below. The grant is the real gate, but a
+  -- single stray `grant execute ... to authenticated` during a later migration
+  -- would silently reopen "seat any rider in any lesson" to every parent. This
+  -- flag is set only by the three authorised entry points, and only after they
+  -- have checked the caller, so a direct RPC call arrives without it.
+  if coalesce(current_setting('app.backfill_entry', true), '') <> '1' then
+    raise exception 'backfill_book_rider() is internal; use the backfill functions.'
+      using errcode = '42501';
+  end if;
+
   select li.max_riders into v_capacity
     from public.lesson_instances li where li.id = instance;
 
@@ -1814,17 +1824,24 @@ $$;
 -- =============================================================================
 -- Lock down the internal primitives.
 --
--- Postgres grants EXECUTE on new functions to PUBLIC by default, and PostgREST
--- exposes every function in `public` as an RPC endpoint. Left alone, a parent
--- could call backfill_book_rider() directly and seat any rider in any lesson,
--- skipping offers, eligibility and the seat race entirely — the engine's whole
--- purpose, bypassed by one HTTP call. These three are internal: only the gated
--- functions above may call them, and SECURITY DEFINER means they still run with
--- the privileges they need when called from inside.
+-- PostgREST exposes every function in `public` as an RPC endpoint. Left open,
+-- a parent could call backfill_book_rider() directly and seat any rider in any
+-- lesson, skipping offers, eligibility and the seat race entirely — the
+-- engine's whole purpose, bypassed by one HTTP call.
+--
+-- REVOKING FROM `public` ALONE IS NOT ENOUGH ON SUPABASE, and this was caught
+-- by a test that failed against the live database rather than by reading the
+-- code. Postgres grants EXECUTE to PUBLIC by default, but Supabase ALSO ships
+-- a default-privileges rule granting ALL on functions to anon, authenticated
+-- and service_role. That is a separate, explicit grant which survives a
+-- `revoke ... from public`, so the endpoint stayed live and a parent really
+-- did seat a rider through it. Both roles must be named.
 -- =============================================================================
-revoke all on function public.backfill_book_rider(uuid, uuid) from public;
-revoke all on function public.notify_rider_family(uuid, text, text, text, text) from public;
-revoke all on function public.notify_admins(text, text, text, text) from public;
+revoke all on function public.backfill_book_rider(uuid, uuid) from public, anon, authenticated;
+revoke all on function public.notify_rider_family(uuid, text, text, text, text)
+  from public, anon, authenticated;
+revoke all on function public.notify_admins(text, text, text, text)
+  from public, anon, authenticated;
 
 -- Read-only seat count. Harmless to expose and used by the admin UI, so this
 -- one stays callable.
@@ -1989,7 +2006,10 @@ begin
     return 'full';
   end if;
 
+  -- Caller is authorised and a seat is free: the engine may book.
+  perform set_config('app.backfill_entry', '1', true);
   perform public.backfill_book_rider(v_instance_id, v_offer.rider_id);
+  perform set_config('app.backfill_entry', '', true);
 
   update public.backfill_offers
      set status = 'accepted', responded_at = now()
@@ -2071,7 +2091,10 @@ begin
     raise exception 'That lesson no longer exists.' using errcode = 'P0002';
   end if;
 
+  -- Caller is authorised (admin): the engine may book. See backfill_book_rider().
+  perform set_config('app.backfill_entry', '1', true);
   perform public.backfill_book_rider(instance, rider);
+  perform set_config('app.backfill_entry', '', true);
 
   update public.backfill_offers
      set status = 'accepted', responded_at = now()
