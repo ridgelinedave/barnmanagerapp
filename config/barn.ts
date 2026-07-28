@@ -94,12 +94,13 @@ export const barn = {
     tasks: true,
     horses: false,
     /**
-     * Phase 1 slice 3a is built but stays dark until 3b lands. Cancelling
-     * currently releases a slot and tells the barn, but nothing offers that
-     * slot to anyone — turning this on now would ship a half-finished
-     * cancellation story to families.
+     * Phase 1 slices 3a + 3b — shipped. Migrations 0007 and 0008 applied,
+     * policy suite green (241 passed / 0 failed / 0 skipped), including the
+     * two-simultaneous-accepts race. The schedule → cancel → backfill story is
+     * complete: a released seat is offered, and the first parent to accept
+     * takes it.
      */
-    lessons: false,
+    lessons: true,
     shows: false,
     invoices: false,
     shop: false,

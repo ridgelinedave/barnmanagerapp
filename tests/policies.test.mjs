@@ -24,7 +24,7 @@
  * Run:  npm run test:policies
  */
 import { createClient } from "@supabase/supabase-js";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -112,6 +112,137 @@ async function refusalMode(promise) {
   if (error) return `rejected: ${error.code ?? ""} ${error.message}`.trim();
   if (!data || data.length === 0) return "filtered to zero rows";
   return `ALLOWED — ${data.length} row(s) affected`;
+}
+
+// -----------------------------------------------------------------------------
+// Function-exposure inventory, parsed from the migrations.
+//
+// PostgREST publishes EVERY function in `public` as an RPC endpoint, and
+// Postgres grants EXECUTE to PUBLIC by default — and on Supabase, separately to
+// anon and authenticated. So a helper written as an internal primitive is a
+// public API unless it is explicitly revoked from all three. That mistake
+// already shipped once here: backfill_book_rider() was callable by any parent
+// and really did seat a rider.
+//
+// Rather than one hand-written assertion per primitive, this reads the
+// migrations, works out what each function was INTENDED to be, and then proves
+// it behaviourally over RPC. A function added in a later migration that is
+// neither revoked nor allowlisted fails the suite, which forces the decision to
+// be made rather than defaulted.
+// -----------------------------------------------------------------------------
+
+/**
+ * Functions that are exposed on purpose and need no gate: read-only, scoped to
+ * the caller, and required by RLS policies (a policy calling a function the
+ * user cannot execute would deny everything).
+ */
+const EXPOSED_BY_DESIGN = new Set([
+  "current_role",
+  "current_family",
+  "current_profile",
+  "has_permission",
+  "family_sees_instance",
+  "family_owns_rider",
+  "instance_taken_seats",
+]);
+
+/** Reads the balanced parenthesised argument list starting at `open`. */
+function readArgList(sql, open) {
+  let depth = 0;
+  for (let i = open; i < sql.length; i++) {
+    if (sql[i] === "(") depth++;
+    else if (sql[i] === ")") {
+      depth--;
+      if (depth === 0) return { text: sql.slice(open + 1, i), end: i };
+    }
+  }
+  return { text: "", end: open };
+}
+
+/** "a uuid, b text default 'x'" → ["a", "b"], respecting nested parens. */
+function argNames(argText) {
+  const parts = [];
+  let depth = 0;
+  let current = "";
+  for (const char of argText) {
+    if (char === "(") depth++;
+    if (char === ")") depth--;
+    if (char === "," && depth === 0) {
+      parts.push(current);
+      current = "";
+    } else current += char;
+  }
+  if (current.trim()) parts.push(current);
+  return parts
+    .map((part) => part.trim().split(/\s+/)[0])
+    .filter((name) => name && /^[a-z_][a-z0-9_]*$/i.test(name));
+}
+
+function parseMigrationFunctions() {
+  const dir = join(root, "supabase", "migrations");
+  const files = readdirSync(dir)
+    .filter((f) => f.endsWith(".sql") && !f.startsWith("_"))
+    .sort();
+  const sql = files.map((f) => readFileSync(join(dir, f), "utf8")).join("\n");
+
+  const functions = new Map();
+
+  // Declarations.
+  const declRe = /create\s+or\s+replace\s+function\s+public\.(?:"([^"]+)"|([a-z_][a-z0-9_]*))\s*\(/gi;
+  let match;
+  while ((match = declRe.exec(sql)) !== null) {
+    const name = match[1] ?? match[2];
+    const open = declRe.lastIndex - 1;
+    const { text, end } = readArgList(sql, open);
+    const after = sql.slice(end + 1, end + 60);
+    const returns = /returns\s+(?:table|setof\s+)?(\w+)/i.exec(after)?.[1]?.toLowerCase() ?? "";
+
+    functions.set(name, {
+      name,
+      args: argNames(text),
+      returnsTrigger: returns === "trigger",
+      revokedFrom: functions.get(name)?.revokedFrom ?? new Set(),
+      grantedTo: functions.get(name)?.grantedTo ?? new Set(),
+    });
+  }
+
+  // Revokes and grants. Later statements win, which matches apply order.
+  const revokeRe =
+    /revoke\s+all\s+on\s+function\s+public\.(?:"([^"]+)"|([a-z_][a-z0-9_]*))\s*\([^)]*\)\s*from\s+([^;]+);/gi;
+  while ((match = revokeRe.exec(sql)) !== null) {
+    const name = match[1] ?? match[2];
+    const roles = match[3].split(",").map((r) => r.trim().toLowerCase());
+    const entry = functions.get(name);
+    if (entry) for (const role of roles) entry.revokedFrom.add(role);
+  }
+
+  const grantRe =
+    /grant\s+execute\s+on\s+function\s+public\.(?:"([^"]+)"|([a-z_][a-z0-9_]*))\s*\([^)]*\)\s*to\s+([^;]+);/gi;
+  while ((match = grantRe.exec(sql)) !== null) {
+    const name = match[1] ?? match[2];
+    const roles = match[3].split(",").map((r) => r.trim().toLowerCase());
+    const entry = functions.get(name);
+    if (entry) for (const role of roles) entry.grantedTo.add(role);
+  }
+
+  return [...functions.values()];
+}
+
+/**
+ * Did this RPC call bounce off the function's EXECUTE privilege, rather than
+ * running and rejecting the caller on its own terms?
+ *
+ * The distinction is the whole point: a domain error like "that lesson no
+ * longer exists" proves the function EXECUTED, which for an internal primitive
+ * is a failure even though an error came back.
+ */
+function blockedAtTheDoor(error) {
+  if (!error) return false;
+  const code = error.code ?? "";
+  const message = (error.message ?? "").toLowerCase();
+  // PGRST202: not in the exposed schema cache. 42883: no such function.
+  if (code === "PGRST202" || code === "42883") return true;
+  return code === "42501" && message.includes("permission denied for function");
 }
 
 /** Asserts a specific row id is invisible to this client. */
@@ -1832,10 +1963,10 @@ async function main() {
       }
       check("anon sees 0 backfill offers", (await visibleIds(anon, "backfill_offers")).ids.length === 0);
 
-      // (5b) The internal primitives must not be reachable as RPC endpoints.
-      // Postgres grants EXECUTE to PUBLIC by default and PostgREST exposes
-      // every function in `public`, so forgetting to revoke these would let a
-      // parent seat any rider anywhere with one HTTP call.
+      // (5b) The one hand-written primitive case worth keeping: it attacks with
+      // REAL arguments and then proves no rider was seated. The generic
+      // "no internal function is reachable" sweep lives in the STANDING GUARD
+      // section and covers every primitive, including ones added later.
       {
         const openSeat = await newInstance("21:00:00");
         const { error } = await parent.rpc("backfill_book_rider", {
@@ -1853,15 +1984,6 @@ async function main() {
           .eq("instance_id", openSeat.id);
         check("nobody was seated by that attempt", (seated?.length ?? 0) === 0);
       }
-      {
-        const { error } = await parent.rpc("notify_admins", {
-          kind: "forged",
-          title: "Forged",
-          body: "x",
-          link_path: "/",
-        });
-        check("parent CANNOT call notify_admins directly", Boolean(error), "no error raised");
-      }
 
       // (6) Reminders are idempotent.
       {
@@ -1877,6 +1999,102 @@ async function main() {
 
       // --- clean up ---------------------------------------------------------
       for (const id of madeInstances) await admin.from("lesson_instances").delete().eq("id", id);
+    }
+  }
+
+  // ===========================================================================
+  // STANDING GUARD — function exposure
+  //
+  // Data-driven from the migrations, so it covers functions added later without
+  // anyone remembering to write a test. Replaces the hand-written per-primitive
+  // assertions that only existed for the three helpers someone thought of.
+  // ===========================================================================
+  console.log("\n\n═══ STANDING GUARD — no internal function is reachable over RPC ═══\n");
+  {
+    const inventory = parseMigrationFunctions();
+    const exposable = inventory.filter((fn) => !fn.returnsTrigger);
+
+    check(
+      "the migrations were parsed and functions were found",
+      exposable.length >= 10,
+      `found ${exposable.length}`,
+    );
+
+    const internal = exposable.filter(
+      (fn) => fn.revokedFrom.has("anon") && fn.revokedFrom.has("authenticated") && !fn.grantedTo.has("authenticated"),
+    );
+    const entryPoints = exposable.filter((fn) => fn.grantedTo.has("authenticated"));
+    const unclassified = exposable.filter(
+      (fn) =>
+        !internal.includes(fn) && !entryPoints.includes(fn) && !EXPOSED_BY_DESIGN.has(fn.name),
+    );
+
+    console.log(
+      `  inventory: ${internal.length} internal, ${entryPoints.length} entry point(s), ` +
+        `${exposable.length - internal.length - entryPoints.length} exposed-by-design, ` +
+        `${inventory.length - exposable.length} trigger function(s) skipped`,
+    );
+
+    // A new function that is neither locked down nor consciously allowlisted is
+    // a decision nobody made. Fail rather than default to exposed.
+    check(
+      "every public function is classified — no new one silently defaults to exposed",
+      unclassified.length === 0,
+      unclassified.length > 0
+        ? `unclassified: ${unclassified.map((f) => f.name).join(", ")} — revoke it, grant it, or add it to EXPOSED_BY_DESIGN`
+        : "",
+    );
+
+    check(
+      "the known internal primitives are all classified as internal",
+      ["backfill_book_rider", "notify_rider_family", "notify_admins"].every((name) =>
+        internal.some((fn) => fn.name === name),
+      ),
+      `internal: ${internal.map((f) => f.name).join(", ")}`,
+    );
+
+    // --- internal primitives must bounce off the privilege, for both roles ---
+    for (const fn of internal) {
+      const args = Object.fromEntries(fn.args.map((name) => [name, null]));
+
+      for (const [label, client] of [
+        ["parent", parent],
+        ["anon", anon],
+      ]) {
+        const { error } = await client.rpc(fn.name, args);
+        check(
+          `${label} CANNOT execute ${fn.name}() — internal`,
+          blockedAtTheDoor(error),
+          error
+            ? `it ran and returned ${error.code}: ${error.message}`
+            : "no error at all — the function executed",
+        );
+      }
+    }
+
+    // --- entry points must remain reachable for an authorised caller --------
+    //
+    // POSITIVE CONTROL for the block above: if a revoke were somehow applied to
+    // everything, every "cannot execute" assertion would pass while the app was
+    // completely broken. These prove the check discriminates.
+    for (const fn of entryPoints) {
+      const args = Object.fromEntries(fn.args.map((name) => [name, null]));
+      const { error } = await admin.rpc(fn.name, args);
+      check(
+        `admin CAN reach ${fn.name}() — entry point`,
+        !blockedAtTheDoor(error),
+        error ? `blocked: ${error.code} ${error.message}` : "",
+      );
+    }
+
+    // --- and the policy helpers must stay callable, or RLS denies everything -
+    for (const name of ["current_role", "current_family", "current_profile"]) {
+      const { error } = await parent.rpc(name);
+      check(
+        `parent CAN reach ${name}() — required by RLS policies`,
+        !blockedAtTheDoor(error),
+        error ? `blocked: ${error.code} ${error.message}` : "",
+      );
     }
   }
 
