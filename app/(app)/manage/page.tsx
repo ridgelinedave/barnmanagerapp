@@ -1,6 +1,8 @@
+import Link from "next/link";
 import { TabPage } from "@/components/TabPage";
 import { StubScreen } from "@/components/StubScreen";
 import { requireTab } from "@/lib/guard";
+import { featureEnabled } from "@/config/barn";
 
 export const metadata = { title: "Manage" };
 
@@ -9,10 +11,27 @@ export default async function ManagePage() {
 
   return (
     <TabPage title="Manage">
+      {featureEnabled("announcements") && (
+        <Link
+          href="/manage/announcements"
+          className="flex min-h-16 items-center gap-3 rounded-2xl border border-brand-ink/10 bg-white p-4"
+        >
+          <span className="flex-1">
+            <span className="block text-base font-semibold">Announcements</span>
+            <span className="block text-sm text-brand-ink/60">
+              Post barn news to families and staff.
+            </span>
+          </span>
+          <span aria-hidden="true" className="text-brand-ink/40">
+            ›
+          </span>
+        </Link>
+      )}
+
       <StubScreen heading="Barn management" phase="Phases 1–3">
         <p className="text-sm text-brand-ink/70">
           Timesheet review and QuickBooks sync, tasks, horses, families and riders, forms admin,
-          and content editing land here.
+          and the rest of the content tools land here.
         </p>
       </StubScreen>
     </TabPage>

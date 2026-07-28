@@ -240,6 +240,73 @@ async function main() {
   }
   console.log(`  notifications 1 per fixture user`);
 
+  // --- announcements (Phase 1, slice 1) ---------------------------------------
+  //
+  // Both fixtures are notify=false on purpose. A notify=true announcement fans
+  // out a notifications row per recipient, which would break the "each user
+  // sees exactly one notification" assertions. The fan-out is tested separately,
+  // at the end of the policy suite, after those counts have been checked.
+  const announcements = {};
+  {
+    const probe = await supabase.from("announcements").select("id").limit(1);
+
+    if (probe.error && /schema cache|does not exist/i.test(probe.error.message)) {
+      console.log("  announcements SKIPPED — table not created yet (apply migration 0005)");
+    } else if (probe.error) {
+      fail("Could not read announcements", probe.error);
+    } else {
+      // Clear fan-out notifications left by a previous test run so the
+      // per-user notification counts start from a known state.
+      const { error: clearError } = await supabase
+        .from("notifications")
+        .delete()
+        .eq("type", "announcement");
+      if (clearError) fail("Could not clear announcement notifications", clearError);
+
+      const FIXTURES = [
+        {
+          key: "all",
+          title: "Phase 1 fixture — barn news for everyone",
+          body_md: "Visible to families and staff. Delete before go-live.",
+          audience: "all",
+          pinned: true,
+        },
+        {
+          key: "staff",
+          title: "Phase 1 fixture — staff only notice",
+          body_md: "Internal. A parent must never see this. Delete before go-live.",
+          audience: "staff",
+          pinned: false,
+        },
+      ];
+
+      for (const fixture of FIXTURES) {
+        const { key, ...row } = fixture;
+
+        const { data: existing } = await supabase
+          .from("announcements")
+          .select("id")
+          .eq("title", row.title)
+          .maybeSingle();
+
+        if (existing) {
+          announcements[`${key}Id`] = existing.id;
+          continue;
+        }
+
+        const { data, error } = await supabase
+          .from("announcements")
+          .insert({ ...row, notify: false, author: created.admin.profileId })
+          .select()
+          .single();
+        if (error) fail(`Could not create the "${row.audience}" announcement fixture`, error);
+        announcements[`${key}Id`] = data.id;
+      }
+
+      console.log(`  announcements 1 'all', 1 'staff'`);
+    }
+  }
+
   // --- record the fixture ids for the policy tests ----------------------------
   const output = {
     generatedAt: new Date().toISOString(),
@@ -251,6 +318,7 @@ async function main() {
     controlFamilyId: controlFamily.id,
     controlRiderId: controlRider.id,
     levelCount: LEVELS.length,
+    announcements,
   };
 
   mkdirSync(here, { recursive: true });

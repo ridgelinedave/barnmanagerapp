@@ -62,6 +62,12 @@ export const barn = {
    * Later phases flip their own flag on as the feature lands.
    */
   features: {
+    // Slice 1 code is complete and `npm run verify` is green, but migration
+    // 0005 has not been applied yet, so the announcements policy tests could
+    // not run. Flip to true once
+    //   npm run db:seed && npm run test:policies
+    // reports zero skipped sections. Until then Home hides the announcements
+    // surface and Manage hides its link.
     announcements: false,
     clockIn: false,
     tasks: false,

@@ -58,6 +58,7 @@ try {
 // Tiny assertion harness — no test-runner dependency.
 // -----------------------------------------------------------------------------
 let passed = 0;
+let skipped = 0;
 const failures = [];
 
 function check(name, condition, detail) {
@@ -508,14 +509,232 @@ async function main() {
     check(`staff CANNOT ${label}`, !mode.startsWith("ALLOWED"), mode);
   }
 
+  // ===========================================================================
+  // announcements (Phase 1, slice 1)
+  //
+  // Audience is the whole point: a 'staff' announcement is internal, and a
+  // parent must not be able to reach it by any route — not by listing, not by
+  // filtering, not by fetching it directly by id.
+  // ===========================================================================
+  const ann = fixtures.announcements ?? {};
+  const haveAnnouncements = Boolean(ann.allId && ann.staffId);
+
+  if (!haveAnnouncements) {
+    console.log("\n\n═══ announcements — SKIPPED ═══");
+    console.log("  Migration 0005 is not applied yet, so there are no fixtures to test.");
+    console.log("  Paste supabase/migrations/20260728000100_announcements.sql, re-seed, re-run.");
+    skipped += 1;
+  } else {
+    console.log("\n\n═══ announcements — ALLOW ═══\n");
+
+    {
+      const { ids: adminIds } = await visibleIds(admin, "announcements");
+      check(
+        "admin sees both the 'all' and 'staff' announcements",
+        adminIds.includes(ann.allId) && adminIds.includes(ann.staffId),
+      );
+
+      const { ids: staffIds } = await visibleIds(staff, "announcements");
+      check(
+        "staff sees both the 'all' and 'staff' announcements",
+        staffIds.includes(ann.allId) && staffIds.includes(ann.staffId),
+      );
+
+      const { ids: parentIds } = await visibleIds(parent, "announcements");
+      check("parent sees the 'all' announcement", parentIds.includes(ann.allId));
+    }
+
+    {
+      const { data, error } = await admin
+        .from("announcements")
+        .insert({ title: "Policy test announcement", body_md: "temp", audience: "all" })
+        .select()
+        .single();
+      check("admin can post an announcement", !error && Boolean(data), error?.message);
+
+      if (data) {
+        const { error: updateError } = await admin
+          .from("announcements")
+          .update({ pinned: true })
+          .eq("id", data.id)
+          .select();
+        check("admin can edit an announcement", !updateError, updateError?.message);
+
+        const { data: deleted } = await admin
+          .from("announcements")
+          .delete()
+          .eq("id", data.id)
+          .select();
+        check("admin can delete an announcement", (deleted?.length ?? 0) === 1);
+      }
+    }
+
+    console.log("\n═══ announcements — DENY (adversarial) ═══\n");
+
+    // (e) The staff-only leak. Three different routes to the same row.
+    await assertCannotSee(
+      "parent CANNOT see the staff-only announcement in a plain list",
+      parent,
+      "announcements",
+      ann.staffId,
+    );
+    {
+      const { data, error } = await parent
+        .from("announcements")
+        .select("id")
+        .eq("audience", "staff");
+      check(
+        "parent CANNOT surface it by filtering audience='staff'",
+        !error && (data?.length ?? 0) === 0,
+        error?.message ?? `saw ${data?.length} row(s)`,
+      );
+    }
+    {
+      const { data, error } = await parent
+        .from("announcements")
+        .select("title, body_md")
+        .eq("id", ann.staffId)
+        .maybeSingle();
+      check(
+        "parent CANNOT fetch its body by id",
+        !error && data === null,
+        error?.message ?? "row returned",
+      );
+    }
+
+    // Writes: parents and staff are readers only.
+    for (const [label, client] of [
+      ["parent", parent],
+      ["staff", staff],
+    ]) {
+      const mode = await refusalMode(
+        client
+          .from("announcements")
+          .insert({ title: `Forged by ${label}`, body_md: "x", audience: "all" })
+          .select(),
+      );
+      check(`${label} CANNOT post an announcement`, !mode.startsWith("ALLOWED"), mode);
+
+      const editMode = await refusalMode(
+        client
+          .from("announcements")
+          .update({ title: `Edited by ${label}` })
+          .eq("id", ann.allId)
+          .select(),
+      );
+      check(`${label} CANNOT edit an announcement`, !editMode.startsWith("ALLOWED"), editMode);
+
+      const deleteMode = await refusalMode(
+        client.from("announcements").delete().eq("id", ann.allId).select(),
+      );
+      check(`${label} CANNOT delete an announcement`, !deleteMode.startsWith("ALLOWED"), deleteMode);
+    }
+
+    // Escalation through the audience column: flipping a staff-only notice to
+    // 'all' would publish it to every family.
+    {
+      const mode = await refusalMode(
+        staff
+          .from("announcements")
+          .update({ audience: "all" })
+          .eq("id", ann.staffId)
+          .select(),
+      );
+      check("staff CANNOT republish a staff-only notice to everyone", !mode.startsWith("ALLOWED"), mode);
+    }
+
+    check(
+      "anon sees 0 announcements",
+      (await visibleIds(anon, "announcements")).ids.length === 0,
+    );
+
+    // -------------------------------------------------------------------------
+    // Notification fan-out. Runs LAST because it deliberately creates
+    // notifications, which changes the per-user counts asserted earlier.
+    // `npm run db:seed` clears them again.
+    // -------------------------------------------------------------------------
+    console.log("\n═══ announcements — notification fan-out ═══\n");
+
+    {
+      const { data: posted, error } = await admin
+        .from("announcements")
+        .insert({
+          title: "Fan-out test — staff only",
+          body_md: "Should notify admin and staff, never the parent.",
+          audience: "staff",
+          notify: true,
+        })
+        .select()
+        .single();
+
+      check("admin can post a notifying announcement", !error && Boolean(posted), error?.message);
+
+      if (posted) {
+        check("the announcement records notified_at", Boolean(posted.notified_at));
+
+        const staffNotifs = await staff
+          .from("notifications")
+          .select("id")
+          .eq("type", "announcement");
+        check(
+          "staff received a notification for the staff-only announcement",
+          (staffNotifs.data?.length ?? 0) === 1,
+          `saw ${staffNotifs.data?.length}`,
+        );
+
+        const parentNotifs = await parent
+          .from("notifications")
+          .select("id")
+          .eq("type", "announcement");
+        check(
+          "parent received NO notification for the staff-only announcement",
+          (parentNotifs.data?.length ?? 0) === 0,
+          `saw ${parentNotifs.data?.length}`,
+        );
+
+        const adminNotifs = await admin
+          .from("notifications")
+          .select("id")
+          .eq("type", "announcement");
+        check(
+          "the author does NOT notify themselves",
+          (adminNotifs.data?.length ?? 0) === 0,
+          `saw ${adminNotifs.data?.length}`,
+        );
+
+        // Editing must not re-notify.
+        await admin
+          .from("announcements")
+          .update({ title: "Fan-out test — edited" })
+          .eq("id", posted.id);
+
+        const staffAfterEdit = await staff
+          .from("notifications")
+          .select("id")
+          .eq("type", "announcement");
+        check(
+          "editing the announcement does NOT re-notify",
+          (staffAfterEdit.data?.length ?? 0) === 1,
+          `saw ${staffAfterEdit.data?.length}`,
+        );
+
+        await admin.from("announcements").delete().eq("id", posted.id);
+      }
+    }
+  }
+
   // ---------------------------------------------------------------------------
-  console.log(`\n\n${passed} passed, ${failures.length} failed`);
+  console.log(`\n\n${passed} passed, ${failures.length} failed${skipped ? `, ${skipped} section(s) skipped` : ""}`);
   if (failures.length > 0) {
     console.error("\nFailures:");
     for (const f of failures) console.error(`  - ${f.name}${f.detail ? ` (${f.detail})` : ""}`);
     process.exit(1);
   }
-  console.log("All policy assertions passed.");
+  console.log(
+    skipped > 0
+      ? "All runnable policy assertions passed — but a section was SKIPPED, so this is not a full pass."
+      : "All policy assertions passed.",
+  );
 }
 
 main().catch((error) => {

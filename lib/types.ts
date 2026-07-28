@@ -47,6 +47,26 @@ export type Rider = {
   created_at: string;
 };
 
+export const AUDIENCES = ["all", "staff"] as const;
+export type Audience = (typeof AUDIENCES)[number];
+
+export function isAudience(value: unknown): value is Audience {
+  return typeof value === "string" && (AUDIENCES as readonly string[]).includes(value);
+}
+
+export type Announcement = {
+  id: string;
+  created_at: string;
+  title: string;
+  body_md: string;
+  pinned: boolean;
+  notify: boolean;
+  audience: Audience;
+  author: string | null;
+  posted_at: string;
+  notified_at: string | null;
+};
+
 export type Notification = {
   id: string;
   profile_id: string;
