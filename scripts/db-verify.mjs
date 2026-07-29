@@ -65,6 +65,9 @@ const EXPECTED_TABLES = [
   "feed_plans",
   // Phase 2 slice 2 — care.
   "care_events",
+  // Phase 2 slice 4 — onboarding forms.
+  "form_templates",
+  "form_submissions",
 ];
 const EXPECTED_FUNCTIONS = [
   "current_role",
@@ -80,6 +83,10 @@ const EXPECTED_FUNCTIONS = [
   // Phase 2 slice 2 — care.
   "care_events_guard_insert",
   "enqueue_care_due_digest",
+  // Phase 2 slices 3–4.
+  "family_may_read_document",
+  "form_submissions_guard",
+  "ensure_family_onboarding",
 ];
 
 let problems = 0;

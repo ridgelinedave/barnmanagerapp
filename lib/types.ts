@@ -314,6 +314,59 @@ export type CareEvent = {
   logged_by: string | null;
 };
 
+export const FORM_FIELD_TYPES = ["text", "textarea", "checkbox", "date"] as const;
+export type FormFieldType = (typeof FORM_FIELD_TYPES)[number];
+
+export type FormField = {
+  key: string;
+  label: string;
+  type: FormFieldType;
+  required?: boolean;
+};
+
+export function isFormField(value: unknown): value is FormField {
+  if (typeof value !== "object" || value === null) return false;
+  const field = value as Record<string, unknown>;
+  return (
+    typeof field.key === "string" &&
+    typeof field.label === "string" &&
+    typeof field.type === "string" &&
+    (FORM_FIELD_TYPES as readonly string[]).includes(field.type)
+  );
+}
+
+/** Field definitions come out of jsonb, so anything malformed is dropped rather than rendered. */
+export function fieldsOf(schema: unknown): FormField[] {
+  return Array.isArray(schema) ? schema.filter(isFormField) : [];
+}
+
+export type FormTemplate = {
+  id: string;
+  created_at: string;
+  name: string;
+  description: string;
+  schema: unknown;
+  required: boolean;
+  applies_to: "family" | "rider";
+  active: boolean;
+};
+
+export type FormStatus = "pending" | "complete";
+
+export type FormSubmission = {
+  id: string;
+  created_at: string;
+  template_id: string;
+  family_id: string;
+  rider_id: string | null;
+  data: Record<string, unknown>;
+  signed_name: string | null;
+  signed_at: string | null;
+  status: FormStatus;
+  /** Path in the private documents bucket. Written server-side on signing. */
+  document_path: string | null;
+};
+
 export type Notification = {
   id: string;
   profile_id: string;

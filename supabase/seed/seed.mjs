@@ -661,6 +661,136 @@ async function main() {
     }
   }
 
+  // --- onboarding forms (Phase 2, slice 4) ------------------------------------
+  //
+  // One required family template and one rider template, plus a pending
+  // submission for BOTH families. Two families matter here for the same reason
+  // as everywhere else: "a parent cannot touch another family's form" needs a
+  // form belonging to another family that provably exists and is provably
+  // reachable by its own owner.
+  const forms = {};
+  {
+    const probe = await supabase.from("form_templates").select("id").limit(1);
+
+    if (probe.error && /schema cache|does not exist/i.test(probe.error.message)) {
+      console.log("  forms         SKIPPED — tables not created yet (apply migration 0013)");
+    } else if (probe.error) {
+      fail("Could not read form_templates", probe.error);
+    } else {
+      const TEMPLATES = [
+        {
+          key: "waiver",
+          name: "Phase 2 Fixture Liability Waiver",
+          description: "Fixture waiver. Delete before go-live.",
+          applies_to: "family",
+          required: true,
+          schema: [
+            { key: "emergency_contact", label: "Emergency contact", type: "text", required: true },
+            { key: "emergency_phone", label: "Emergency phone", type: "text", required: true },
+            { key: "notes", label: "Anything we should know", type: "textarea", required: false },
+          ],
+        },
+        {
+          key: "medical",
+          name: "Phase 2 Fixture Rider Medical",
+          description: "Fixture per-rider form. Delete before go-live.",
+          applies_to: "rider",
+          required: true,
+          schema: [
+            { key: "allergies", label: "Allergies", type: "text", required: false },
+            { key: "consent", label: "I consent to emergency treatment", type: "checkbox", required: true },
+          ],
+        },
+      ];
+
+      const templates = {};
+      for (const template of TEMPLATES) {
+        const { key, ...row } = template;
+
+        const { data: existing } = await supabase
+          .from("form_templates")
+          .select("*")
+          .eq("name", row.name)
+          .maybeSingle();
+
+        if (existing) {
+          templates[key] = existing;
+          continue;
+        }
+
+        const { data, error } = await supabase
+          .from("form_templates")
+          .insert({ ...row, active: true })
+          .select()
+          .single();
+        if (error) fail(`Could not create the "${row.name}" template`, error);
+        templates[key] = data;
+      }
+
+      // A pending submission per family for the family-scoped waiver, and one
+      // per rider for the rider-scoped form.
+      const SUBMISSIONS = [
+        { key: "mainWaiver", template: templates.waiver.id, family_id: family.id, rider_id: null },
+        {
+          key: "controlWaiver",
+          template: templates.waiver.id,
+          family_id: controlFamily.id,
+          rider_id: null,
+        },
+        {
+          key: "mainRider",
+          template: templates.medical.id,
+          family_id: family.id,
+          rider_id: rider.id,
+        },
+      ];
+
+      const submissions = {};
+      for (const submission of SUBMISSIONS) {
+        const { key, template, ...row } = submission;
+
+        const { data: existing } = await supabase
+          .from("form_submissions")
+          .select("*")
+          .eq("template_id", template)
+          .eq("family_id", row.family_id)
+          .maybeSingle();
+
+        if (existing) {
+          // Reset to pending so the sign-it tests have something to sign on
+          // every run. Service role, so the guard trigger stands aside.
+          const { data, error } = await supabase
+            .from("form_submissions")
+            .update({
+              status: "pending",
+              signed_at: null,
+              signed_name: null,
+              data: {},
+              document_path: null,
+            })
+            .eq("id", existing.id)
+            .select()
+            .single();
+          if (error) fail(`Could not reset the "${key}" submission`, error);
+          submissions[key] = data;
+          continue;
+        }
+
+        const { data, error } = await supabase
+          .from("form_submissions")
+          .insert({ template_id: template, ...row, status: "pending" })
+          .select()
+          .single();
+        if (error) fail(`Could not create the "${key}" submission`, error);
+        submissions[key] = data;
+      }
+
+      forms.templates = templates;
+      forms.submissions = submissions;
+      console.log(`  forms         2 templates, 3 pending submissions (both families)`);
+    }
+  }
+
   // --- record the fixture ids for the policy tests ----------------------------
   const output = {
     generatedAt: new Date().toISOString(),
@@ -677,6 +807,8 @@ async function main() {
     // what makes the horses section of the suite report a SKIP rather than a
     // pass.
     horses,
+    // Phase 2 slice 4.
+    forms,
   };
 
   mkdirSync(here, { recursive: true });

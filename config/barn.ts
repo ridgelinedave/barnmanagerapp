@@ -18,6 +18,7 @@ export type BarnFeatureFlag =
   | "horses"
   | "care"
   | "documents"
+  | "forms"
   | "lessons"
   | "shows"
   | "invoices"
@@ -117,6 +118,18 @@ export const barn = {
      * flag stays OFF until David audits the SQL: this is the legal vault.
      */
     documents: false,
+    /**
+     * Phase 2 slice 4 — onboarding forms, e-signature and the PDF vault.
+     * Migration 0013 applied and the policy suite is green; the flag stays OFF
+     * until David audits the SQL.
+     *
+     * NOTE: the SPEC §5 "soft gate" — blocking parents from the rest of the app
+     * until required forms are signed — is deliberately NOT wired up. The seam
+     * is `onboardingOutstanding()` in lib/forms.ts. Locking a paying family out
+     * of their lesson schedule over an unsigned waiver is a support call, so
+     * switching it on is David's call, not mine.
+     */
+    forms: false,
     /**
      * Phase 1 slices 3a + 3b — shipped. Migrations 0007 and 0008 applied,
      * policy suite green (241 passed / 0 failed / 0 skipped), including the

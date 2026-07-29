@@ -3595,6 +3595,404 @@ async function main() {
   }
 
   // ===========================================================================
+  // onboarding forms (Phase 2, slice 4)
+  //
+  // The property under test is that a SIGNATURE MEANS SOMETHING. Three ways it
+  // could be worthless, each asserted:
+  //
+  //   * a family marks a form complete without signing it
+  //   * a family edits a form after signing it
+  //   * a family answers, or reads, another family's form
+  //
+  // The row policy decides which rows; the trigger decides which changes. Both
+  // are exercised, and every deny is preceded by the matching allow so a
+  // refusal cannot be confused with an unreachable row.
+  // ===========================================================================
+  {
+    const formFx = fixtures.forms ?? {};
+    const templates = formFx.templates ?? {};
+    const submissions = formFx.submissions ?? {};
+    const haveForms = Boolean(
+      templates.waiver?.id && submissions.mainWaiver?.id && submissions.controlWaiver?.id && parent2,
+    );
+
+    if (!haveForms) {
+      console.log("\n\n═══ onboarding forms — SKIPPED ═══");
+      console.log("  Migration 0013 is not applied yet, or seed-output.json predates the form");
+      console.log("  fixtures. Apply supabase/migrations/20260729000200_onboarding_forms.sql,");
+      console.log("  re-seed, re-run.");
+      skipped += 1;
+    } else {
+      const mine = submissions.mainWaiver;
+      const theirs = submissions.controlWaiver;
+
+      console.log("\n\n═══ onboarding forms — ALLOW ═══\n");
+
+      {
+        const { data, error } = await parent
+          .from("form_templates")
+          .select("id, name, schema")
+          .eq("id", templates.waiver.id)
+          .maybeSingle();
+        check(
+          "parent can read the template they have to fill in",
+          !error && data?.id === templates.waiver.id,
+          error?.message,
+        );
+        check(
+          "…including its field definitions, or there is nothing to render",
+          Array.isArray(data?.schema) && data.schema.length > 0,
+          JSON.stringify(data?.schema ?? null),
+        );
+      }
+
+      {
+        const { data, error } = await parent
+          .from("form_submissions")
+          .select("id, status")
+          .eq("id", mine.id)
+          .maybeSingle();
+        check(
+          "parent sees their own pending submission",
+          !error && data?.id === mine.id,
+          error?.message,
+        );
+        check("…and it starts pending", data?.status === "pending", `status ${data?.status}`);
+      }
+
+      {
+        // Filling in answers without signing: allowed, stays pending.
+        const { error } = await parent
+          .from("form_submissions")
+          .update({ data: { emergency_contact: "A Person", emergency_phone: "555-0111" } })
+          .eq("id", mine.id);
+        check("parent CAN save answers without signing", !error, error?.message);
+
+        const { data } = await parent
+          .from("form_submissions")
+          .select("status, signed_at, data")
+          .eq("id", mine.id)
+          .maybeSingle();
+        check("…it is still pending", data?.status === "pending", `status ${data?.status}`);
+        check("…with no signature recorded", data?.signed_at === null, `signed_at ${data?.signed_at}`);
+        check(
+          "…and the answers were stored",
+          data?.data?.emergency_contact === "A Person",
+          JSON.stringify(data?.data),
+        );
+      }
+
+      {
+        // Signing it.
+        const { error } = await parent
+          .from("form_submissions")
+          .update({ status: "complete", signed_name: "A Parent" })
+          .eq("id", mine.id);
+        check("parent CAN sign their own form", !error, error?.message);
+
+        const { data } = await parent
+          .from("form_submissions")
+          .select("status, signed_name, signed_at")
+          .eq("id", mine.id)
+          .maybeSingle();
+        check("…it is complete", data?.status === "complete", `status ${data?.status}`);
+        check("…the signed name is recorded", data?.signed_name === "A Parent", data?.signed_name);
+        check(
+          "…and signed_at was set BY THE DATABASE, not sent by the client",
+          Boolean(data?.signed_at),
+          "no signing timestamp",
+        );
+      }
+
+      {
+        const { data, error } = await admin.from("form_submissions").select("id, family_id");
+        const ids = new Set((data ?? []).map((s) => s.id));
+        check(
+          "admin reads every family's submissions",
+          !error && ids.has(mine.id) && ids.has(theirs.id),
+          error?.message ?? `saw ${ids.size}`,
+        );
+      }
+
+      {
+        const { data, error } = await admin.rpc("ensure_family_onboarding", {
+          family: fixtures.familyId,
+        });
+        check("admin CAN materialise a family's onboarding checklist", !error, error?.message);
+        // Idempotent: everything already exists from the seed, so a second run
+        // adds nothing. Asserted rather than assumed — this function will be
+        // re-run every time the barn adds a template.
+        const { data: again } = await admin.rpc("ensure_family_onboarding", {
+          family: fixtures.familyId,
+        });
+        check(
+          "…and running it again creates nothing",
+          again === 0,
+          `created ${again} on the second call (first: ${data})`,
+        );
+      }
+
+      // =======================================================================
+      console.log("\n\n═══ onboarding forms — DENY (adversarial) ═══\n");
+      // =======================================================================
+
+      console.log("a signature cannot be faked, skipped, or edited away");
+      {
+        // Control: the row is signed and complete (asserted above), and the
+        // parent can still SEE it — so a refusal is about the change, not the
+        // row being gone.
+        const { data: visible } = await parent
+          .from("form_submissions")
+          .select("id")
+          .eq("id", mine.id);
+        check(
+          "control: the parent can still see their signed form",
+          (visible?.length ?? 0) === 1,
+          "the row vanished, which would make the next assertions vacuous",
+        );
+
+        const mode = await refusalMode(
+          parent
+            .from("form_submissions")
+            .update({ data: { emergency_contact: "Changed After Signing" } })
+            .eq("id", mine.id)
+            .select(),
+        );
+        check("parent CANNOT edit a form after signing it", !mode.startsWith("ALLOWED"), mode);
+
+        const { data } = await parent
+          .from("form_submissions")
+          .select("data")
+          .eq("id", mine.id)
+          .maybeSingle();
+        check(
+          "…and the signed answers are unchanged",
+          data?.data?.emergency_contact === "A Person",
+          JSON.stringify(data?.data),
+        );
+      }
+
+      {
+        // The unsigned rider form is the vehicle for the "complete without a
+        // signature" attempt, since the waiver is already signed.
+        const riderSubmission = submissions.mainRider;
+        if (riderSubmission?.id) {
+          const mode = await refusalMode(
+            parent
+              .from("form_submissions")
+              .update({ status: "complete" })
+              .eq("id", riderSubmission.id)
+              .select(),
+          );
+          check(
+            "parent CANNOT mark a form complete without signing it",
+            !mode.startsWith("ALLOWED"),
+            mode,
+          );
+
+          const { data } = await parent
+            .from("form_submissions")
+            .select("status")
+            .eq("id", riderSubmission.id)
+            .maybeSingle();
+          check(
+            "…and it is still pending",
+            data?.status === "pending",
+            `status is now ${data?.status}`,
+          );
+
+          const blankMode = await refusalMode(
+            parent
+              .from("form_submissions")
+              .update({ status: "complete", signed_name: "   " })
+              .eq("id", riderSubmission.id)
+              .select(),
+          );
+          check(
+            "parent CANNOT sign with whitespace for a name",
+            !blankMode.startsWith("ALLOWED"),
+            blankMode,
+          );
+        }
+      }
+
+      console.log("\nand a family cannot reach another family's forms");
+      {
+        // Control: the other family's form provably exists and its own owner
+        // provably reaches it.
+        const { data: control } = await parent2
+          .from("form_submissions")
+          .select("id")
+          .eq("id", theirs.id);
+        check(
+          "control: the other family reaches its own submission",
+          (control?.length ?? 0) === 1,
+          `saw ${control?.length}`,
+        );
+
+        await assertCannotSee(
+          "parent CANNOT see another family's submission",
+          parent,
+          "form_submissions",
+          theirs.id,
+        );
+        await assertCannotSee(
+          "the other family CANNOT see this family's submission",
+          parent2,
+          "form_submissions",
+          mine.id,
+        );
+
+        const mode = await refusalMode(
+          parent
+            .from("form_submissions")
+            .update({ status: "complete", signed_name: "Not Their Name" })
+            .eq("id", theirs.id)
+            .select(),
+        );
+        check("parent CANNOT sign another family's form", !mode.startsWith("ALLOWED"), mode);
+
+        const { data: after } = await admin
+          .from("form_submissions")
+          .select("status")
+          .eq("id", theirs.id)
+          .maybeSingle();
+        check(
+          "…and it is still pending when admin re-reads it",
+          after?.status === "pending",
+          `status ${after?.status}`,
+        );
+      }
+
+      {
+        // Moving a form to another family would be a way to read it.
+        const riderSubmission = submissions.mainRider;
+        if (riderSubmission?.id) {
+          const mode = await refusalMode(
+            parent
+              .from("form_submissions")
+              .update({ family_id: controlFamilyId })
+              .eq("id", riderSubmission.id)
+              .select(),
+          );
+          check(
+            "parent CANNOT move their form to another family",
+            !mode.startsWith("ALLOWED"),
+            mode,
+          );
+        }
+      }
+
+      {
+        const mode = await refusalMode(
+          parent
+            .from("form_submissions")
+            .insert({ template_id: templates.waiver.id, family_id: controlFamilyId })
+            .select(),
+        );
+        check("parent CANNOT create a submission for another family", !mode.startsWith("ALLOWED"), mode);
+      }
+
+      {
+        const mode = await refusalMode(
+          parent.from("form_submissions").delete().eq("id", mine.id).select(),
+        );
+        check("parent CANNOT delete a signed form", !mode.startsWith("ALLOWED"), mode);
+
+        const { data } = await admin.from("form_submissions").select("id").eq("id", mine.id);
+        check("…and it survives", (data?.length ?? 0) === 1);
+      }
+
+      console.log("\nstaff see nothing here; parents cannot author templates");
+      {
+        const { ids } = await visibleIds(staff, "form_submissions");
+        check("staff sees 0 form submissions", ids.length === 0, `saw ${ids.length}`);
+        const { ids: templateIds } = await visibleIds(staff, "form_templates");
+        check("staff sees 0 form templates", templateIds.length === 0, `saw ${templateIds.length}`);
+      }
+      {
+        const mode = await refusalMode(
+          parent
+            .from("form_templates")
+            .insert({ name: "Parent-authored template", applies_to: "family" })
+            .select(),
+        );
+        check("parent CANNOT create a template", !mode.startsWith("ALLOWED"), mode);
+      }
+      {
+        const mode = await refusalMode(
+          parent
+            .from("form_templates")
+            .update({ required: false })
+            .eq("id", templates.waiver.id)
+            .select(),
+        );
+        check("parent CANNOT make a required form optional", !mode.startsWith("ALLOWED"), mode);
+      }
+      {
+        const { error } = await parent.rpc("ensure_family_onboarding", {
+          family: fixtures.familyId,
+        });
+        check(
+          "parent CANNOT run the onboarding materialiser — refused by the function",
+          Boolean(error) && !blockedAtTheDoor(error),
+          error ? `blocked at the door: ${error.code}` : "it ran for a parent",
+        );
+      }
+      {
+        for (const table of ["form_templates", "form_submissions"]) {
+          const { ids } = await visibleIds(anon, table);
+          check(`anon sees 0 rows in ${table}`, ids.length === 0, `saw ${ids.length}`);
+        }
+      }
+
+      console.log("\nadmin — the control proving the write rules are not simply broken");
+      {
+        const { error } = await admin
+          .from("form_submissions")
+          .update({ data: { emergency_contact: "Corrected By The Barn" } })
+          .eq("id", mine.id);
+        check("admin CAN correct a signed form", !error, error?.message);
+      }
+
+      // --- restore the fixture ------------------------------------------------
+      //
+      // This section SIGNS a submission, which is a one-way door for the family
+      // that owns it — that is the whole point of the table. Without putting it
+      // back, the second run of the suite would find an already-complete form
+      // and "parent CAN sign their own form" would go red for a reason that has
+      // nothing to do with a policy.
+      //
+      // Admin is the right hand to do it: a signed form being un-signed is
+      // exactly the barn-only correction path, so this exercises it rather than
+      // working around it. The suite must pass twice with no re-seed, and this
+      // is what makes that true here.
+      {
+        const { error } = await admin
+          .from("form_submissions")
+          .update({ status: "pending", signed_name: null, signed_at: null, data: {} })
+          .eq("id", mine.id);
+        check(
+          "the signed fixture is reset for the next run — admin can un-sign",
+          !error,
+          error?.message,
+        );
+
+        const { data } = await admin
+          .from("form_submissions")
+          .select("status, signed_at")
+          .eq("id", mine.id)
+          .maybeSingle();
+        check(
+          "…and it really is pending again",
+          data?.status === "pending" && data?.signed_at === null,
+          `status ${data?.status}, signed_at ${data?.signed_at}`,
+        );
+      }
+    }
+  }
+
+  // ===========================================================================
   // STANDING GUARD — function exposure
   //
   // Data-driven from the migrations, so it covers functions added later without
