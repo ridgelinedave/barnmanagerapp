@@ -71,6 +71,62 @@ function zoneOffsetMs(at: Date, timeZone: string): number {
   return asUtc - at.getTime();
 }
 
+/**
+ * Who the feed is being built for.
+ *
+ * `isBarn` is admin or staff — they see the whole calendar. Everyone else is a
+ * family, scoped to their own riders and to public events.
+ */
+export type FeedViewer = { isBarn: boolean; familyId: string | null };
+
+/**
+ * WHICH BARN EVENTS THIS VIEWER MAY SEE.
+ *
+ * Extracted from the route handler on purpose. The feed runs with the service
+ * role and no session, so RLS is not protecting it — this filter IS the
+ * boundary, and a boundary that can only be exercised by fetching a live
+ * subscription URL is a boundary nobody tests. As a plain function over arrays
+ * it is asserted directly in tests/ical.test.mjs.
+ *
+ * The route ALSO filters at the query level. That is deliberate belt and
+ * braces, not redundancy: two independent chances to keep a staff-only vet
+ * visit off forty families' phones.
+ */
+export function scopeEvents<T extends { visibility: string }>(
+  viewer: FeedViewer,
+  events: T[],
+): T[] {
+  if (viewer.isBarn) return events;
+  return events.filter((event) => event.visibility === "all");
+}
+
+/**
+ * WHICH LESSONS THIS VIEWER MAY SEE.
+ *
+ * A family sees an instance only when one of THEIR riders holds a live seat in
+ * it — the same rule the lesson_riders policy applies, restated because the
+ * policy cannot run here.
+ *
+ * A family with no riders, or no family at all, gets nothing rather than
+ * everything: the empty-input case is the one a naive filter gets backwards.
+ */
+export function scopeLessons<T extends { id: string }>(
+  viewer: FeedViewer,
+  instances: T[],
+  seats: { instance_id: string; rider_id: string }[],
+  familyRiderIds: string[],
+): T[] {
+  if (viewer.isBarn) return instances;
+  if (!viewer.familyId || familyRiderIds.length === 0) return [];
+
+  const mine = new Set(familyRiderIds);
+  const booked = new Set(
+    seats.filter((seat) => mine.has(seat.rider_id)).map((seat) => seat.instance_id),
+  );
+
+  return instances.filter((instance) => booked.has(instance.id));
+}
+
 export type CalendarEvent = {
   /** Stable across regenerations: the same lesson must not duplicate on refresh. */
   uid: string;

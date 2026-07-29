@@ -1,6 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { renderCalendar, type CalendarEvent } from "@/lib/ical";
+import {
+  renderCalendar,
+  scopeEvents,
+  scopeLessons,
+  type CalendarEvent,
+  type FeedViewer,
+} from "@/lib/ical";
 import { barnLocalToUtc } from "@/lib/dates";
 import { barn, featureEnabled } from "@/config/barn";
 
@@ -58,12 +64,18 @@ export async function GET(request: NextRequest, context: { params: Promise<{ tok
   if (!profile) return new NextResponse("Not found", { status: 404 });
 
   const isBarn = profile.role === "admin" || profile.role === "staff";
+  const viewer: FeedViewer = {
+    isBarn,
+    familyId: (profile.family_id as string | null) ?? null,
+  };
   const events: CalendarEvent[] = [];
   const now = new Date();
 
   // --- barn events ----------------------------------------------------------
   // A family sees only what is marked visible to everyone. This is the line
-  // that keeps a staff-only vet visit off a family's phone.
+  // that keeps a staff-only vet visit off a family's phone — applied twice, at
+  // the query and again in scopeEvents(), because it is the kind of line that
+  // must not depend on one expression being right.
   let eventQuery = supabase
     .from("events")
     .select("id, type, title, description, start_at, end_at, location, visibility");
@@ -71,7 +83,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ tok
 
   const { data: barnEvents } = await eventQuery;
 
-  for (const event of barnEvents ?? []) {
+  for (const event of scopeEvents(viewer, barnEvents ?? [])) {
     events.push({
       uid: `event-${event.id}@crouse-barn-app`,
       start: new Date(event.start_at as string),
@@ -89,30 +101,33 @@ export async function GET(request: NextRequest, context: { params: Promise<{ tok
       .select("id, date, start_time, duration_min, type, status")
       .eq("status", "scheduled");
 
-    let relevant = instances ?? [];
+    // Mirrors the lesson_riders policy: this family's riders, actually booked.
+    let riderIds: string[] = [];
+    let seats: { instance_id: string; rider_id: string }[] = [];
 
-    if (!isBarn) {
-      // Mirrors the lesson_riders policy: this family's riders, actually booked.
+    if (!isBarn && viewer.familyId) {
       const { data: riders } = await supabase
         .from("riders")
-        .select("id, name")
-        .eq("family_id", profile.family_id as string);
+        .select("id")
+        .eq("family_id", viewer.familyId);
 
-      const riderIds = (riders ?? []).map((r) => r.id as string);
+      riderIds = (riders ?? []).map((r) => r.id as string);
 
-      if (riderIds.length === 0) {
-        relevant = [];
-      } else {
-        const { data: seats } = await supabase
+      if (riderIds.length > 0) {
+        const { data: rows } = await supabase
           .from("lesson_riders")
           .select("instance_id, rider_id, status")
           .in("rider_id", riderIds)
           .in("status", ["booked", "backfilled"]);
 
-        const booked = new Set((seats ?? []).map((s) => s.instance_id as string));
-        relevant = relevant.filter((i) => booked.has(i.id as string));
+        seats = (rows ?? []).map((row) => ({
+          instance_id: row.instance_id as string,
+          rider_id: row.rider_id as string,
+        }));
       }
     }
+
+    const relevant = scopeLessons(viewer, instances ?? [], seats, riderIds);
 
     for (const instance of relevant) {
       // Lessons are stored as a barn-local date and wall-clock time; a calendar

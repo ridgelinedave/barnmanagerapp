@@ -8,7 +8,13 @@
  *
  * Run:  npm run test:ical
  */
-import { renderCalendar, icalDate, localToUtc as convert } from "../lib/ical.ts";
+import {
+  renderCalendar,
+  icalDate,
+  localToUtc as convert,
+  scopeEvents,
+  scopeLessons,
+} from "../lib/ical.ts";
 
 /** The barn's zone, stated here so the test does not depend on config/barn.ts. */
 const TZ = "America/New_York";
@@ -122,6 +128,93 @@ check(
   localToUtc("2026-07-30", "00:00:00").toISOString() === "2026-07-30T04:00:00.000Z",
   localToUtc("2026-07-30", "00:00:00").toISOString(),
 );
+
+console.log("\nfeed scoping — who is in whose calendar\n");
+
+// The feed runs with the service role and NO session, so RLS protects nothing
+// there: these two functions are the boundary. Both denials get a positive
+// control first, so "absent" cannot be confused with "the list was empty".
+
+const BARN = { isBarn: true, familyId: null };
+const FAMILY_A = { isBarn: false, familyId: "family-a" };
+const FAMILY_B = { isBarn: false, familyId: "family-b" };
+
+const EVENTS = [
+  { id: "public-clinic", visibility: "all" },
+  { id: "staff-vet-visit", visibility: "staff" },
+];
+
+{
+  const barnSees = scopeEvents(BARN, EVENTS).map((e) => e.id);
+  check(
+    "control: the barn sees both the public and the staff-only event",
+    barnSees.includes("public-clinic") && barnSees.includes("staff-vet-visit"),
+    barnSees.join(", "),
+  );
+
+  const familySees = scopeEvents(FAMILY_A, EVENTS).map((e) => e.id);
+  check(
+    "control: a family DOES see the public event",
+    familySees.includes("public-clinic"),
+    "if the family saw nothing, the denial below would prove nothing",
+  );
+  check(
+    "a visibility='staff' event does NOT appear in a family's feed",
+    !familySees.includes("staff-vet-visit"),
+    `family saw: ${familySees.join(", ")}`,
+  );
+}
+
+const INSTANCES = [{ id: "lesson-a" }, { id: "lesson-b" }, { id: "lesson-unbooked" }];
+const SEATS = [
+  { instance_id: "lesson-a", rider_id: "rider-a1" },
+  { instance_id: "lesson-b", rider_id: "rider-b1" },
+];
+const RIDERS_A = ["rider-a1"];
+const RIDERS_B = ["rider-b1"];
+
+{
+  const aSees = scopeLessons(FAMILY_A, INSTANCES, SEATS, RIDERS_A).map((i) => i.id);
+  const bSees = scopeLessons(FAMILY_B, INSTANCES, SEATS, RIDERS_B).map((i) => i.id);
+
+  check(
+    "control: family A sees the lesson its own rider is booked into",
+    aSees.includes("lesson-a"),
+    aSees.join(", "),
+  );
+  check(
+    "control: family B sees its own",
+    bSees.includes("lesson-b"),
+    bSees.join(", "),
+  );
+
+  check(
+    "one family's lessons do NOT appear in another family's feed",
+    !aSees.includes("lesson-b") && !bSees.includes("lesson-a"),
+    `A saw ${aSees.join(", ")}; B saw ${bSees.join(", ")}`,
+  );
+  check(
+    "a lesson nobody in the family is booked into is absent",
+    !aSees.includes("lesson-unbooked") && !bSees.includes("lesson-unbooked"),
+  );
+  check(
+    "the barn still sees every lesson",
+    scopeLessons(BARN, INSTANCES, SEATS, []).length === 3,
+  );
+}
+
+{
+  // The empty cases are the ones a naive filter gets backwards — "no riders"
+  // must mean nothing, never everything.
+  check(
+    "a family with no riders gets an EMPTY feed, not the whole barn's",
+    scopeLessons(FAMILY_A, INSTANCES, SEATS, []).length === 0,
+  );
+  check(
+    "a viewer with no family at all gets an empty feed",
+    scopeLessons({ isBarn: false, familyId: null }, INSTANCES, SEATS, RIDERS_A).length === 0,
+  );
+}
 
 console.log(`\n${passed} passed, ${failures.length} failed`);
 if (failures.length > 0) {

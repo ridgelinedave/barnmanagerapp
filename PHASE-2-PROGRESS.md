@@ -9,20 +9,69 @@
 
 ## Headline
 
-**Five slices shipped green. Two are live; three are built and waiting on
-David's SQL audit.**
+**All five slices are live.** `horses`, `care`, `documents`, `forms` and
+`events` are on.
 
-**Suite: 480 passed, 0 failed, 0 skipped**, run twice with no re-seed between,
-after every applied migration. Plus `test:pdf` (12) and `test:ical` (20), both
-in `npm run verify`.
+**Suite: 521 passed, 0 failed, 0 skipped**, run twice with no re-seed. Advisor
+**clean across 8 lints**. Plus `test:pdf` (12) and `test:ical` (30).
+
+The green gate is now one command, and it includes the Advisor:
+
+```bash
+npm run db:gate    # seed → test:policies → test:policies (no re-seed) → db:advisor
+```
 
 | Slice | Migration | Flag | State |
 |---|---|---|---|
-| 1 — horses, rider links, feed plans | 0010 | `horses` **on** | Live, audited |
-| 2 — care events, due-soon, digest | 0011 | `care` **on** | Live, audited |
-| 3 — documents vault (Storage) | 0012 | `documents` **off** | **Needs audit** |
-| 4 — onboarding forms + PDF vault | 0013 | `forms` **off** | **Needs audit** |
-| 5 — events + iCal feed | 0014 | `events` **off** | **Needs audit** |
+| 1 — horses, rider links, feed plans | 0010 | `horses` **on** | Live |
+| 2 — care events, due-soon, digest | 0011 | `care` **on** | Live |
+| 3 — documents vault (Storage) | 0012 | `documents` **on** | Live |
+| 4 — onboarding forms + PDF vault | 0013 | `forms` **on** | Live |
+| 5 — events + iCal feed | 0014 | `events` **on** | Live |
+| — security lockdown | 0015 | — | Live |
+
+---
+
+## The Advisor found something an eyeball pass had missed for three phases
+
+`npm run db:advisor` runs Supabase's own Security Advisor lints (the SQL from
+github.com/supabase/splinter, copied verbatim) against the live schema, so the
+check is part of the gate rather than something to remember. On its first run it
+reported **26 findings** against lint 0028: **every** SECURITY DEFINER function
+in `public` was EXECUTE-able by `anon`.
+
+Nobody wrote that. Postgres grants EXECUTE to PUBLIC by default and Supabase
+ships a *separate* default-privileges grant to `anon` and `authenticated` on
+top — so every function not explicitly closed was open. Same mechanism as the
+`backfill_book_rider` incident in Phase 1; we had only ever closed the functions
+classified as internal.
+
+**All 26 were probed before deciding anything.** Nothing was exploitable: the
+nine trigger functions are unreachable over PostgREST, the admin entry points
+raise on their own role checks (`respond_to_backfill_offer` was called against a
+**real sent offer** — refused, status unchanged), `eligible_backfill_riders`
+gates on `current_role()` inside the query and returned empty for a real
+instance, and the policy helpers return null/false for a caller with no
+identity. The one real leak was `instance_taken_seats`, which handed a seat
+count to anyone who knew a lesson's uuid.
+
+**Fixed rather than allowlisted** (migration 0015). It sweeps `pg_proc`, revokes
+from `public, anon, authenticated`, then grants back to `authenticated` by name
+— so the default for a function added in a later phase is now **closed**.
+Forgetting to close something used to be silent; forgetting to open something is
+now a loud, immediate failure.
+
+Guarded three ways so it cannot drift back:
+1. the policy suite asserts behaviourally that **no** definer function in
+   `public` is reachable signed-out — data-driven from the migrations, so future
+   functions are covered without anyone writing a new test;
+2. `db:advisor` runs in the green gate;
+3. `CLAUDE.md` documents the gate as seed → test → test → advisor.
+
+**What the Advisor does not cover:** auth-config advisors — leaked-password
+protection, OTP expiry, MFA options, Postgres version patches. Those live in the
+Auth service, not the database, and cannot be seen over a Postgres connection.
+**Still worth a look at Dashboard → Advisors before any launch.**
 
 Every migration is applied to the live Supabase project and every slice is
 committed separately on `phase-2`:
@@ -43,24 +92,32 @@ shows phase was not started.
 
 ## WHAT NEEDS DAVID
 
-1. **Audit three migrations, then flip three flags.** `0012` (documents),
-   `0013` (forms), `0014` (events). Each is applied and green; flipping the flag
-   is the only remaining step. **Run Security Advisor after reviewing** — slice 3
-   touches Storage, which the Advisor checks separately from table RLS.
-2. **Decide on the onboarding soft gate** (slice 4). SPEC §5 wants parents
+1. **A painted-pixel pass on the newly-live surfaces.** Their server output is
+   verified — content, scoping, read-only vs editable, signed vs unsigned — and
+   the admin horse page, the events calendar and the form fill/sign screen were
+   measured at 390px with no overflow and every target ≥44px. But the Browser
+   pane stopped compositing partway through, so **these are not measured at
+   320px**: `/manage/forms`, `/more` (the subscribe block), and the documents
+   list on `/more/horses/[id]` as a parent. The long unbroken strings on those
+   screens — the calendar URL and document filenames — carry `break-all` and
+   `break-words`, but that is reasoning, not a measurement. Worth one look on a
+   real phone.
+2. **Check Dashboard → Advisors** for the auth-config lints `db:advisor` cannot
+   see (see above).
+3. **Decide on the onboarding soft gate** (slice 4). SPEC §5 wants parents
    blocked from the app until required forms are signed. It is deliberately NOT
    wired up — the seam is `onboardingOutstanding()` in `lib/forms.ts`. Locking a
    paying family out of their lesson schedule over an unsigned waiver is a
    support call, so it should be a deliberate choice.
-3. **Decide the care digest's cron semantics** (slice 2). Idempotency is per
+4. **Decide the care digest's cron semantics** (slice 2). Idempotency is per
    care item *forever*, so a weekly cron on `enqueue_care_due_digest()` would go
    quiet after the first week. Fine as a button; needs a week-scoped key as a job.
-4. **Form templates are created in SQL for now.** There is no admin authoring UI
+5. **Form templates are created in SQL for now.** There is no admin authoring UI
    for the `schema` jsonb — the dashboard lists templates and shows who has
    signed, but new templates are seeded directly. Worth knowing before Belle asks.
-5. **Confirm the remaining `config/barn.ts` placeholders** — the geofence is
+6. **Confirm the remaining `config/barn.ts` placeholders** — the geofence is
    still `null`, so clock-in flags nothing.
-6. **Deployment is still unaddressed**, and the iCal feed is the first thing that
+7. **Deployment is still unaddressed**, and the iCal feed is the first thing that
    genuinely needs a stable public host: a subscription URL that changes breaks
    every calendar that has it.
 
@@ -68,7 +125,7 @@ shows phase was not started.
 
 ## Slices 3–5, in brief
 
-### Slice 3 — documents vault (`documents` flag OFF)
+### Slice 3 — documents vault (`documents` flag ON)
 
 A **private** `documents` bucket, created with `public = false` and re-asserted
 private on every re-run, so re-applying the migration is also the fix if anyone
@@ -93,7 +150,7 @@ real uploaded object, fetched with no session, must not serve the file.
 `listBuckets()` returns nothing useful over an anon-key session, and a flag is
 the wrong thing to test anyway. `db:verify` now covers Storage as well.
 
-### Slice 4 — onboarding forms, e-signature, PDF vault (`forms` flag OFF)
+### Slice 4 — onboarding forms, e-signature, PDF vault (`forms` flag ON)
 
 Everything here exists to make a signature mean something: identity columns are
 immutable, `status` may only go pending → complete **with** a signature, the
@@ -115,7 +172,21 @@ as long as the vault matters. `tests/pdf.test.mjs` covers what a reader rejects
 on: xref offsets pointing at their objects, stream lengths in **bytes** not
 characters, escaping, latin1 encoding, and pagination.
 
-### Slice 5 — events + iCal (`events` flag OFF)
+### The sign → PDF → vault path, exercised end to end
+
+Signed a fixture waiver through the running app as a parent. The database
+recorded the signature with a server-set `signed_at`; the server action rendered
+the PDF and wrote it to `family_<uuid>/forms/…` in the private bucket as the
+service role; the row's `document_path` was filled in. Downloaded it back:
+**1,249 bytes, `%PDF-1.4` header, signature block present.** Fixture reset
+afterwards so the suite stays green.
+
+The submit was programmatic rather than a hit-tested tap — the pane was not
+compositing — so this proves the **server** path, not that the button is
+tappable. The button was separately confirmed to render at ≥44px and not be
+overlapped.
+
+### Slice 5 — events + iCal (`events` flag ON)
 
 Staff-only events never reach a family. The calendar **token is a bearer
 credential**, so it is readable only by its owner — not by staff, and **not by
@@ -441,9 +512,11 @@ npm run verify           # typecheck, lint, build, leak check, PDF + iCal tests
 npm run db:verify        # introspect the live schema, incl. Storage
 npm run db:apply -- <f>  # apply a migration
 npm run db:seed          # test fixtures
-npm run test:policies    # the 480-assertion RLS suite
+npm run db:gate          # THE GREEN GATE: seed → policies → policies → advisor
+npm run db:advisor       # Supabase security lints (splinter), DB-level only
+npm run test:policies    # the 521-assertion RLS suite
 npm run test:pdf         # PDF structure (12)
-npm run test:ical        # feed format + DST conversion (20)
+npm run test:ical        # feed format, DST conversion, feed scoping (30)
 npm run demo:seed        # walkthrough data  (-- --clean to remove)
 ```
 
