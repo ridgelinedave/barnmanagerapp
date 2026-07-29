@@ -1,9 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { TabPage } from "@/components/TabPage";
+import { CareTimeline } from "@/components/CareTimeline";
+import { CareLogForm } from "@/components/CareLogForm";
 import { currentRole } from "@/lib/guard";
 import { getHorse, listFeedPlans, listHorseRiders } from "@/lib/horses";
-import { MEAL_LABELS } from "@/lib/types";
+import { listCareEvents, loggerNames, upcoming } from "@/lib/care";
+import { barnToday, formatBarnDayLabel } from "@/lib/dates";
+import { CARE_TYPE_LABELS, MEAL_LABELS } from "@/lib/types";
 import { featureEnabled } from "@/config/barn";
 
 export const metadata = { title: "Horse" };
@@ -29,8 +33,17 @@ export default async function HorseDetailPage({
   const horse = await getHorse(id);
   if (!horse) notFound();
 
-  const [plans, riders] = await Promise.all([listFeedPlans(id), listHorseRiders(id)]);
+  const careOn = featureEnabled("care");
+  const [plans, riders, care, loggers] = await Promise.all([
+    listFeedPlans(id),
+    listHorseRiders(id),
+    careOn ? listCareEvents(id) : Promise.resolve([]),
+    // The "logged by" line is a barn detail. A family sees what was done and
+    // when, not which employee wrote it up.
+    careOn && role !== "parent" ? loggerNames() : Promise.resolve(undefined),
+  ]);
   const activePlans = plans.filter((p) => p.active);
+  const due = upcoming(care);
 
   const facts: [string, string][] = [
     horse.barn_name ? ["Barn name", horse.barn_name] : null,
@@ -86,6 +99,51 @@ export default async function HorseDetailPage({
           ))
         )}
       </section>
+
+      {careOn && (
+        <>
+          {due.length > 0 && (
+            <section className="rounded-2xl border border-brand-ink/10 bg-white p-4">
+              <h2 className="text-base font-semibold">Coming up</h2>
+              <ul className="mt-2 flex flex-col gap-1">
+                {due.map((event) => (
+                  <li key={event.id} className="text-sm text-brand-ink/85">
+                    <span className="font-medium">{CARE_TYPE_LABELS[event.type]}</span> — due{" "}
+                    {formatBarnDayLabel(event.due_next!)}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          <section className="flex flex-col gap-3">
+            <div className="flex items-baseline gap-2">
+              <h2 className="text-base font-semibold">Care history</h2>
+              <p className="text-sm text-brand-ink/60">
+                {care.length === 0 ? "Nothing logged" : `${care.length} record(s)`}
+              </p>
+            </div>
+
+            <CareTimeline
+              events={care}
+              today={barnToday()}
+              loggerNames={loggers}
+              emptyMessage={
+                role === "parent"
+                  ? "Nothing logged for this horse yet."
+                  : "Nothing logged yet. Add the first record below."
+              }
+            />
+
+            {role !== "parent" && (
+              <div className="rounded-2xl border border-brand-ink/10 bg-white p-4">
+                <h3 className="mb-3 text-sm font-semibold text-brand-ink/70">Log care</h3>
+                <CareLogForm horseId={horse.id} today={barnToday()} />
+              </div>
+            )}
+          </section>
+        </>
+      )}
 
       {riders.length > 0 && (
         <section className="rounded-2xl border border-brand-ink/10 bg-white p-4">

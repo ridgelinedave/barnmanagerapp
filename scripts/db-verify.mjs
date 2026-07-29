@@ -63,6 +63,8 @@ const EXPECTED_TABLES = [
   "horses",
   "horse_riders",
   "feed_plans",
+  // Phase 2 slice 2 — care.
+  "care_events",
 ];
 const EXPECTED_FUNCTIONS = [
   "current_role",
@@ -75,6 +77,9 @@ const EXPECTED_FUNCTIONS = [
   "family_owns_horse",
   "family_rides_horse",
   "horses_basics",
+  // Phase 2 slice 2 — care.
+  "care_events_guard_insert",
+  "enqueue_care_due_digest",
 ];
 
 let problems = 0;

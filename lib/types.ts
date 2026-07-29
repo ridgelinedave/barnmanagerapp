@@ -272,6 +272,48 @@ export type FeedPlan = {
   active: boolean;
 };
 
+export const CARE_TYPES = [
+  "vaccine",
+  "coggins",
+  "dental",
+  "deworm",
+  "farrier",
+  "vet",
+  "medication",
+  "wound",
+  "other",
+] as const;
+export type CareType = (typeof CARE_TYPES)[number];
+
+export function isCareType(value: unknown): value is CareType {
+  return typeof value === "string" && (CARE_TYPES as readonly string[]).includes(value);
+}
+
+export const CARE_TYPE_LABELS: Record<CareType, string> = {
+  vaccine: "Vaccine",
+  coggins: "Coggins",
+  dental: "Dental",
+  deworm: "Worming",
+  farrier: "Farrier",
+  vet: "Vet",
+  medication: "Medication",
+  wound: "Wound",
+  other: "Other",
+};
+
+export type CareEvent = {
+  id: string;
+  created_at: string;
+  horse_id: string;
+  type: CareType;
+  description: string;
+  /** Barn-local date, YYYY-MM-DD. Routinely in the past — care is logged after the fact. */
+  performed_at: string;
+  due_next: string | null;
+  /** Forced to the logging profile by a trigger; never client-supplied. */
+  logged_by: string | null;
+};
+
 export type Notification = {
   id: string;
   profile_id: string;

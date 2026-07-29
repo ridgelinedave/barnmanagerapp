@@ -16,6 +16,7 @@ export type BarnFeatureFlag =
   | "clockIn"
   | "tasks"
   | "horses"
+  | "care"
   | "lessons"
   | "shows"
   | "invoices"
@@ -103,6 +104,12 @@ export const barn = {
      * the three-tier horse visibility checked from BOTH families' logins.
      */
     horses: true,
+    /**
+     * Phase 2 slice 2 — shipped. Migration 0011 applied (including the
+     * overdue-in-the-digest amendment from the audit), Security Advisor clean,
+     * policy suite green (389 passed / 0 failed / 0 skipped).
+     */
+    care: true,
     /**
      * Phase 1 slices 3a + 3b — shipped. Migrations 0007 and 0008 applied,
      * policy suite green (241 passed / 0 failed / 0 skipped), including the

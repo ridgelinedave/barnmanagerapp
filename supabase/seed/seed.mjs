@@ -429,6 +429,112 @@ async function main() {
 
       horses.feedPlans = feedPlans;
       console.log(`  horses        4 (owned, ridden, barn, unrelated) + 4 feed plans`);
+
+      // --- care events (Phase 2, slice 2) ---------------------------------
+      //
+      // One past event and one with a future due date on BOTH the owned horse
+      // and the ridden horse. The pair on the ridden horse is the whole point:
+      // the fixture parent provably reaches that horse through basics, so
+      // "sees no care events" cannot be confused with "cannot see the horse".
+      //
+      // due_next on the owned horse is 14 days out — inside the digest's
+      // 30-day window, and computed from today so it never ages out of it.
+      const careProbe = await supabase.from("care_events").select("id").limit(1);
+
+      if (careProbe.error && /schema cache|does not exist/i.test(careProbe.error.message)) {
+        console.log("  care_events   SKIPPED — table not created yet (apply migration 0011)");
+      } else if (careProbe.error) {
+        fail("Could not read care_events", careProbe.error);
+      } else {
+        const day = (offset) => {
+          const d = new Date();
+          d.setDate(d.getDate() + offset);
+          return d.toISOString().slice(0, 10);
+        };
+
+        const CARE = [
+          {
+            key: "ownedVaccine",
+            horse_id: horses.owned.id,
+            type: "vaccine",
+            description: "Fixture spring shots. Owner and barn only.",
+            performed_at: day(-60),
+            due_next: day(14),
+          },
+          {
+            key: "ownedFarrier",
+            horse_id: horses.owned.id,
+            type: "farrier",
+            description: "Fixture reset, front shoes.",
+            performed_at: day(-21),
+            due_next: null,
+          },
+          {
+            // Already lapsed. The digest deliberately has no lower bound on
+            // due_next, so this must appear in it — an item nobody acted on is
+            // the one most worth a reminder.
+            key: "ownedOverdue",
+            horse_id: horses.owned.id,
+            type: "deworm",
+            description: "Fixture worming, now overdue.",
+            performed_at: day(-120),
+            due_next: day(-7),
+          },
+          {
+            key: "riddenCoggins",
+            horse_id: horses.ridden.id,
+            type: "coggins",
+            description: "Another family's Coggins. The riding family must never read this.",
+            performed_at: day(-90),
+            due_next: day(20),
+          },
+          {
+            key: "riddenMedication",
+            horse_id: horses.ridden.id,
+            type: "medication",
+            description: "Another family's medication record.",
+            performed_at: day(-3),
+            due_next: null,
+          },
+        ];
+
+        const careEvents = {};
+        for (const event of CARE) {
+          const { key, ...row } = event;
+
+          const { data: existing } = await supabase
+            .from("care_events")
+            .select("*")
+            .eq("horse_id", row.horse_id)
+            .eq("type", row.type)
+            .maybeSingle();
+
+          if (existing) {
+            // Re-assert the dates so the due item stays inside the 30-day
+            // window however long ago the fixture was first created.
+            const { data, error } = await supabase
+              .from("care_events")
+              .update({ ...row, logged_by: created.staff.profileId })
+              .eq("id", existing.id)
+              .select()
+              .single();
+            if (error) fail(`Could not refresh the "${key}" care fixture`, error);
+            careEvents[key] = data;
+            continue;
+          }
+
+          const { data, error } = await supabase
+            .from("care_events")
+            .insert({ ...row, logged_by: created.staff.profileId })
+            .select()
+            .single();
+          if (error) fail(`Could not create the "${key}" care fixture`, error);
+          careEvents[key] = data;
+        }
+
+        horses.careEvents = careEvents;
+        console.log(`  care_events   5 (3 owned incl. 1 overdue, 2 on another family's horse)`);
+      }
     }
   }
 
@@ -457,6 +563,10 @@ async function main() {
     "backfill_offer",
     "backfill_result",
     "lesson_reminder",
+    // Cleared so the digest's "it really does create rows" path is exercised
+    // on the first run after a seed. The idempotency assertion holds on the
+    // second run precisely because these are NOT cleared between runs.
+    "care_due",
   ]) {
     const { error } = await supabase.from("notifications").delete().eq("type", type);
     if (error) fail(`Could not clear '${type}' notifications`, error);

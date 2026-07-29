@@ -10,6 +10,10 @@ import {
   listFeedPlans,
   listHorseRiders,
 } from "@/lib/horses";
+import { CareTimeline } from "@/components/CareTimeline";
+import { CareLogForm } from "@/components/CareLogForm";
+import { listCareEvents, loggerNames } from "@/lib/care";
+import { barnToday } from "@/lib/dates";
 import { MEAL_LABELS } from "@/lib/types";
 import { featureEnabled } from "@/config/barn";
 import { deleteHorse, retireFeedPlan, unassignRider } from "../actions";
@@ -28,11 +32,14 @@ export default async function ManageHorsePage({
   const horse = await getHorse(id);
   if (!horse) notFound();
 
-  const [families, riders, allRiders, plans] = await Promise.all([
+  const careOn = featureEnabled("care");
+  const [families, riders, allRiders, plans, care, loggers] = await Promise.all([
     familyNames(),
     listHorseRiders(id),
     listAssignableRiders(),
     listFeedPlans(id),
+    careOn ? listCareEvents(id) : Promise.resolve([]),
+    careOn ? loggerNames() : Promise.resolve(new Map<string, string>()),
   ]);
 
   const assigned = new Set(riders.map((r) => r.id));
@@ -139,6 +146,24 @@ export default async function ManageHorsePage({
           </details>
         )}
       </section>
+
+      {careOn && (
+        <section className="flex flex-col gap-3">
+          <div className="flex items-baseline gap-2">
+            <h2 className="text-base font-semibold">Care history</h2>
+            <p className="text-sm text-brand-ink/60">
+              {care.length === 0 ? "Nothing logged" : `${care.length} record(s)`}
+            </p>
+          </div>
+
+          <CareTimeline events={care} today={barnToday()} loggerNames={loggers} />
+
+          <div className="rounded-2xl border border-brand-ink/10 bg-white p-4">
+            <h3 className="mb-3 text-sm font-semibold text-brand-ink/70">Log care</h3>
+            <CareLogForm horseId={horse.id} today={barnToday()} />
+          </div>
+        </section>
+      )}
 
       <form action={deleteHorse}>
         <input type="hidden" name="id" value={horse.id} />

@@ -2974,6 +2974,422 @@ async function main() {
   }
 
   // ===========================================================================
+  // care_events (Phase 2, slice 2)
+  //
+  // The most sensitive table in the app, so the denials are the point and each
+  // one is preceded by proof that the thing being denied exists and is
+  // reachable by somebody.
+  //
+  // The sharpest control here is the riding family's: they provably reach the
+  // ridden horse through horses_basics(), and that horse provably has care
+  // events an admin can read. Only then does "they see zero care rows" mean
+  // the care boundary held, rather than the horse simply being invisible or
+  // the table being empty.
+  // ===========================================================================
+  {
+    const horseFx = fixtures.horses ?? {};
+    const care = horseFx.careEvents ?? {};
+    const haveCare = Boolean(
+      care.ownedVaccine?.id &&
+        care.ownedFarrier?.id &&
+        care.ownedOverdue?.id &&
+        care.riddenCoggins?.id &&
+        parent2,
+    );
+
+    if (!haveCare) {
+      console.log("\n\n═══ care events — SKIPPED ═══");
+      console.log("  Migration 0011 is not applied yet, or seed-output.json predates the care");
+      console.log("  fixtures. Apply supabase/migrations/20260728000700_care_events.sql,");
+      console.log("  re-seed, re-run.");
+      skipped += 1;
+    } else {
+      const owned = horseFx.owned;
+      const ridden = horseFx.ridden;
+      const ownedCareIds = [care.ownedVaccine.id, care.ownedFarrier.id, care.ownedOverdue.id];
+      const riddenCareIds = [care.riddenCoggins.id, care.riddenMedication.id];
+      const allCareIds = [...ownedCareIds, ...riddenCareIds];
+
+      console.log("\n\n═══ care events — ALLOW ═══\n");
+
+      check(
+        "fixture control: the care events carry a description and a performed date",
+        [care.ownedVaccine, care.riddenCoggins].every((e) => e.description && e.performed_at),
+        "an empty care row would make every deny below vacuous",
+      );
+
+      for (const [label, client] of [
+        ["admin", admin],
+        ["staff", staff],
+      ]) {
+        const { data, error } = await client
+          .from("care_events")
+          .select("id, type, description, performed_at, due_next")
+          .in("id", allCareIds);
+        check(
+          `${label} reads every fixture care event`,
+          !error && (data?.length ?? 0) === 5,
+          error?.message ?? `saw ${data?.length}`,
+        );
+        const coggins = data?.find((e) => e.id === care.riddenCoggins.id);
+        check(
+          `${label} reads the description on another family's horse`,
+          Boolean(coggins?.description),
+          "the row came back without its description",
+        );
+      }
+
+      console.log("\nthe owning family — full care history for the horse they own");
+      {
+        const { data, error } = await parent
+          .from("care_events")
+          .select("id, type, description, performed_at, due_next")
+          .eq("horse_id", owned.id);
+        check(
+          "owner parent reads ALL THREE care events on their own horse",
+          !error && (data?.length ?? 0) === 3,
+          error?.message ?? `saw ${data?.length}`,
+        );
+        const vaccine = data?.find((e) => e.id === care.ownedVaccine.id);
+        check(
+          "…in full — description, date performed, and what is due next",
+          Boolean(vaccine?.description && vaccine?.performed_at && vaccine?.due_next),
+          JSON.stringify(vaccine ?? null),
+        );
+        check(
+          "…and the worming/farrier history is there, which is the point for a boarder",
+          data?.some((e) => e.type === "farrier") ?? false,
+        );
+      }
+
+      console.log("\nstaff log care — insert only, attributed to them");
+      const staffLogged = [];
+      {
+        // The spoof attempt: staff claims the admin logged it.
+        const { data, error } = await staff
+          .from("care_events")
+          .insert({
+            horse_id: owned.id,
+            type: "wound",
+            description: "Policy test — staff-logged care event.",
+            performed_at: "2026-07-20",
+            logged_by: users.admin.profileId,
+          })
+          .select()
+          .single();
+
+        check("staff CAN log a care event", !error && Boolean(data), error?.message);
+
+        if (data) {
+          staffLogged.push(data.id);
+          check(
+            "logged_by is forced to the caller — the claimed profile is ignored",
+            data.logged_by === users.staff.profileId,
+            `recorded ${data.logged_by}, staff is ${users.staff.profileId}, admin is ${users.admin.profileId}`,
+          );
+          check(
+            "a past performed_at is accepted — care is routinely logged after the fact",
+            data.performed_at === "2026-07-20",
+            `stored ${data.performed_at}`,
+          );
+        }
+      }
+
+      console.log("\ndue soon, and the digest");
+      {
+        const { data, error } = await admin
+          .from("care_events")
+          .select("id, due_next")
+          .not("due_next", "is", null)
+          .gte("due_next", new Date().toISOString().slice(0, 10))
+          .order("due_next", { ascending: true });
+
+        check(
+          "admin's due-soon surface finds the fixture item due in 14 days",
+          !error && (data ?? []).some((e) => e.id === care.ownedVaccine.id),
+          error?.message ?? `saw ${data?.length} due item(s)`,
+        );
+        const dues = (data ?? []).map((e) => e.due_next);
+        check(
+          "…soonest first",
+          dues.every((d, i) => i === 0 || dues[i - 1] <= d),
+          dues.join(", "),
+        );
+      }
+
+      {
+        const digestLink = `/manage/care?event=${care.ownedVaccine.id}`;
+        const existedBefore = async () => {
+          const { data } = await admin
+            .from("notifications")
+            .select("id")
+            .eq("type", "care_due")
+            .eq("link_path", digestLink);
+          return (data?.length ?? 0) > 0;
+        };
+
+        const before = await existedBefore();
+        const { data: firstRun, error } = await admin.rpc("enqueue_care_due_digest");
+        check("admin CAN run the care digest", !error, error?.message);
+
+        // Order-independent, and deliberately ONE assertion rather than a
+        // conditional block: a check that only sometimes runs makes the suite
+        // total change between runs, which reads like a flake.
+        //
+        // `db:seed` clears care_due, so on the first run after a seed `before`
+        // is false and this genuinely tests that the digest creates. On the
+        // second run of the same seed it is satisfied by `before`, and the two
+        // assertions after it carry the weight instead.
+        check(
+          "the digest creates the notification when it is missing",
+          before || (firstRun ?? 0) >= 1,
+          `already present: ${before}, created this call: ${firstRun}`,
+        );
+
+        const { data: secondRun } = await admin.rpc("enqueue_care_due_digest");
+        check(
+          "running it again creates nothing — idempotent per care item",
+          secondRun === 0,
+          `created ${secondRun} on the second call`,
+        );
+
+        check(
+          "the admin has a care_due notification for the item that is due",
+          await existedBefore(),
+          "the digest reported success but nothing landed",
+        );
+
+        // The amendment: overdue care is IN the digest, not only on the screen.
+        // Control first — the fixture really is in the past, so this is not
+        // just re-testing the future item under another name.
+        check(
+          "control: the overdue fixture's due date really is in the past",
+          care.ownedOverdue.due_next < new Date().toISOString().slice(0, 10),
+          `due_next is ${care.ownedOverdue.due_next}`,
+        );
+
+        const { data: overdueNotif } = await admin
+          .from("notifications")
+          .select("id")
+          .eq("type", "care_due")
+          .eq("link_path", `/manage/care?event=${care.ownedOverdue.id}`);
+        check(
+          "the digest includes care that is already OVERDUE",
+          (overdueNotif?.length ?? 0) === 1,
+          `found ${overdueNotif?.length} notification(s) for the overdue item`,
+        );
+      }
+
+      // =======================================================================
+      console.log("\n\n═══ care events — DENY (adversarial) ═══\n");
+      // =======================================================================
+
+      console.log("riding a horse earns NOTHING here — there is no basics tier for care");
+      {
+        // Control: they really do reach this horse.
+        const { data: basics } = await parent.rpc("horses_basics");
+        check(
+          "control: the parent reaches the ridden horse through basics",
+          (basics ?? []).some((h) => h.id === ridden.id),
+          "if they cannot see the horse at all, the care denial proves nothing",
+        );
+
+        // Control: the horse really does have care events.
+        const { data: exists } = await admin
+          .from("care_events")
+          .select("id")
+          .eq("horse_id", ridden.id);
+        check(
+          "control: that horse really does have care events",
+          (exists?.length ?? 0) === 2,
+          `admin saw ${exists?.length}`,
+        );
+
+        const { data, error } = await parent
+          .from("care_events")
+          .select("*")
+          .eq("horse_id", ridden.id);
+        check(
+          "parent sees ZERO care events for a horse their rider rides",
+          !error && (data?.length ?? 0) === 0,
+          error?.message ?? `LEAKED ${data?.length} row(s)`,
+        );
+
+        for (const id of riddenCareIds) {
+          await assertCannotSee(
+            `parent CANNOT fetch that care event by id (${id.slice(0, 8)}…)`,
+            parent,
+            "care_events",
+            id,
+          );
+        }
+      }
+
+      console.log("\nand neither family can read the other's — checked from both logins");
+      {
+        // Control on each side first.
+        const { data: mine } = await parent
+          .from("care_events")
+          .select("id")
+          .in("id", ownedCareIds);
+        check(
+          "control: the first family reads its own three care events",
+          (mine?.length ?? 0) === 3,
+          `saw ${mine?.length}`,
+        );
+
+        const { data: theirs } = await parent2
+          .from("care_events")
+          .select("id")
+          .in("id", riddenCareIds);
+        check(
+          "control: the other family reads its own two care events",
+          (theirs?.length ?? 0) === 2,
+          `saw ${theirs?.length}`,
+        );
+
+        const { data: leak1 } = await parent.from("care_events").select("id").in("id", riddenCareIds);
+        check(
+          "the first family CANNOT read the other family's care events",
+          (leak1?.length ?? 0) === 0,
+          `LEAKED ${leak1?.length}`,
+        );
+
+        const { data: leak2 } = await parent2.from("care_events").select("id").in("id", ownedCareIds);
+        check(
+          "the other family CANNOT read the first family's care events",
+          (leak2?.length ?? 0) === 0,
+          `LEAKED ${leak2?.length}`,
+        );
+      }
+
+      console.log("\nstaff log, and nothing else — the append-only half");
+      {
+        const target = staffLogged[0] ?? care.ownedVaccine.id;
+
+        // Control: staff can READ the row they are about to fail to change.
+        const { data: readable } = await staff.from("care_events").select("id").eq("id", target);
+        check(
+          "control: staff can read the care event they are about to try to edit",
+          (readable?.length ?? 0) === 1,
+          "a refusal means nothing if the row is invisible",
+        );
+
+        const mode = await refusalMode(
+          staff
+            .from("care_events")
+            .update({ description: "rewritten by staff" })
+            .eq("id", target)
+            .select(),
+        );
+        check(
+          "staff CANNOT edit a care event — even one they logged themselves",
+          !mode.startsWith("ALLOWED"),
+          mode,
+        );
+
+        const { data: after } = await admin
+          .from("care_events")
+          .select("description")
+          .eq("id", target)
+          .maybeSingle();
+        check(
+          "…and the description is unchanged when admin re-reads it",
+          after?.description !== "rewritten by staff",
+          `now: ${after?.description}`,
+        );
+
+        const deleteMode = await refusalMode(
+          staff.from("care_events").delete().eq("id", target).select(),
+        );
+        check("staff CANNOT delete a care event", !deleteMode.startsWith("ALLOWED"), deleteMode);
+
+        const { data: survived } = await admin.from("care_events").select("id").eq("id", target);
+        check("…and the row survives", (survived?.length ?? 0) === 1);
+      }
+
+      console.log("\nparents write nothing; anon sees nothing");
+      {
+        const mode = await refusalMode(
+          parent
+            .from("care_events")
+            .insert({
+              horse_id: owned.id,
+              type: "vet",
+              description: "Parent-logged care.",
+              performed_at: "2026-07-20",
+            })
+            .select(),
+        );
+        check("parent CANNOT log care, even on their own horse", !mode.startsWith("ALLOWED"), mode);
+      }
+      {
+        const mode = await refusalMode(
+          parent
+            .from("care_events")
+            .update({ description: "rewritten by a parent" })
+            .eq("id", care.ownedVaccine.id)
+            .select(),
+        );
+        check("parent CANNOT edit their own horse's care history", !mode.startsWith("ALLOWED"), mode);
+      }
+      {
+        const { ids } = await visibleIds(anon, "care_events");
+        check("anon sees 0 care events", ids.length === 0, `saw ${ids.length}`);
+      }
+      {
+        const { error } = await anon.rpc("enqueue_care_due_digest");
+        check(
+          "anon CANNOT run the care digest",
+          blockedAtTheDoor(error),
+          error ? `it ran and returned ${error.code}: ${error.message}` : "it executed",
+        );
+      }
+      {
+        // Granted to authenticated, gated on role INSIDE. So this must fail on
+        // the function's own terms, not at the door — which is a different
+        // failure from anon's above, and worth telling apart.
+        const { error } = await staff.rpc("enqueue_care_due_digest");
+        check(
+          "staff CANNOT run the care digest — refused by the function, not the grant",
+          Boolean(error) && !blockedAtTheDoor(error),
+          error ? `blocked at the door: ${error.code}` : "it ran for a staff member",
+        );
+      }
+
+      console.log("\nadmin — the control proving the write policies are not simply broken");
+      {
+        const { data, error } = await admin
+          .from("care_events")
+          .insert({
+            horse_id: owned.id,
+            type: "dental",
+            description: "Policy test — admin-logged.",
+            performed_at: "2026-07-21",
+          })
+          .select()
+          .single();
+        check("admin CAN log a care event", !error && Boolean(data), error?.message);
+
+        if (data) {
+          const { error: updateError } = await admin
+            .from("care_events")
+            .update({ description: "Policy test — admin-edited." })
+            .eq("id", data.id);
+          check("admin CAN correct a care event", !updateError, updateError?.message);
+
+          await admin.from("care_events").delete().eq("id", data.id);
+          const { data: gone } = await admin.from("care_events").select("id").eq("id", data.id);
+          check("admin CAN delete a care event", (gone?.length ?? 0) === 0);
+        }
+      }
+
+      // Clean up what this section created, so counts stay stable across runs.
+      for (const id of staffLogged) await admin.from("care_events").delete().eq("id", id);
+    }
+  }
+
+  // ===========================================================================
   // STANDING GUARD — function exposure
   //
   // Data-driven from the migrations, so it covers functions added later without

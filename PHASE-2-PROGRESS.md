@@ -2,18 +2,18 @@
 
 **Branch:** `phase-2` · branched from `phase-1-complete` (`54cdd11`)
 **`main` untouched** at `840dc18` (verified Phase 0 state)
-**Date:** 2026-07-28
+**Date:** 2026-07-29
 **Nothing is deployed.** All of this runs locally against the live Supabase project.
 
 ---
 
 ## Headline
 
-**Slice 1 — horse records + feed plans — is complete, applied, audited and live
-behind its flag.** `horses` is **on**. Security Advisor is clean (checked by
-David after the SQL review).
+**Slices 1 and 2 are complete, applied, audited and live behind their flags.**
+`horses` and `care` are both **on**. Security Advisor is clean (checked by
+David after each SQL review).
 
-**Suite: 347 passed, 0 failed, 0 skipped**, run twice with no re-seed between,
+**Suite: 389 passed, 0 failed, 0 skipped**, run twice with no re-seed between,
 after every applied migration.
 
 ---
@@ -85,7 +85,88 @@ against it. Same guarantee, clean Advisor — confirmed clean in the dashboard.
 
 ---
 
-## Two gaps closed in the same commit
+## Slice 2 — care events
+
+Migration `supabase/migrations/20260728000700_care_events.sql` (0011).
+`care` flag **on**, after David's audit.
+
+Per-horse vaccines, Coggins, dental, worming, farrier, vet, medication and
+wounds, with what falls due next.
+
+### The rules, and why they are stricter than horses
+
+**There is no basics tier.** A family whose rider merely rides a horse sees
+**zero** care rows — not a redacted view, not names-only. Horse visibility
+needed a projection function because "some columns" is not expressible as a row
+policy; care needs none, because the answer is not "fewer columns", it is "no
+rows". The parent branch of the SELECT policy is `family_owns_horse()` and the
+policy carries a comment saying it must never become `family_rides_horse()` —
+that one-word change is the whole failure mode.
+
+**Staff insert, and only insert.** No UPDATE and no DELETE policy reachable by
+a plain staff member, the same append-only discipline as `punches`: a care log
+the person who wrote it can quietly rewrite is not a medical record. `logged_by`
+is pinned to the caller by a BEFORE INSERT trigger, so attribution cannot be
+spoofed.
+
+**`performed_at` is deliberately NOT pinned to now()**, unlike
+`punches.punched_at`. A punch is an assertion about the present and a
+client-supplied time is a way to invent paid hours; a care event is routinely
+written up days after the vet came, so a past date is the normal case.
+
+### Decisions on the record
+
+- **Update/delete gate on `has_permission('manage_horses')`**, so a senior
+  trainer granted the flag can correct records without being made an admin.
+  Default staff cannot. "Corrections are admin-only" and this are the same
+  thing only while nobody holds the flag.
+- **The digest includes overdue care** (amended after review — the original
+  had a `due_next >= current_date` lower bound). An item that lapses is the one
+  most worth a reminder; excluding the past would have meant the digest went
+  quiet exactly when the care became overdue. Screen and digest now agree on
+  what counts as outstanding.
+- **Idempotency is per care item forever**, matching `enqueue_lesson_reminders`.
+  Right for an admin-triggered button, **wrong for the weekly digest SPEC §8
+  describes** — a weekly cron on this function goes quiet after the first week.
+  Flagged in the migration; the fix is probably to scope the key to the week.
+- **The 30-day window lives in two places** — the SQL digest and
+  `CARE_DUE_SOON_DAYS` in `lib/care.ts`, each pointing at the other. It is not
+  in `config/barn.ts` because that file is for barn-specific *facts*, not
+  product rules a clone would keep. The digest measures from Postgres
+  `current_date` (UTC) and the screen from the barn's today, so the two can
+  disagree about an item exactly on the boundary for a few hours each evening.
+
+### What the tests prove
+
+- **Double control on the sharpest denial:** the riding family provably reaches
+  the horse through `horses_basics()`, and an admin provably reads care events
+  on that same horse — only then does "they see zero care rows" mean the care
+  boundary held rather than the horse being invisible or the table empty.
+  Checked by direct id fetch as well as filtered list.
+- Both families, from both logins: each reads its own, neither reads the other's.
+- **Staff append-only:** staff read the row (control), cannot update it, and the
+  description is unchanged when admin re-reads; cannot delete it, and the row
+  survives. Admin performs all four operations as the control.
+- **`logged_by` is forced** — a staff insert claiming the admin's profile is
+  recorded as the staff profile.
+- **Two different refusals, told apart:** anon is blocked at the door by the
+  grant; staff passes the grant and is refused by the function on role.
+- **Overdue care reaches the digest**, with a control asserting the fixture's
+  due date really is in the past.
+
+### Verified in the browser (390px and 320px)
+
+Admin due-soon shows `Overdue (1)` above `Coming up (2)`, each linking to the
+horse; care history and the log form on the admin horse page with the overdue
+chip and "Logged by" attribution; staff get the same log form from
+`/more/horses/[id]`; the owning parent gets **read-only** history plus "Coming
+up", with **no log form and no "logged by" line** (which employee wrote it up is
+a barn detail). No horizontal scroll at either width, no console errors, every
+touch target ≥44px.
+
+---
+
+## Two gaps closed in slice 1's commit
 
 **1. `db:verify` was quietly blind.** `EXPECTED_TABLES` had been the Phase 0
 five since Phase 0, so the verifier printed "Schema matches the migrations.
