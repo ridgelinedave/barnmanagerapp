@@ -9,12 +9,152 @@
 
 ## Headline
 
-**Slices 1 and 2 are complete, applied, audited and live behind their flags.**
-`horses` and `care` are both **on**. Security Advisor is clean (checked by
-David after each SQL review).
+**Five slices shipped green. Two are live; three are built and waiting on
+David's SQL audit.**
 
-**Suite: 389 passed, 0 failed, 0 skipped**, run twice with no re-seed between,
-after every applied migration.
+**Suite: 480 passed, 0 failed, 0 skipped**, run twice with no re-seed between,
+after every applied migration. Plus `test:pdf` (12) and `test:ical` (20), both
+in `npm run verify`.
+
+| Slice | Migration | Flag | State |
+|---|---|---|---|
+| 1 — horses, rider links, feed plans | 0010 | `horses` **on** | Live, audited |
+| 2 — care events, due-soon, digest | 0011 | `care` **on** | Live, audited |
+| 3 — documents vault (Storage) | 0012 | `documents` **off** | **Needs audit** |
+| 4 — onboarding forms + PDF vault | 0013 | `forms` **off** | **Needs audit** |
+| 5 — events + iCal feed | 0014 | `events` **off** | **Needs audit** |
+
+Every migration is applied to the live Supabase project and every slice is
+committed separately on `phase-2`:
+
+```
+3b79783  slice 5 — barn events and the iCal subscription feed
+f9c6eae  slice 4 — onboarding forms, e-signature and the PDF vault
+d15fb5f  slice 3 — the documents vault (private Storage bucket)
+6e12f20  slice 2 — care events, due-soon and the admin digest
+fcaad13  slice 1 — horses, rider links and feed plans
+```
+
+**`main` was not touched. Nothing is deployed. No deferred work was attempted**
+(QuickBooks, Resend/email, SMS/push, the Academy, the boarder persona), and the
+shows phase was not started.
+
+---
+
+## WHAT NEEDS DAVID
+
+1. **Audit three migrations, then flip three flags.** `0012` (documents),
+   `0013` (forms), `0014` (events). Each is applied and green; flipping the flag
+   is the only remaining step. **Run Security Advisor after reviewing** — slice 3
+   touches Storage, which the Advisor checks separately from table RLS.
+2. **Decide on the onboarding soft gate** (slice 4). SPEC §5 wants parents
+   blocked from the app until required forms are signed. It is deliberately NOT
+   wired up — the seam is `onboardingOutstanding()` in `lib/forms.ts`. Locking a
+   paying family out of their lesson schedule over an unsigned waiver is a
+   support call, so it should be a deliberate choice.
+3. **Decide the care digest's cron semantics** (slice 2). Idempotency is per
+   care item *forever*, so a weekly cron on `enqueue_care_due_digest()` would go
+   quiet after the first week. Fine as a button; needs a week-scoped key as a job.
+4. **Form templates are created in SQL for now.** There is no admin authoring UI
+   for the `schema` jsonb — the dashboard lists templates and shows who has
+   signed, but new templates are seeded directly. Worth knowing before Belle asks.
+5. **Confirm the remaining `config/barn.ts` placeholders** — the geofence is
+   still `null`, so clock-in flags nothing.
+6. **Deployment is still unaddressed**, and the iCal feed is the first thing that
+   genuinely needs a stable public host: a subscription URL that changes breaks
+   every calendar that has it.
+
+---
+
+## Slices 3–5, in brief
+
+### Slice 3 — documents vault (`documents` flag OFF)
+
+A **private** `documents` bucket, created with `public = false` and re-asserted
+private on every re-run, so re-applying the migration is also the fix if anyone
+flips it in the dashboard. Table RLS says nothing about Storage, so the rules
+are four policies on `storage.objects`, each pinned to `bucket_id = 'documents'`
+— a policy that forgot the bucket would widen access to every other bucket.
+
+Visibility mirrors **care**, not horses: the owning family reads its own horse's
+folder and its own family folder; a family whose rider merely rides the horse
+gets nothing. Families never write — a document a family can add is a document
+the barn did not verify.
+
+The path convention (`horse_<uuid>/`, `family_<uuid>/`) **is** the boundary, so
+it is parsed in exactly one place and built in exactly one place. Filenames are
+sanitised before they become paths: a name containing `../` would otherwise
+escape its horse's folder, which is a privilege escalation dressed as a
+filename. The uuid is regex-checked before it is cast, because a malformed path
+raising inside a policy turns a "no" into a failed query.
+
+**The bucket's privateness is asserted behaviourally** — the public URL for a
+real uploaded object, fetched with no session, must not serve the file.
+`listBuckets()` returns nothing useful over an anon-key session, and a flag is
+the wrong thing to test anyway. `db:verify` now covers Storage as well.
+
+### Slice 4 — onboarding forms, e-signature, PDF vault (`forms` flag OFF)
+
+Everything here exists to make a signature mean something: identity columns are
+immutable, `status` may only go pending → complete **with** a signature, the
+signing timestamp is set by the database, a signed form cannot be edited by the
+family, and a CHECK constraint refuses a signature-less "complete" row even from
+the service role. Row policy decides which rows; the trigger decides which
+changes. Staff see nothing on either table.
+
+Signing runs on the parent's own session so the policy and trigger decide it.
+The **PDF write runs as the service role** — families deliberately have no write
+access to the vault — but only *after* the database accepts the signature, so
+the privileged step is gated by the unprivileged one. If the PDF fails the
+signature still stands: the row is the record.
+
+**The PDF is hand-written** (`lib/pdf.ts`, ~150 lines) rather than pulled from a
+library, because the only thing this app renders is labelled text and a
+signature block, and a dependency in the legal-vault path has to be audited for
+as long as the vault matters. `tests/pdf.test.mjs` covers what a reader rejects
+on: xref offsets pointing at their objects, stream lengths in **bytes** not
+characters, escaping, latin1 encoding, and pagination.
+
+### Slice 5 — events + iCal (`events` flag OFF)
+
+Staff-only events never reach a family. The calendar **token is a bearer
+credential**, so it is readable only by its owner — not by staff, and **not by
+admin**: a token an employee can read is an employee who can subscribe to a
+family's schedule forever, and revoking their account would not revoke it. A
+trigger forces the token to a server-generated uuid on insert and rotation.
+
+The feed route runs with the service role and no session, so **RLS protects
+nothing there and the scoping in the handler is the boundary** — stated at the
+top of the file, with every query re-stating the rule its policy would have
+applied. Unknown and malformed tokens both get 404.
+
+Lessons are stored as barn-local date + wall clock and converted to UTC for the
+feed, with a **two-pass** correction because a single pass lands an hour out on
+the two DST boundary days. `tests/ical.test.mjs` covers that plus CRLF endings,
+75-**octet** folding measured in bytes, and escaping.
+
+Verified behaviourally: the feed returns **404, not a sign-in redirect**, so the
+`/api/ical` middleware exemption works and the flag really does gate it.
+
+---
+
+## Decisions and assumptions worth challenging
+
+- **`has_permission('manage_horses')` gates care corrections**, so a senior
+  trainer granted the flag can edit care records. Default staff cannot.
+- **`manage_schedule` gates events**, since it is the same calendar as lessons.
+- **The care due-soon screen shows overdue items; the digest now does too**
+  (amended after review — the lower bound was removed).
+- **The 30-day care window lives in two places**, SQL and `lib/care.ts`, each
+  pointing at the other. Not in `config/barn.ts`, which is for barn *facts*.
+- **`ensure_family_onboarding()` is admin-triggered**, not automatic on family
+  creation. Re-run it after adding a template; it is idempotent.
+- **Two new test suites were added to `npm run verify`** (`test:pdf`,
+  `test:ical`). `lib/pdf.ts` and `lib/ical.ts` are deliberately not
+  `server-only` — they are pure functions, and that is what makes them testable
+  outside the bundler.
+- **`/api/ical` is now a public path in the middleware.** It has to be; the
+  token authenticates the request.
 
 ---
 
@@ -287,3 +427,26 @@ checklist gate and PDF vault · events and iCal feeds · then Belle's additions
 **Deferred, needs David's accounts — not attempted:**
 QuickBooks/Intuit OAuth and TimeActivity sync · Resend email (in-app
 notifications only) · SMS and push · the Academy · the boarder persona.
+
+**Not started, deliberately:** the shows phase, which is being re-scoped into
+the show-team hub.
+
+---
+
+## Commands
+
+```
+npm run dev              # local dev
+npm run verify           # typecheck, lint, build, leak check, PDF + iCal tests
+npm run db:verify        # introspect the live schema, incl. Storage
+npm run db:apply -- <f>  # apply a migration
+npm run db:seed          # test fixtures
+npm run test:policies    # the 480-assertion RLS suite
+npm run test:pdf         # PDF structure (12)
+npm run test:ical        # feed format + DST conversion (20)
+npm run demo:seed        # walkthrough data  (-- --clean to remove)
+```
+
+Fixture logins are `phase0.admin@`, `phase0.staff@`, `phase0.parent@` and
+`phase0.parent2@example.com`; the shared password is printed by `db:seed` and
+written to the gitignored `supabase/seed/seed-output.json`.
