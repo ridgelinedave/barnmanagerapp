@@ -116,6 +116,14 @@ exists`, `create or replace function`, and `drop policy if exists` before every
 re-applied after amendments; a file that fails the second time leaves the schema
 half-changed.
 
+### Editing files
+
+**Never rewrite source files through PowerShell.** `Get-Content`/`Set-Content`
+round-trip through the ANSI codepage: it adds a BOM and double-encodes
+em-dashes, which breaks the file. Use the Edit tool. (This happened here — a
+regex renumber through PowerShell corrupted the test suite and had to be
+restored from git.)
+
 ### Config
 
 **Barn-specific values live only in `/config/barn.ts`.** Never hard-code colours,
