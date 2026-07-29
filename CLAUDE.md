@@ -98,12 +98,27 @@ pass twice in a row with no re-seed.
 **The green gate.** After every applied migration:
 
 ```bash
-npm run db:seed && npm run test:policies   # then test:policies again, no re-seed
+npm run db:gate    # seed → test:policies → test:policies (no re-seed) → db:advisor
 ```
 
-Both runs must be **0 failed, 0 skipped**. A skipped section is not a pass — it
-is reported as a skip precisely so it cannot be mistaken for one. **Stop on
-red.** Do not build on a failing state; fix it or revert the slice.
+Both suite runs must be **0 failed, 0 skipped**, and the advisor must report
+**no findings**. A skipped section is not a pass — it is reported as a skip
+precisely so it cannot be mistaken for one. **Stop on red.** Do not build on a
+failing state; fix it or revert the slice.
+
+`db:advisor` runs Supabase's own Security Advisor lints (from
+github.com/supabase/splinter) against the live schema, so "did you check the
+Advisor?" is answered by the gate rather than by memory. It covers DB-level
+lints only — the auth-config ones (leaked-password protection, OTP expiry, MFA,
+Postgres version) are not visible over a Postgres connection and still need a
+look at Dashboard → Advisors before a launch.
+
+> This exists because the Advisor caught something an eyeball pass had missed
+> for three phases: **every** SECURITY DEFINER function was EXECUTE-able by
+> `anon`, because Postgres grants to PUBLIC by default and Supabase adds a
+> separate grant to `anon` and `authenticated` on top. Migration 0015 closed the
+> default; the suite now asserts behaviourally that no definer function is
+> reachable signed-out.
 
 ### Migrations
 

@@ -4372,6 +4372,37 @@ async function main() {
       );
     }
 
+    // --- NOTHING is executable signed-out -----------------------------------
+    //
+    // Every SECURITY DEFINER function in `public` runs with its owner's
+    // privileges and therefore bypasses RLS on everything it touches. Postgres
+    // grants EXECUTE to PUBLIC by default, and Supabase ships a SEPARATE
+    // default grant to anon and authenticated — so for three phases every
+    // function nobody had explicitly closed was callable by a signed-out
+    // caller. `db:advisor` found 26 of them (splinter lint 0028); migration
+    // 0015 closed the default and re-granted only what a signed-in session
+    // calls.
+    //
+    // This is the assertion that stops it drifting back. It is behavioural and
+    // data-driven for the same reason as the classification guard above: a
+    // function added in a later phase is covered without anyone remembering to
+    // write a test for it.
+    //
+    // Trigger functions are included deliberately. PostgREST will not route to
+    // them today, which is a property of PostgREST rather than of our grants —
+    // so "blocked" is asserted, not assumed.
+    for (const fn of inventory) {
+      const args = Object.fromEntries(fn.args.map((name) => [name, null]));
+      const { error } = await anon.rpc(fn.name, args);
+      check(
+        `anon CANNOT execute ${fn.name}() — no definer function is reachable signed-out`,
+        blockedAtTheDoor(error),
+        error
+          ? `it ran and returned ${error.code}: ${error.message}`
+          : "no error at all — the function executed for a signed-out caller",
+      );
+    }
+
     // --- and the policy helpers must stay callable, or RLS denies everything -
     for (const name of ["current_role", "current_family", "current_profile"]) {
       const { error } = await parent.rpc(name);
