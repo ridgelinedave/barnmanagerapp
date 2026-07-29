@@ -18,6 +18,7 @@
     "test:ical": "node tests/ical.test.mjs",
     "verify": "npm run typecheck && npm run lint && npm run build && npm run check:leak && npm run test:pdf && npm run test:ical",
     "db:verify": "node --env-file=.env.local scripts/db-verify.mjs",
+    "db:advisor": "node --env-file=.env.local scripts/db-advisor.mjs",
     "db:apply": "node --env-file=.env.local scripts/db-apply.mjs",
     "brand:assets": "node scripts/generate-brand-assets.mjs",
     "demo:seed": "node --env-file=.env.local supabase/seed/demo.mjs"
