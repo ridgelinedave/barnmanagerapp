@@ -152,6 +152,10 @@ const EXPOSED_BY_DESIGN = new Set([
   // staff, admin and signed-out caller.
   "family_owns_horse",
   "family_rides_horse",
+  // Phase 2 slice 3. Policy helper for storage.objects — same reasoning: the
+  // policy is evaluated as the querying user, so it must stay callable, and it
+  // answers only about the caller's own family.
+  "family_may_read_document",
 ]);
 
 /** Reads the balanced parenthesised argument list starting at `open`. */
@@ -3386,6 +3390,207 @@ async function main() {
 
       // Clean up what this section created, so counts stay stable across runs.
       for (const id of staffLogged) await admin.from("care_events").delete().eq("id", id);
+    }
+  }
+
+  // ===========================================================================
+  // documents bucket — Storage (Phase 2, slice 3)
+  //
+  // Table RLS does not cover Storage, so none of the work above says anything
+  // about this. Everything here runs through the storage API with a real
+  // session, which is what a browser would do.
+  //
+  // The bucket being PRIVATE is asserted first and separately: if it were
+  // public, every policy below could pass while anyone with the URL read the
+  // file anyway, without a session and without evaluating a single policy.
+  // ===========================================================================
+  {
+    const horseFx = fixtures.horses ?? {};
+    const haveDocs = Boolean(horseFx.owned?.id && horseFx.ridden?.id && parent2);
+
+    if (!haveDocs) {
+      console.log("\n\n═══ documents (Storage) — SKIPPED ═══");
+      console.log("  Horse fixtures are missing. Apply the migrations, re-seed, re-run.");
+      skipped += 1;
+    } else {
+      const owned = horseFx.owned;
+      const ridden = horseFx.ridden;
+      const ownedPath = `horse_${owned.id}/policy-test-owned.txt`;
+      const riddenPath = `horse_${ridden.id}/policy-test-ridden.txt`;
+      const familyPath = `family_${familyId}/policy-test-family.txt`;
+      const body = () => new Blob(["policy test document"], { type: "text/plain" });
+      const uploaded = [];
+
+      console.log("\n\n═══ documents (Storage) — ALLOW ═══\n");
+
+      for (const [label, client, path] of [
+        ["admin", admin, ownedPath],
+        ["staff", staff, riddenPath],
+      ]) {
+        const { error } = await client.storage.from("documents").upload(path, body(), {
+          upsert: true,
+          contentType: "text/plain",
+        });
+        check(`${label} CAN upload a document`, !error, error?.message);
+        if (!error) uploaded.push(path);
+      }
+
+      {
+        const { error } = await admin.storage.from("documents").upload(familyPath, body(), {
+          upsert: true,
+          contentType: "text/plain",
+        });
+        check("admin CAN upload into a family folder", !error, error?.message);
+        if (!error) uploaded.push(familyPath);
+      }
+
+      {
+        // Control for every "cannot download" below: the file is really there
+        // and is really readable by someone.
+        const { data, error } = await admin.storage.from("documents").download(ownedPath);
+        check(
+          "admin CAN download it — the object exists and is reachable",
+          !error && Boolean(data),
+          error?.message,
+        );
+      }
+
+      {
+        // THE BUCKET IS PRIVATE — asserted behaviourally, not by reading a
+        // flag. `listBuckets()` returns nothing useful over an anon-key
+        // session (bucket metadata is service-role territory), and a flag is
+        // the wrong thing to test anyway: what matters is that the public URL
+        // for a real object, fetched with no session at all, does not serve
+        // the file. If the bucket were public, every policy above would still
+        // pass while anyone with the link read the document.
+        const { data } = admin.storage.from("documents").getPublicUrl(ownedPath);
+        const response = await fetch(data.publicUrl, { redirect: "manual" });
+        check(
+          "the bucket is PRIVATE — the public URL serves nothing without a session",
+          !response.ok,
+          `public URL returned ${response.status}`,
+        );
+      }
+
+      console.log("\nthe owning family reads its own scope, and nothing else");
+      {
+        const { data, error } = await parent.storage.from("documents").download(ownedPath);
+        check(
+          "owner parent CAN download their own horse's document",
+          !error && Boolean(data),
+          error?.message,
+        );
+      }
+      {
+        const { data, error } = await parent.storage.from("documents").download(familyPath);
+        check(
+          "owner parent CAN download their own family folder's document",
+          !error && Boolean(data),
+          error?.message,
+        );
+      }
+      {
+        const { data, error } = await parent.storage.from("documents").list(`horse_${owned.id}`);
+        check(
+          "owner parent CAN list their own horse's folder",
+          !error && (data ?? []).some((o) => o.name === "policy-test-owned.txt"),
+          error?.message ?? `saw ${data?.length} object(s)`,
+        );
+      }
+
+      // =======================================================================
+      console.log("\n\n═══ documents (Storage) — DENY (adversarial) ═══\n");
+      // =======================================================================
+
+      console.log("riding a horse earns nothing here either");
+      {
+        // Control: they provably reach the horse itself.
+        const { data: basics } = await parent.rpc("horses_basics");
+        check(
+          "control: the parent reaches the ridden horse through basics",
+          (basics ?? []).some((h) => h.id === ridden.id),
+          "if the horse were invisible the document denial would prove nothing",
+        );
+
+        const { data, error } = await parent.storage.from("documents").download(riddenPath);
+        check(
+          "parent CANNOT download a document for a horse they only ride",
+          Boolean(error) || !data,
+          "LEAKED the document",
+        );
+
+        const { data: listed } = await parent.storage.from("documents").list(`horse_${ridden.id}`);
+        check(
+          "…and CANNOT list that horse's folder",
+          (listed ?? []).length === 0,
+          `LEAKED ${listed?.length} object name(s)`,
+        );
+      }
+
+      console.log("\nand neither family reaches the other's — both directions");
+      {
+        // Control: parent2 really can read its own horse's folder.
+        const { data: own, error: ownError } = await parent2.storage
+          .from("documents")
+          .download(riddenPath);
+        check(
+          "control: the other family CAN download its own horse's document",
+          !ownError && Boolean(own),
+          ownError?.message,
+        );
+
+        const { data, error } = await parent2.storage.from("documents").download(ownedPath);
+        check(
+          "the other family CANNOT download the first family's horse document",
+          Boolean(error) || !data,
+          "LEAKED across families",
+        );
+
+        const { data: fam } = await parent2.storage.from("documents").download(familyPath);
+        check(
+          "the other family CANNOT download the first family's folder",
+          !fam,
+          "LEAKED a family folder",
+        );
+      }
+
+      console.log("\nfamilies never write to the vault");
+      {
+        const { error } = await parent.storage
+          .from("documents")
+          .upload(`horse_${owned.id}/parent-upload.txt`, body(), { contentType: "text/plain" });
+        check(
+          "parent CANNOT upload, even for the horse they own",
+          Boolean(error),
+          "a family wrote to the legal vault",
+        );
+      }
+      {
+        const { error } = await parent.storage.from("documents").remove([ownedPath]);
+        const { data: stillThere } = await admin.storage.from("documents").download(ownedPath);
+        check(
+          "parent CANNOT delete their own horse's document",
+          Boolean(error) || Boolean(stillThere),
+          "the document was removed by a family",
+        );
+        check("…and the document survives", Boolean(stillThere));
+      }
+
+      console.log("\nanon");
+      {
+        const { data, error } = await anon.storage.from("documents").download(ownedPath);
+        check("anon CANNOT download from the vault", Boolean(error) || !data, "LEAKED to anon");
+      }
+      {
+        const { data } = await anon.storage.from("documents").list(`horse_${owned.id}`);
+        check("anon CANNOT list the vault", (data ?? []).length === 0, `saw ${data?.length}`);
+      }
+
+      // Clean up. Staff and admin both hold delete, so this also exercises it.
+      {
+        const { error } = await staff.storage.from("documents").remove(uploaded);
+        check("staff CAN delete a document — the barn owns the vault", !error, error?.message);
+      }
     }
   }
 

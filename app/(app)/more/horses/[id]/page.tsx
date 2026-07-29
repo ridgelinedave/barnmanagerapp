@@ -3,6 +3,9 @@ import { notFound } from "next/navigation";
 import { TabPage } from "@/components/TabPage";
 import { CareTimeline } from "@/components/CareTimeline";
 import { CareLogForm } from "@/components/CareLogForm";
+import { DocumentList } from "@/components/DocumentList";
+import { DocumentUploadForm } from "@/components/HorseDocuments";
+import { listHorseDocuments } from "@/lib/documents";
 import { currentRole } from "@/lib/guard";
 import { getHorse, listFeedPlans, listHorseRiders } from "@/lib/horses";
 import { listCareEvents, loggerNames, upcoming } from "@/lib/care";
@@ -34,13 +37,17 @@ export default async function HorseDetailPage({
   if (!horse) notFound();
 
   const careOn = featureEnabled("care");
-  const [plans, riders, care, loggers] = await Promise.all([
+  const documentsOn = featureEnabled("documents");
+  const [plans, riders, care, loggers, documents] = await Promise.all([
     listFeedPlans(id),
     listHorseRiders(id),
     careOn ? listCareEvents(id) : Promise.resolve([]),
     // The "logged by" line is a barn detail. A family sees what was done and
     // when, not which employee wrote it up.
     careOn && role !== "parent" ? loggerNames() : Promise.resolve(undefined),
+    // Storage RLS filters this: the barn sees the folder, the owning family
+    // sees the folder, anyone else gets an empty list.
+    documentsOn ? listHorseDocuments(id) : Promise.resolve([]),
   ]);
   const activePlans = plans.filter((p) => p.active);
   const due = upcoming(care);
@@ -143,6 +150,34 @@ export default async function HorseDetailPage({
             )}
           </section>
         </>
+      )}
+
+      {documentsOn && (
+        <section className="flex flex-col gap-3">
+          <div className="flex items-baseline gap-2">
+            <h2 className="text-base font-semibold">Documents</h2>
+            <p className="text-sm text-brand-ink/60">
+              {documents.length === 0 ? "None yet" : `${documents.length}`}
+            </p>
+          </div>
+
+          <DocumentList
+            documents={documents}
+            horseId={horse.id}
+            canDelete={role !== "parent"}
+            emptyMessage={
+              role === "parent"
+                ? "No documents for this horse yet."
+                : "No documents yet. Add the first below."
+            }
+          />
+
+          {role !== "parent" && (
+            <div className="rounded-2xl border border-brand-ink/10 bg-white p-4">
+              <DocumentUploadForm horseId={horse.id} />
+            </div>
+          )}
+        </section>
       )}
 
       {riders.length > 0 && (

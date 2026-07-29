@@ -17,6 +17,7 @@ export type BarnFeatureFlag =
   | "tasks"
   | "horses"
   | "care"
+  | "documents"
   | "lessons"
   | "shows"
   | "invoices"
@@ -110,6 +111,12 @@ export const barn = {
      * policy suite green (389 passed / 0 failed / 0 skipped).
      */
     care: true,
+    /**
+     * Phase 2 slice 3 — horse documents in the private `documents` Storage
+     * bucket. Migration 0012 applied and the policy suite is green, but the
+     * flag stays OFF until David audits the SQL: this is the legal vault.
+     */
+    documents: false,
     /**
      * Phase 1 slices 3a + 3b — shipped. Migrations 0007 and 0008 applied,
      * policy suite green (241 passed / 0 failed / 0 skipped), including the

@@ -12,7 +12,10 @@ import {
 } from "@/lib/horses";
 import { CareTimeline } from "@/components/CareTimeline";
 import { CareLogForm } from "@/components/CareLogForm";
+import { DocumentList } from "@/components/DocumentList";
+import { DocumentUploadForm } from "@/components/HorseDocuments";
 import { listCareEvents, loggerNames } from "@/lib/care";
+import { listHorseDocuments } from "@/lib/documents";
 import { barnToday } from "@/lib/dates";
 import { MEAL_LABELS } from "@/lib/types";
 import { featureEnabled } from "@/config/barn";
@@ -33,13 +36,15 @@ export default async function ManageHorsePage({
   if (!horse) notFound();
 
   const careOn = featureEnabled("care");
-  const [families, riders, allRiders, plans, care, loggers] = await Promise.all([
+  const documentsOn = featureEnabled("documents");
+  const [families, riders, allRiders, plans, care, loggers, documents] = await Promise.all([
     familyNames(),
     listHorseRiders(id),
     listAssignableRiders(),
     listFeedPlans(id),
     careOn ? listCareEvents(id) : Promise.resolve([]),
     careOn ? loggerNames() : Promise.resolve(new Map<string, string>()),
+    documentsOn ? listHorseDocuments(id) : Promise.resolve([]),
   ]);
 
   const assigned = new Set(riders.map((r) => r.id));
@@ -161,6 +166,23 @@ export default async function ManageHorsePage({
           <div className="rounded-2xl border border-brand-ink/10 bg-white p-4">
             <h3 className="mb-3 text-sm font-semibold text-brand-ink/70">Log care</h3>
             <CareLogForm horseId={horse.id} today={barnToday()} />
+          </div>
+        </section>
+      )}
+
+      {documentsOn && (
+        <section className="flex flex-col gap-3">
+          <div className="flex items-baseline gap-2">
+            <h2 className="text-base font-semibold">Documents</h2>
+            <p className="text-sm text-brand-ink/60">
+              {documents.length === 0 ? "None yet" : `${documents.length}`}
+            </p>
+          </div>
+
+          <DocumentList documents={documents} horseId={horse.id} canDelete />
+
+          <div className="rounded-2xl border border-brand-ink/10 bg-white p-4">
+            <DocumentUploadForm horseId={horse.id} />
           </div>
         </section>
       )}

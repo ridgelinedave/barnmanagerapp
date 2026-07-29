@@ -233,6 +233,63 @@ console.log("\nTriggers");
   for (const row of rows) console.log(`  [x] ${row.relname}.${row.tgname}`);
 }
 
+// --- storage -----------------------------------------------------------------
+//
+// Table RLS says nothing about Storage: it is a separate schema with its own
+// table and its own policies, and a bucket marked public is readable by anyone
+// with the URL, with no policy evaluated at all. So the bucket flag is checked
+// here, at the catalog, as well as behaviourally in the policy suite.
+console.log("\nStorage");
+{
+  const { rows: buckets } = await client.query(
+    `select id, public from storage.buckets where id = 'documents'`,
+  );
+
+  if (buckets.length === 0) {
+    flag("the `documents` bucket does not exist — apply migration 0012.");
+  } else {
+    const isPublic = buckets[0].public;
+    console.log(`  [${isPublic ? "!" : "x"}] bucket documents — ${isPublic ? "PUBLIC" : "private"}`);
+    if (isPublic) {
+      flag("the `documents` bucket is PUBLIC — every file in it is readable by URL.");
+    }
+  }
+
+  const { rows: rls } = await client.query(
+    `select c.relrowsecurity as enabled
+       from pg_class c
+       join pg_namespace n on n.oid = c.relnamespace
+      where n.nspname = 'storage' and c.relname = 'objects'`,
+  );
+  if (!rls[0]?.enabled) flag("storage.objects has RLS DISABLED — every object is readable.");
+  else console.log("  [x] storage.objects RLS on");
+
+  const { rows: policies } = await client.query(
+    `select policyname, cmd, roles::text, qual, with_check
+       from pg_policies
+      where schemaname = 'storage' and tablename = 'objects'
+        and policyname like 'documents:%'
+      order by cmd, policyname`,
+  );
+  for (const row of policies) {
+    console.log(`  ${row.cmd.padEnd(6)} ${row.roles.padEnd(17)} ${row.policyname}`);
+    if (!row.roles.includes("authenticated")) {
+      flag(`storage policy "${row.policyname}" is not scoped to authenticated.`);
+    }
+    // A documents policy that forgot its bucket predicate would apply to every
+    // other bucket in the project.
+    const body = `${row.qual ?? ""} ${row.with_check ?? ""}`;
+    if (!body.includes("'documents'")) {
+      flag(`storage policy "${row.policyname}" does not pin bucket_id = 'documents'.`);
+    }
+  }
+  if (policies.length < 4) {
+    flag(`only ${policies.length} documents policies found — expected 4 (select/insert/update/delete).`);
+  } else {
+    console.log(`  — ${policies.length} documents policies`);
+  }
+}
+
 // --- column grants -----------------------------------------------------------
 console.log("\nColumn grants on notifications (authenticated)");
 {
