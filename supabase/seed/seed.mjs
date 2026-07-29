@@ -791,6 +791,81 @@ async function main() {
     }
   }
 
+  // --- events (Phase 2, slice 5) ----------------------------------------------
+  //
+  // One public and one staff-only, so "a family sees the barn calendar" and "a
+  // family never sees the internal one" are both real assertions rather than
+  // one asserted and the other assumed.
+  const events = {};
+  {
+    const probe = await supabase.from("events").select("id").limit(1);
+
+    if (probe.error && /schema cache|does not exist/i.test(probe.error.message)) {
+      console.log("  events        SKIPPED — table not created yet (apply migration 0014)");
+    } else if (probe.error) {
+      fail("Could not read events", probe.error);
+    } else {
+      const inDays = (offset, hour) => {
+        const d = new Date();
+        d.setDate(d.getDate() + offset);
+        d.setHours(hour, 0, 0, 0);
+        return d.toISOString();
+      };
+
+      const EVENTS = [
+        {
+          key: "public",
+          type: "clinic",
+          title: "Phase 2 Fixture Clinic",
+          description: "Visible to everyone. Delete before go-live.",
+          location: "Main arena",
+          visibility: "all",
+          start_at: inDays(7, 10),
+          end_at: inDays(7, 15),
+        },
+        {
+          key: "staffOnly",
+          type: "vet",
+          title: "Phase 2 Fixture Staff-Only Vet Visit",
+          description: "Internal. A family must never see this. Delete before go-live.",
+          location: "Barn office",
+          visibility: "staff",
+          start_at: inDays(3, 9),
+          end_at: inDays(3, 11),
+        },
+      ];
+
+      for (const event of EVENTS) {
+        const { key, ...row } = event;
+
+        const { data: existing } = await supabase
+          .from("events")
+          .select("*")
+          .eq("title", row.title)
+          .maybeSingle();
+
+        if (existing) {
+          // Keep the dates in the future so the feed always has something.
+          const { data, error } = await supabase
+            .from("events")
+            .update(row)
+            .eq("id", existing.id)
+            .select()
+            .single();
+          if (error) fail(`Could not refresh the "${key}" event`, error);
+          events[key] = data;
+          continue;
+        }
+
+        const { data, error } = await supabase.from("events").insert(row).select().single();
+        if (error) fail(`Could not create the "${key}" event`, error);
+        events[key] = data;
+      }
+
+      console.log(`  events        1 public, 1 staff-only`);
+    }
+  }
+
   // --- record the fixture ids for the policy tests ----------------------------
   const output = {
     generatedAt: new Date().toISOString(),
@@ -809,6 +884,8 @@ async function main() {
     horses,
     // Phase 2 slice 4.
     forms,
+    // Phase 2 slice 5.
+    events,
   };
 
   mkdirSync(here, { recursive: true });

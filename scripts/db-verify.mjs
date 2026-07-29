@@ -68,6 +68,9 @@ const EXPECTED_TABLES = [
   // Phase 2 slice 4 — onboarding forms.
   "form_templates",
   "form_submissions",
+  // Phase 2 slice 5 — events and calendar subscriptions.
+  "events",
+  "ical_tokens",
 ];
 const EXPECTED_FUNCTIONS = [
   "current_role",
@@ -87,6 +90,8 @@ const EXPECTED_FUNCTIONS = [
   "family_may_read_document",
   "form_submissions_guard",
   "ensure_family_onboarding",
+  // Phase 2 slice 5.
+  "ical_token_guard",
 ];
 
 let problems = 0;

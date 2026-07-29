@@ -3,8 +3,15 @@ import { createServerClient } from "@supabase/ssr";
 import { publicEnv, supabaseConfigured } from "@/lib/env";
 import { devRoleFromRequestCookie } from "@/lib/dev-role";
 
-/** Routes reachable without a session. */
-const PUBLIC_PATHS = ["/sign-in", "/auth"];
+/**
+ * Routes reachable without a session.
+ *
+ * `/api/ical` is here because a calendar client cannot sign in — it just
+ * fetches a URL. The unguessable per-user token in the path is what
+ * authenticates the request, and the route handler re-implements the
+ * visibility rules itself, since RLS cannot help a request with no session.
+ */
+const PUBLIC_PATHS = ["/sign-in", "/auth", "/api/ical"];
 
 function isPublicPath(pathname: string) {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));

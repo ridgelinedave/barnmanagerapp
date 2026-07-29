@@ -3993,6 +3993,301 @@ async function main() {
   }
 
   // ===========================================================================
+  // events + ical_tokens (Phase 2, slice 5)
+  //
+  // Two separate properties:
+  //
+  //   events      — a staff-only entry must never reach a family. Ordinary RLS.
+  //   ical_tokens — the token is a BEARER CREDENTIAL. Anyone holding it reads
+  //                 that person's calendar with no session, so "only its owner
+  //                 can read it" includes the admin. That is the unusual rule
+  //                 here and it gets the most assertions.
+  // ===========================================================================
+  {
+    const eventFx = fixtures.events ?? {};
+    const haveEvents = Boolean(eventFx.public?.id && eventFx.staffOnly?.id && parent2);
+
+    if (!haveEvents) {
+      console.log("\n\n═══ events + iCal — SKIPPED ═══");
+      console.log("  Migration 0014 is not applied yet, or seed-output.json predates the event");
+      console.log("  fixtures. Apply supabase/migrations/20260729000300_events_ical.sql,");
+      console.log("  re-seed, re-run.");
+      skipped += 1;
+    } else {
+      const publicEvent = eventFx.public;
+      const staffEvent = eventFx.staffOnly;
+
+      console.log("\n\n═══ events + iCal — ALLOW ═══\n");
+
+      for (const [label, client] of [
+        ["admin", admin],
+        ["staff", staff],
+      ]) {
+        const { data, error } = await client
+          .from("events")
+          .select("id, title, visibility")
+          .in("id", [publicEvent.id, staffEvent.id]);
+        check(
+          `${label} sees both the public and the staff-only event`,
+          !error && (data?.length ?? 0) === 2,
+          error?.message ?? `saw ${data?.length}`,
+        );
+      }
+
+      {
+        const { data, error } = await parent
+          .from("events")
+          .select("id, title, description")
+          .eq("id", publicEvent.id)
+          .maybeSingle();
+        check(
+          "parent sees the barn-wide event",
+          !error && data?.id === publicEvent.id,
+          error?.message,
+        );
+        check(
+          "…with its details, which is what makes the calendar worth subscribing to",
+          Boolean(data?.title && data?.description),
+          JSON.stringify(data ?? null),
+        );
+      }
+
+      console.log("\ncalendar tokens");
+      let parentToken = null;
+      {
+        // Always attempted, never conditionally: a check that only runs on some
+        // runs makes the suite total move between them, which reads like a
+        // flake. A second attempt hits the unique constraint on profile_id,
+        // which is itself the right answer — one token per person.
+        const { error: mintError } = await parent
+          .from("ical_tokens")
+          .insert({ profile_id: users.parent.profileId })
+          .select()
+          .single();
+        check(
+          "parent CAN mint their own calendar token, and only one",
+          !mintError || mintError.code === "23505",
+          mintError ? `${mintError.code}: ${mintError.message}` : "",
+        );
+
+        const { data: row } = await parent
+          .from("ical_tokens")
+          .select("*")
+          .eq("profile_id", users.parent.profileId)
+          .maybeSingle();
+        parentToken = row;
+
+        check("the token exists", Boolean(parentToken?.token), "no token row");
+        check(
+          "…and it is a server-generated uuid, not something the client chose",
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+            parentToken?.token ?? "",
+          ),
+          `token is ${parentToken?.token}`,
+        );
+      }
+
+      {
+        // Rotation: ask for a new one, get one, and it is different.
+        const before = parentToken.token;
+        const { data, error } = await parent
+          .from("ical_tokens")
+          .update({ token: "00000000-0000-0000-0000-000000000000" })
+          .eq("profile_id", users.parent.profileId)
+          .select()
+          .single();
+
+        check("parent CAN rotate their own token", !error, error?.message);
+        check(
+          "…the chosen value is IGNORED — the database mints the replacement",
+          data?.token !== "00000000-0000-0000-0000-000000000000",
+          `token became ${data?.token}`,
+        );
+        check("…and it really changed", data?.token !== before, "rotation was a no-op");
+        check("…and the rotation is timestamped", Boolean(data?.rotated_at));
+        parentToken = data;
+      }
+
+      // =======================================================================
+      console.log("\n\n═══ events + iCal — DENY (adversarial) ═══\n");
+      // =======================================================================
+
+      console.log("a staff-only event never reaches a family");
+      {
+        // Control: it exists and staff really do see it (asserted above).
+        await assertCannotSee(
+          "parent CANNOT see the staff-only event",
+          parent,
+          "events",
+          staffEvent.id,
+        );
+        await assertCannotSee(
+          "the other family CANNOT see it either",
+          parent2,
+          "events",
+          staffEvent.id,
+        );
+
+        const { data } = await parent.from("events").select("id");
+        check(
+          "the staff-only event is absent from the family's whole event list",
+          !(data ?? []).some((e) => e.id === staffEvent.id),
+          "it leaked into an unfiltered read",
+        );
+      }
+
+      console.log("\nfamilies and staff do not author the calendar");
+      {
+        const mode = await refusalMode(
+          parent
+            .from("events")
+            .insert({ title: "Parent-created event", start_at: new Date().toISOString() })
+            .select(),
+        );
+        check("parent CANNOT create an event", !mode.startsWith("ALLOWED"), mode);
+      }
+      {
+        const mode = await refusalMode(
+          parent
+            .from("events")
+            .update({ title: "Renamed by a parent" })
+            .eq("id", publicEvent.id)
+            .select(),
+        );
+        check("parent CANNOT edit an event they can see", !mode.startsWith("ALLOWED"), mode);
+
+        const { data } = await admin
+          .from("events")
+          .select("title")
+          .eq("id", publicEvent.id)
+          .maybeSingle();
+        check("…and the title is unchanged", data?.title === publicEvent.title, data?.title);
+      }
+      {
+        // Staff hold manage_schedule false by default, so they read the whole
+        // calendar and write none of it.
+        const mode = await refusalMode(
+          staff
+            .from("events")
+            .update({ title: "Renamed by staff" })
+            .eq("id", staffEvent.id)
+            .select(),
+        );
+        check("staff CANNOT edit an event", !mode.startsWith("ALLOWED"), mode);
+      }
+
+      console.log("\nthe calendar token is a credential — owner only, admin included");
+      {
+        // Control: the owner reads their own, and it is really there.
+        const { data: own } = await parent
+          .from("ical_tokens")
+          .select("token")
+          .eq("profile_id", users.parent.profileId);
+        check(
+          "control: the owner reads their own token",
+          (own?.length ?? 0) === 1 && Boolean(own[0].token),
+          `saw ${own?.length}`,
+        );
+
+        // THE UNUSUAL RULE: not even the admin.
+        const { data: byAdmin } = await admin.from("ical_tokens").select("token, profile_id");
+        check(
+          "ADMIN CANNOT read anyone's calendar token",
+          (byAdmin ?? []).every((row) => row.profile_id !== users.parent.profileId),
+          `admin saw ${byAdmin?.length} token row(s) including the parent's`,
+        );
+
+        const { data: byStaff } = await staff.from("ical_tokens").select("token");
+        check(
+          "staff CANNOT read anyone's calendar token",
+          (byStaff ?? []).length === 0,
+          `staff saw ${byStaff?.length}`,
+        );
+
+        const { data: byOther } = await parent2
+          .from("ical_tokens")
+          .select("token")
+          .eq("profile_id", users.parent.profileId);
+        check(
+          "another family CANNOT read this family's token",
+          (byOther?.length ?? 0) === 0,
+          `saw ${byOther?.length}`,
+        );
+      }
+
+      {
+        const mode = await refusalMode(
+          parent2
+            .from("ical_tokens")
+            .update({ token: "11111111-1111-1111-1111-111111111111" })
+            .eq("profile_id", users.parent.profileId)
+            .select(),
+        );
+        check("another family CANNOT rotate this family's token", !mode.startsWith("ALLOWED"), mode);
+
+        const { data } = await parent
+          .from("ical_tokens")
+          .select("token")
+          .eq("profile_id", users.parent.profileId)
+          .maybeSingle();
+        check(
+          "…and the token is unchanged when its owner re-reads it",
+          data?.token === parentToken.token,
+          "somebody else's rotation landed",
+        );
+      }
+
+      {
+        const mode = await refusalMode(
+          parent2
+            .from("ical_tokens")
+            .insert({ profile_id: users.parent.profileId })
+            .select(),
+        );
+        check(
+          "another family CANNOT mint a token pointed at someone else",
+          !mode.startsWith("ALLOWED"),
+          mode,
+        );
+      }
+
+      {
+        const { ids } = await visibleIds(anon, "events");
+        check("anon sees 0 events", ids.length === 0, `saw ${ids.length}`);
+        const { ids: tokenIds } = await visibleIds(anon, "ical_tokens");
+        check("anon sees 0 calendar tokens", tokenIds.length === 0, `saw ${tokenIds.length}`);
+      }
+
+      console.log("\nadmin — the control proving the write rules are not simply broken");
+      {
+        const { data, error } = await admin
+          .from("events")
+          .insert({
+            type: "closure",
+            title: "Policy Test Closure",
+            start_at: new Date().toISOString(),
+            visibility: "all",
+          })
+          .select()
+          .single();
+        check("admin CAN create an event", !error && Boolean(data), error?.message);
+
+        if (data) {
+          const { error: updateError } = await admin
+            .from("events")
+            .update({ title: "Policy Test Closure (edited)" })
+            .eq("id", data.id);
+          check("admin CAN edit an event", !updateError, updateError?.message);
+
+          await admin.from("events").delete().eq("id", data.id);
+          const { data: gone } = await admin.from("events").select("id").eq("id", data.id);
+          check("admin CAN delete an event", (gone?.length ?? 0) === 0);
+        }
+      }
+    }
+  }
+
+  // ===========================================================================
   // STANDING GUARD — function exposure
   //
   // Data-driven from the migrations, so it covers functions added later without

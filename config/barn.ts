@@ -19,6 +19,7 @@ export type BarnFeatureFlag =
   | "care"
   | "documents"
   | "forms"
+  | "events"
   | "lessons"
   | "shows"
   | "invoices"
@@ -130,6 +131,15 @@ export const barn = {
      * switching it on is David's call, not mine.
      */
     forms: false,
+    /**
+     * Phase 2 slice 5 — barn events and the iCal subscription feed. Migration
+     * 0014 applied and the policy suite is green; the flag stays OFF until
+     * David audits the SQL.
+     *
+     * NOTE: this flag also gates `/api/ical/[token].ics`. The feed returns 404
+     * while it is off, so no subscription URL can work before the audit.
+     */
+    events: false,
     /**
      * Phase 1 slices 3a + 3b — shipped. Migrations 0007 and 0008 applied,
      * policy suite green (241 passed / 0 failed / 0 skipped), including the

@@ -367,6 +367,37 @@ export type FormSubmission = {
   document_path: string | null;
 };
 
+export const EVENT_TYPES = ["show", "clinic", "farrier", "vet", "closure", "other"] as const;
+export type EventType = (typeof EVENT_TYPES)[number];
+
+export function isEventType(value: unknown): value is EventType {
+  return typeof value === "string" && (EVENT_TYPES as readonly string[]).includes(value);
+}
+
+export const EVENT_TYPE_LABELS: Record<EventType, string> = {
+  show: "Show",
+  clinic: "Clinic",
+  farrier: "Farrier",
+  vet: "Vet",
+  closure: "Closed",
+  other: "Other",
+};
+
+export type EventVisibility = "all" | "staff";
+
+/** Named BarnEvent, not Event — `Event` is a DOM global and shadowing it bites. */
+export type BarnEvent = {
+  id: string;
+  created_at: string;
+  type: EventType;
+  title: string;
+  description: string;
+  start_at: string;
+  end_at: string | null;
+  location: string;
+  visibility: EventVisibility;
+};
+
 export type Notification = {
   id: string;
   profile_id: string;

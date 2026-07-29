@@ -1,4 +1,5 @@
 import { barn } from "@/config/barn";
+import { localToUtc } from "@/lib/ical";
 
 /**
  * "Today" at the barn, as YYYY-MM-DD.
@@ -105,6 +106,17 @@ export function minutesUntilBarnDateTime(isoDate: string, time: string): number 
  */
 export function isInsideBackfillCutoff(isoDate: string, time: string): boolean {
   return minutesUntilBarnDateTime(isoDate, time) < barn.backfillCutoffMinutes;
+}
+
+/**
+ * A barn-local date + wall-clock time as a real UTC instant.
+ *
+ * The conversion itself lives in `lib/ical.ts` — deliberately, because that
+ * module imports nothing, which is what lets `tests/ical.test.mjs` exercise it
+ * directly. This wrapper just supplies the barn's zone.
+ */
+export function barnLocalToUtc(isoDate: string, time: string): Date {
+  return localToUtc(isoDate, time, barn.timezone);
 }
 
 export const WEEKDAY_NAMES = [
