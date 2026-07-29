@@ -4,7 +4,8 @@ Read this before writing anything. These are conventions the build has already
 paid for; several exist because the alternative shipped a bug here.
 
 **Anchor files:** [`SPEC.md`](SPEC.md) (full product spec) ·
-[`PHASE-1-PROGRESS.md`](PHASE-1-PROGRESS.md) (where things stand) ·
+[`PHASE-2-PROGRESS.md`](PHASE-2-PROGRESS.md) (where things stand) ·
+[`PHASE-1-PROGRESS.md`](PHASE-1-PROGRESS.md) (the phase before) ·
 [`config/barn.ts`](config/barn.ts) (every barn-specific value) ·
 [`tests/policies.test.mjs`](tests/policies.test.mjs) (the security contract)
 

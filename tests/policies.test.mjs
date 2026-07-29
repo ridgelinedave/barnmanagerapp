@@ -144,6 +144,14 @@ const EXPOSED_BY_DESIGN = new Set([
   "family_sees_instance",
   "family_owns_rider",
   "instance_taken_seats",
+  // Phase 2 slice 1. Policy helpers, so they MUST stay callable by
+  // authenticated — an RLS policy is evaluated as the querying user, and a
+  // user who cannot execute the helper is denied the table entirely. Both
+  // answer only about the caller's own family (no family argument exists to
+  // pass), and both return false when current_family() is null, which is every
+  // staff, admin and signed-out caller.
+  "family_owns_horse",
+  "family_rides_horse",
 ]);
 
 /** Reads the balanced parenthesised argument list starting at `open`. */
@@ -259,6 +267,10 @@ async function main() {
   const admin = await clientFor("admin");
   const staff = await clientFor("staff");
   const parent = await clientFor("parent");
+  // The control family's own login. Null only when seed-output.json predates
+  // this fixture, which the horses section reports as a skip rather than
+  // quietly testing one direction and calling it symmetry.
+  const parent2 = fixtures.users?.parent2 ? await clientFor("parent2") : null;
 
   const { familyId, controlFamilyId, riderId, controlRiderId, levelCount, users } = fixtures;
 
@@ -2401,6 +2413,563 @@ async function main() {
       // runs without a re-seed, the previous run's rows are still there.
       for (const id of madePeriods) await admin.from("pay_periods").delete().eq("id", id);
       void madePunches;
+    }
+  }
+
+  // ===========================================================================
+  // horses, horse_riders, feed_plans (Phase 2, slice 1)
+  //
+  // The property under test is a COLUMN boundary, not a row boundary, so the
+  // controls have to be sharper than usual. Three things must all be true at
+  // once for "the riding family cannot read the breed" to mean anything:
+  //
+  //   1. the breed is actually stored on that row  (else nothing is hidden)
+  //   2. somebody CAN read it — admin, staff, and the owning family
+  //   3. the riding family, who demonstrably reaches the horse's basics,
+  //      cannot
+  //
+  // Miss (1) and the assertion passes against a null. Miss (2) and it passes
+  // against a column nobody can read. Miss (3) and it is not testing the tier
+  // at all. Every deny below is preceded by the matching allow.
+  // ===========================================================================
+  {
+    const horseFx = fixtures.horses ?? {};
+    const haveHorses = Boolean(
+      horseFx.owned?.id && horseFx.ridden?.id && horseFx.barn?.id && horseFx.unrelated?.id && parent2,
+    );
+
+    if (!haveHorses) {
+      console.log("\n\n═══ horses — SKIPPED ═══");
+      console.log("  Migration 0010 is not applied yet, or seed-output.json predates the second");
+      console.log("  parent fixture. Apply supabase/migrations/20260728000600_horses.sql,");
+      console.log("  re-seed, re-run.");
+      skipped += 1;
+    } else {
+      const owned = horseFx.owned;
+      const ridden = horseFx.ridden;
+      const barnHorse = horseFx.barn;
+      const unrelated = horseFx.unrelated;
+      const fixtureHorseIds = [owned.id, ridden.id, barnHorse.id, unrelated.id];
+
+      console.log("\n\n═══ horses — ALLOW ═══\n");
+
+      // --- the fixtures themselves are the control ---------------------------
+      check(
+        "fixture control: every fixture horse carries a breed, dob and notes",
+        [owned, ridden, barnHorse, unrelated].every((h) => h.breed && h.dob && h.notes),
+        "a null sensitive column would make every deny below vacuous",
+      );
+
+      console.log("\nadmin and staff — full read on every horse");
+      for (const [label, client] of [
+        ["admin", admin],
+        ["staff", staff],
+      ]) {
+        const { data, error } = await client
+          .from("horses")
+          .select("id, name, breed, dob, notes")
+          .in("id", fixtureHorseIds);
+
+        check(
+          `${label} sees all 4 fixture horses`,
+          !error && (data?.length ?? 0) === 4,
+          error?.message ?? `saw ${data?.length}`,
+        );
+
+        // The row the parent will be refused, read in full by someone allowed
+        // to. This is the positive control the column-deny tests hang off.
+        const riddenRow = data?.find((h) => h.id === ridden.id);
+        check(
+          `${label} reads breed/dob/notes on the ridden horse`,
+          Boolean(riddenRow?.breed && riddenRow?.dob && riddenRow?.notes),
+          riddenRow ? "a sensitive column came back empty" : "row not visible",
+        );
+      }
+
+      console.log("\nowner family — full read on the horse it owns");
+      {
+        const { data, error } = await parent
+          .from("horses")
+          .select("id, name, breed, dob, notes")
+          .eq("id", owned.id)
+          .maybeSingle();
+
+        check("owner parent sees their own horse", !error && data?.id === owned.id, error?.message);
+        check(
+          "owner parent reads breed, dob and notes on their OWN horse",
+          Boolean(data?.breed && data?.dob && data?.notes),
+          "parents are not blanket-denied these columns — ownership is what decides",
+        );
+        check(
+          "the values match what was seeded (not a coincidentally-truthy row)",
+          data?.breed === owned.breed && data?.notes === owned.notes,
+          `got ${data?.breed} / ${data?.notes}`,
+        );
+      }
+
+      console.log("\nriding family — the basics tier, and only the basics tier");
+      let basics = [];
+      {
+        const { data, error } = await parent.rpc("horses_basics");
+        basics = data ?? [];
+
+        check("parent can call horses_basics()", !error, error?.message);
+
+        const riddenBasics = basics.find((h) => h.id === ridden.id);
+        const barnBasics = basics.find((h) => h.id === barnHorse.id);
+
+        // POSITIVE CONTROL for every "cannot reach breed" below: the parent
+        // demonstrably reaches this horse, and gets real values for the three
+        // columns they are entitled to.
+        check(
+          "parent reaches the ridden horse through basics",
+          Boolean(riddenBasics),
+          `basics returned ${basics.length} row(s)`,
+        );
+        check(
+          "the basics row carries name, barn_name and photo",
+          Boolean(riddenBasics?.name && riddenBasics?.barn_name && riddenBasics?.photo_url),
+          JSON.stringify(riddenBasics ?? null),
+        );
+        check(
+          "parent also reaches the barn-owned horse their rider rides",
+          Boolean(barnBasics),
+          "barn-owned + ridden is the same tier as another family's horse + ridden",
+        );
+
+        // The projection IS the boundary. Not "the app did not ask for breed" —
+        // the columns are not in the return type at all.
+        const keys = Object.keys(riddenBasics ?? {});
+        check(
+          "the basics projection contains no sensitive column",
+          keys.length > 0 && !["breed", "dob", "notes", "owner_family_id"].some((k) => keys.includes(k)),
+          `keys: ${keys.join(", ")}`,
+        );
+
+        check(
+          "the unrelated horse is absent from basics — riding is what earns it",
+          !basics.some((h) => h.id === unrelated.id),
+        );
+        check(
+          "the owned horse is absent from basics — it is read in full from the table",
+          !basics.some((h) => h.id === owned.id),
+        );
+      }
+
+      console.log("\nfeed plans");
+      {
+        const { data, error } = await parent.from("feed_plans").select("*").eq("horse_id", owned.id);
+        check(
+          "owner parent reads their own horse's feed chart (both meals)",
+          !error && (data?.length ?? 0) === 2,
+          error?.message ?? `saw ${data?.length}`,
+        );
+        check(
+          "the chart carries the special instructions staff and owner both need",
+          Boolean(data?.some((p) => p.meal === "am" && p.special_instructions)),
+          "the am plan came back without its instructions",
+        );
+
+        const { data: board, error: boardError } = await staff
+          .from("feed_plans")
+          .select("id, horse_id, meal")
+          .in("horse_id", fixtureHorseIds)
+          .eq("active", true);
+        check(
+          "staff sees every fixture horse's active plans — the feed board",
+          !boardError && (board?.length ?? 0) === 4,
+          boardError?.message ?? `saw ${board?.length}`,
+        );
+      }
+
+      console.log("\nhorse_riders");
+      {
+        const { data, error } = await parent.from("horse_riders").select("horse_id, rider_id");
+        const seen = new Set((data ?? []).map((r) => r.horse_id));
+        check(
+          "parent sees their own rider's horse assignments",
+          !error && seen.has(ridden.id) && seen.has(barnHorse.id),
+          error?.message ?? `saw ${[...seen].length} link(s)`,
+        );
+        check(
+          "parent does NOT see another family's rider assignment",
+          !seen.has(unrelated.id),
+          "the control rider's link to the unrelated horse leaked",
+        );
+        // Both families have a rider on the barn horse, so "which horse" no
+        // longer distinguishes them — assert on the rider instead. Every link
+        // this parent can read must belong to their own rider.
+        check(
+          "every link the parent reads belongs to their own rider",
+          (data ?? []).every((r) => r.rider_id === riderId),
+          `saw rider ids: ${[...new Set((data ?? []).map((r) => r.rider_id))].join(", ")}`,
+        );
+      }
+
+      // =======================================================================
+      console.log("\n\nthe OTHER family, from their own login — the mirror image");
+      //
+      // Everything above is one family's view. A policy that leaked in the
+      // other direction would pass every assertion so far, because there was
+      // nobody signed in on the other side to notice. This section is that
+      // second side: the control family's parent, checked against the same
+      // rules, in reverse.
+      // =======================================================================
+      {
+        const { data, error } = await parent2.from("horses").select("id, name, breed, notes");
+        const visible = new Set((data ?? []).map((h) => h.id));
+
+        // Control: they really do reach their own horses, in full.
+        check(
+          "the other family sees BOTH horses it owns",
+          !error && visible.has(ridden.id) && visible.has(unrelated.id),
+          error?.message ?? `saw ${visible.size} horse(s)`,
+        );
+        const riddenRow = (data ?? []).find((h) => h.id === ridden.id);
+        check(
+          "…and reads breed and notes on them, being the owner",
+          Boolean(riddenRow?.breed && riddenRow?.notes),
+          "the owner tier is not working from this side",
+        );
+
+        // The deny, in the direction nothing could previously test.
+        check(
+          "the other family CANNOT see the first family's horse",
+          !visible.has(owned.id),
+          "cross-family read leaked in the reverse direction",
+        );
+        check(
+          "the other family CANNOT see the barn horse it does not own",
+          !visible.has(barnHorse.id),
+          "barn-owned is not the same as visible-to-everyone",
+        );
+        check(
+          "the other family sees exactly the 2 fixture horses it owns",
+          fixtureHorseIds.filter((id) => visible.has(id)).length === 2,
+          `saw ${fixtureHorseIds.filter((id) => visible.has(id)).length} of the 4`,
+        );
+      }
+
+      {
+        const { data, error } = await parent2.rpc("horses_basics");
+        const basics2 = data ?? [];
+
+        // Control: the second family HAS a basics tier, so the deny below is
+        // about scoping and not about an empty function.
+        check(
+          "the other family reaches the barn horse through basics",
+          !error && basics2.some((h) => h.id === barnHorse.id),
+          error?.message ?? `basics returned ${basics2.length} row(s)`,
+        );
+        check(
+          "the other family's basics carry no sensitive column either",
+          basics2.length > 0 &&
+            !["breed", "dob", "notes"].some((k) => Object.keys(basics2[0]).includes(k)),
+          `keys: ${Object.keys(basics2[0] ?? {}).join(", ")}`,
+        );
+        check(
+          "the first family's horse is absent from the other family's basics",
+          !basics2.some((h) => h.id === owned.id),
+        );
+      }
+
+      {
+        // Control first: they read their own horse's chart.
+        const { data: own } = await parent2.from("feed_plans").select("id").eq("horse_id", ridden.id);
+        check(
+          "the other family reads the feed chart of a horse it owns",
+          (own?.length ?? 0) === 1,
+          `saw ${own?.length}`,
+        );
+
+        const { data: theirs } = await parent2
+          .from("feed_plans")
+          .select("id")
+          .eq("horse_id", owned.id);
+        check(
+          "the other family CANNOT read the first family's feed chart",
+          (theirs?.length ?? 0) === 0,
+          `LEAKED ${theirs?.length} row(s)`,
+        );
+      }
+
+      {
+        const { data } = await parent2.from("horse_riders").select("rider_id");
+        check(
+          "every link the other family reads belongs to THEIR rider",
+          (data ?? []).length > 0 && (data ?? []).every((r) => r.rider_id === controlRiderId),
+          `saw rider ids: ${[...new Set((data ?? []).map((r) => r.rider_id))].join(", ")}`,
+        );
+      }
+
+      {
+        const mode = await refusalMode(
+          parent2.from("horses").update({ notes: "rewritten" }).eq("id", ridden.id).select(),
+        );
+        check("the other family CANNOT edit the horse it owns either", !mode.startsWith("ALLOWED"), mode);
+      }
+
+      // =======================================================================
+      console.log("\n\n═══ horses — DENY (adversarial) ═══\n");
+      // =======================================================================
+
+      console.log("the riding family cannot cross from basics to the table");
+      await assertCannotSee(
+        "parent CANNOT see the ridden horse's row in `horses`",
+        parent,
+        "horses",
+        ridden.id,
+      );
+      await assertCannotSee(
+        "parent CANNOT see the barn-owned horse's row in `horses`",
+        parent,
+        "horses",
+        barnHorse.id,
+      );
+      await assertCannotSee(
+        "parent CANNOT see the unrelated horse at all",
+        parent,
+        "horses",
+        unrelated.id,
+      );
+
+      {
+        // Asking for the sensitive columns by name, on a horse they provably
+        // reach through basics. This is the query the app is not trusted to
+        // avoid writing.
+        const { data, error } = await parent
+          .from("horses")
+          .select("id, breed, dob, notes")
+          .eq("id", ridden.id);
+        check(
+          "parent CANNOT read breed/dob/notes on the horse their rider rides",
+          !error && (data?.length ?? 0) === 0,
+          error?.message ?? `LEAKED: ${JSON.stringify(data)}`,
+        );
+      }
+
+      {
+        // The realistic bypass: reach the horse through a row they ARE allowed
+        // to read. PostgREST embeds respect the embedded table's RLS, and this
+        // proves it rather than assuming it.
+        const { data, error } = await parent
+          .from("horse_riders")
+          .select("horse_id, horses(breed, notes)")
+          .eq("horse_id", ridden.id);
+        const leaked = (data ?? []).some((row) => row.horses?.breed || row.horses?.notes);
+        check(
+          "parent CANNOT reach breed/notes by embedding horses through horse_riders",
+          !error && !leaked,
+          error?.message ?? `LEAKED: ${JSON.stringify(data)}`,
+        );
+      }
+
+      {
+        // And the projection will not even name the column.
+        const { error } = await parent.rpc("horses_basics").select("id, breed");
+        check(
+          "horses_basics() cannot be asked for breed — it is not in the return type",
+          Boolean(error),
+          "selecting a column that should not exist succeeded",
+        );
+      }
+
+      console.log("\nunrelated family, and the write boundary");
+      {
+        const { data } = await parent.from("horses").select("id");
+        const visible = new Set((data ?? []).map((h) => h.id));
+        check(
+          "parent sees exactly ONE fixture horse — the one they own",
+          fixtureHorseIds.filter((id) => visible.has(id)).length === 1 && visible.has(owned.id),
+          `saw ${fixtureHorseIds.filter((id) => visible.has(id)).length} of the 4 fixture horses`,
+        );
+      }
+
+      {
+        const mode = await refusalMode(
+          parent.from("horses").insert({ name: "Parent-created horse" }).select(),
+        );
+        check("parent CANNOT create a horse", !mode.startsWith("ALLOWED"), mode);
+      }
+
+      {
+        // The sharpest write test: a row the parent CAN see. Read access is
+        // real, so a refusal here is about the write policy, not visibility.
+        const mode = await refusalMode(
+          parent.from("horses").update({ notes: "rewritten by a parent" }).eq("id", owned.id).select(),
+        );
+        check("parent CANNOT edit the horse they own", !mode.startsWith("ALLOWED"), mode);
+
+        const { data } = await parent.from("horses").select("notes").eq("id", owned.id).maybeSingle();
+        check(
+          "…and the note is unchanged when re-read",
+          data?.notes === owned.notes,
+          `now: ${data?.notes}`,
+        );
+      }
+
+      {
+        const mode = await refusalMode(parent.from("horses").delete().eq("id", owned.id).select());
+        check("parent CANNOT delete the horse they own", !mode.startsWith("ALLOWED"), mode);
+
+        // Re-read rather than trust the refusal: a delete that reported zero
+        // rows and still removed one would pass the line above.
+        const { data } = await admin.from("horses").select("id").eq("id", owned.id).maybeSingle();
+        check("…and the horse is still there when admin re-reads it", data?.id === owned.id);
+      }
+
+      {
+        // Seating your own rider on any horse you like would be the horse
+        // equivalent of the backfill_book_rider hole.
+        const mode = await refusalMode(
+          parent
+            .from("horse_riders")
+            .insert({ horse_id: unrelated.id, rider_id: riderId })
+            .select(),
+        );
+        check("parent CANNOT assign their rider to a horse", !mode.startsWith("ALLOWED"), mode);
+      }
+
+      {
+        const mode = await refusalMode(
+          parent
+            .from("feed_plans")
+            .insert({ horse_id: owned.id, meal: "lunch", description: "parent-written" })
+            .select(),
+        );
+        check("parent CANNOT write a feed plan for their own horse", !mode.startsWith("ALLOWED"), mode);
+      }
+
+      {
+        // Feed access follows OWNERSHIP, not riding — and the control is that
+        // this exact plan is readable by admin and sits on a horse the parent
+        // provably reaches through basics.
+        const { data: control } = await admin
+          .from("feed_plans")
+          .select("id")
+          .eq("horse_id", ridden.id)
+          .eq("active", true);
+        check(
+          "control: the ridden horse really does have an active feed plan",
+          (control?.length ?? 0) === 1,
+          `admin saw ${control?.length}`,
+        );
+
+        const { data, error } = await parent.from("feed_plans").select("*").eq("horse_id", ridden.id);
+        check(
+          "parent CANNOT read the feed chart of a horse they ride but do not own",
+          !error && (data?.length ?? 0) === 0,
+          error?.message ?? `LEAKED ${data?.length} row(s)`,
+        );
+
+        const { data: other } = await parent.from("feed_plans").select("*").eq("horse_id", unrelated.id);
+        check(
+          "parent CANNOT read an unrelated family's feed chart",
+          (other?.length ?? 0) === 0,
+          `LEAKED ${other?.length} row(s)`,
+        );
+      }
+
+      console.log("\nstaff read everything, and write nothing");
+      {
+        // Control first: staff genuinely reach this row (asserted above), so a
+        // refused write is about the write policy.
+        const mode = await refusalMode(
+          staff.from("horses").update({ notes: "rewritten by staff" }).eq("id", barnHorse.id).select(),
+        );
+        check("staff CANNOT edit a horse", !mode.startsWith("ALLOWED"), mode);
+
+        const { data } = await staff.from("horses").select("notes").eq("id", barnHorse.id).maybeSingle();
+        check(
+          "…and the barn horse's notes are unchanged",
+          data?.notes === barnHorse.notes,
+          `now: ${data?.notes}`,
+        );
+      }
+
+      {
+        const mode = await refusalMode(
+          staff.from("horses").insert({ name: "Staff-created horse" }).select(),
+        );
+        check("staff CANNOT create a horse", !mode.startsWith("ALLOWED"), mode);
+      }
+
+      {
+        const mode = await refusalMode(staff.from("horses").delete().eq("id", barnHorse.id).select());
+        check("staff CANNOT delete a horse", !mode.startsWith("ALLOWED"), mode);
+      }
+
+      {
+        const mode = await refusalMode(
+          staff
+            .from("feed_plans")
+            .update({ description: "rewritten by staff" })
+            .eq("horse_id", owned.id)
+            .eq("meal", "am")
+            .select(),
+        );
+        check("staff CANNOT rewrite a feed plan", !mode.startsWith("ALLOWED"), mode);
+      }
+
+      {
+        const mode = await refusalMode(
+          staff
+            .from("horse_riders")
+            .insert({ horse_id: owned.id, rider_id: controlRiderId })
+            .select(),
+        );
+        check("staff CANNOT assign a rider to a horse", !mode.startsWith("ALLOWED"), mode);
+      }
+
+      console.log("\nanon");
+      for (const table of ["horses", "horse_riders", "feed_plans"]) {
+        const { ids } = await visibleIds(anon, table);
+        check(`anon sees 0 rows in ${table}`, ids.length === 0, `saw ${ids.length}`);
+      }
+      {
+        const { data, error } = await anon.rpc("horses_basics");
+        check(
+          "anon CANNOT call horses_basics()",
+          blockedAtTheDoor(error),
+          error
+            ? `it ran and returned ${error.code}: ${error.message}`
+            : `it executed and returned ${data?.length ?? 0} row(s)`,
+        );
+      }
+
+      // --- admin can, which is the control for every "cannot" above ----------
+      console.log("\nadmin — the control proving the write policies are not simply broken");
+      {
+        const { data, error } = await admin
+          .from("horses")
+          .insert({ name: "Policy Test Horse", breed: "Test", active: true })
+          .select()
+          .single();
+        check("admin CAN create a horse", !error && Boolean(data), error?.message);
+
+        if (data) {
+          const { error: updateError } = await admin
+            .from("horses")
+            .update({ notes: "admin edit" })
+            .eq("id", data.id);
+          check("admin CAN edit a horse", !updateError, updateError?.message);
+
+          const { error: linkError } = await admin
+            .from("horse_riders")
+            .insert({ horse_id: data.id, rider_id: riderId });
+          check("admin CAN assign a rider", !linkError, linkError?.message);
+
+          const { error: planError } = await admin
+            .from("feed_plans")
+            .insert({ horse_id: data.id, meal: "am", description: "admin plan" });
+          check("admin CAN write a feed plan", !planError, planError?.message);
+
+          // Cascades clean up the link and the plan.
+          await admin.from("horses").delete().eq("id", data.id);
+          const { data: gone } = await admin.from("horses").select("id").eq("id", data.id);
+          check("admin CAN delete a horse", (gone?.length ?? 0) === 0);
+        }
+      }
     }
   }
 

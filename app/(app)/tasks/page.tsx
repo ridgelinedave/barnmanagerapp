@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { TabPage } from "@/components/TabPage";
 import { StubScreen } from "@/components/StubScreen";
 import { TaskCard } from "@/components/TaskCard";
@@ -32,6 +33,23 @@ export default async function TasksPage() {
 
   return (
     <TabPage title="Tasks">
+      {featureEnabled("horses") && (
+        <Link
+          href="/tasks/feed"
+          className="flex min-h-16 items-center gap-3 rounded-2xl border border-brand-ink/10 bg-white p-4"
+        >
+          <span className="flex-1">
+            <span className="block text-base font-semibold">Feed board</span>
+            <span className="block text-sm text-brand-ink/60">
+              Who eats what, morning, lunch and evening.
+            </span>
+          </span>
+          <span aria-hidden="true" className="text-brand-ink/40">
+            ›
+          </span>
+        </Link>
+      )}
+
       <div className="flex items-baseline gap-2">
         <h2 className="text-base font-semibold">{formatBarnDayLabel(today)}</h2>
         <p className="text-sm text-brand-ink/60">

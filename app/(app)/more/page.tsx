@@ -40,6 +40,27 @@ export default async function MorePage() {
         </Link>
       )}
 
+      {featureEnabled("horses") && (
+        <Link
+          href="/more/horses"
+          className="flex min-h-16 items-center gap-3 rounded-2xl border border-brand-ink/10 bg-white p-4"
+        >
+          <span className="flex-1">
+            <span className="block text-base font-semibold">
+              {role === "parent" ? "Your horses" : "Horse directory"}
+            </span>
+            <span className="block text-sm text-brand-ink/60">
+              {role === "parent"
+                ? "Your horse's record and feed chart."
+                : "Every horse at the barn, and what they're fed."}
+            </span>
+          </span>
+          <span aria-hidden="true" className="text-brand-ink/40">
+            ›
+          </span>
+        </Link>
+      )}
+
       <InstallPrompt />
 
       <section className="rounded-2xl border border-brand-ink/10 bg-white p-4">

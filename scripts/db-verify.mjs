@@ -29,13 +29,52 @@ const client = new pg.Client({
   connectionTimeoutMillis: 15000,
 });
 
-const EXPECTED_TABLES = ["families", "levels", "notifications", "profiles", "riders"];
+/**
+ * EVERY table the migrations create — not a sample.
+ *
+ * This list was the Phase 0 five for three phases, which meant `db:verify`
+ * printed "Schema matches the migrations. Nothing to fix." while never once
+ * looking at whether RLS was on for announcements, tasks, lessons or punches.
+ * A verifier that is silent about most of the schema is worse than no verifier,
+ * because it reports confidence it has not earned.
+ *
+ * ADD EVERY NEW TABLE HERE IN THE SAME COMMIT THAT CREATES IT. The sweep below
+ * fails on any public table missing from this list, so forgetting is loud.
+ */
+const EXPECTED_TABLES = [
+  // Phase 0 — core identity.
+  "families",
+  "levels",
+  "notifications",
+  "profiles",
+  "riders",
+  // Phase 1 — announcements, tasks, scheduling, backfill, time clock.
+  "announcements",
+  "task_templates",
+  "tasks",
+  "lesson_templates",
+  "lesson_instances",
+  "lesson_riders",
+  "backfill_offers",
+  "punches",
+  "pay_periods",
+  "timesheet_approvals",
+  // Phase 2 slice 1 — horses.
+  "horses",
+  "horse_riders",
+  "feed_plans",
+];
 const EXPECTED_FUNCTIONS = [
   "current_role",
   "current_family",
   "current_profile",
   "has_permission",
   "profiles_guard_privileged_columns",
+  // Phase 2 slice 1. horses_basics() is the column boundary for the basics
+  // tier, so a mutable search_path on it would be a way around that boundary.
+  "family_owns_horse",
+  "family_rides_horse",
+  "horses_basics",
 ];
 
 let problems = 0;
@@ -99,8 +138,17 @@ console.log("Tables and RLS");
     if (row.policy_count === 0) flag(`${table} has RLS on but NO policies — nothing is reachable.`);
   }
 
-  const extra = rows.map((r) => r.table_name).filter((t) => !EXPECTED_TABLES.includes(t));
-  if (extra.length) console.log(`  (other tables in public: ${extra.join(", ")})`);
+  // The other direction: a table that exists but nobody listed. Previously
+  // this was printed as a note and ignored, which is how the Phase 1 tables
+  // went unchecked for three phases. It is now a problem.
+  const unlisted = rows.map((r) => r.table_name).filter((t) => !EXPECTED_TABLES.includes(t));
+  for (const table of unlisted) {
+    const row = found.get(table);
+    flag(
+      `${table} exists in public but is not in EXPECTED_TABLES — add it, so its RLS is checked ` +
+        `(currently ${row.rls_enabled ? "RLS on" : "RLS OFF"}, ${row.policy_count} policies).`,
+    );
+  }
 }
 
 // --- policies ----------------------------------------------------------------
@@ -149,6 +197,19 @@ console.log("\nFunctions");
     if (row.security_definer && !pinned) {
       flag(`${fn}() is SECURITY DEFINER with a mutable search_path — privilege-escalation risk.`);
     }
+  }
+
+  // And the same check over EVERY definer function, named or not. The list
+  // above catches a function that has gone missing; this catches one that was
+  // added without anyone updating the list — including trigger functions,
+  // which are just as dangerous with a mutable search_path.
+  const definers = rows.filter((r) => r.security_definer);
+  const unpinned = definers.filter((r) => !r.config.includes("search_path"));
+  console.log(
+    `  — ${definers.length} SECURITY DEFINER function(s), ${definers.length - unpinned.length} with a pinned search_path`,
+  );
+  for (const row of unpinned) {
+    flag(`${row.proname}() is SECURITY DEFINER with a mutable search_path — privilege-escalation risk.`);
   }
 }
 

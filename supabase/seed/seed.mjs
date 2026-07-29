@@ -56,10 +56,31 @@ const password =
 
 const LEVELS = ["Intro", "Training", "First", "Second", "Third", "Fourth"];
 
+/**
+ * `family` picks which fixture family a parent belongs to.
+ *
+ * There are TWO parents on purpose. With one, every cross-family assertion is
+ * one-directional — "this family cannot see the other's data" is only ever
+ * checked from the side that has a login, and a policy that leaked the other
+ * way would pass. The second parent makes both directions testable.
+ */
 const FIXTURES = [
   { key: "admin", email: "phase0.admin@example.com", role: "admin", fullName: "Phase 0 Admin" },
   { key: "staff", email: "phase0.staff@example.com", role: "staff", fullName: "Phase 0 Staff" },
-  { key: "parent", email: "phase0.parent@example.com", role: "parent", fullName: "Phase 0 Parent" },
+  {
+    key: "parent",
+    email: "phase0.parent@example.com",
+    role: "parent",
+    fullName: "Phase 0 Parent",
+    family: "main",
+  },
+  {
+    key: "parent2",
+    email: "phase0.parent2@example.com",
+    role: "parent",
+    fullName: "Phase 0 Control Parent",
+    family: "control",
+  },
 ];
 
 const FAMILY_NAME = "Phase 0 Test Family";
@@ -162,7 +183,12 @@ async function main() {
       role: fixture.role,
       full_name: fixture.fullName,
       // Only parents carry a family_id (enforced by a CHECK constraint).
-      family_id: fixture.role === "parent" ? family.id : null,
+      family_id:
+        fixture.role === "parent"
+          ? fixture.family === "control"
+            ? controlFamily.id
+            : family.id
+          : null,
     };
 
     const { data: profile, error } = await supabase
@@ -209,6 +235,202 @@ async function main() {
   const rider = await ensureRider(family.id, RIDER_NAME);
   const controlRider = await ensureRider(controlFamily.id, CONTROL_RIDER_NAME);
   console.log(`  riders        ${rider.name}, ${controlRider.name}`);
+
+  // --- horses, rider links and feed plans (Phase 2, slice 1) -------------------
+  //
+  // Four horses, one per visibility tier as seen BY THE FIRST PARENT:
+  //
+  //   owned      the parent's family owns it        → full read
+  //   ridden     control family owns it, parent's rider rides it → basics only
+  //   barn       nobody owns it, parent's rider rides it         → basics only
+  //   unrelated  control family owns it, only the control rider rides it → none
+  //
+  // The SECOND parent (the control family) sees the mirror image: they own
+  // `ridden` and `unrelated` in full, get `barn` as basics, and must not see
+  // `owned` at all. Both directions of every cross-family rule are therefore
+  // real assertions rather than one side assumed from the other.
+  //
+  // breed / dob / notes are populated on ALL FOUR on purpose. They are the
+  // positive control for the column-projection tests: "the parent cannot see
+  // the breed" means nothing if the breed is null in the first place.
+  const horses = {};
+  {
+    const probe = await supabase.from("horses").select("id").limit(1);
+
+    if (probe.error && /schema cache|does not exist/i.test(probe.error.message)) {
+      console.log("  horses        SKIPPED — tables not created yet (apply migration 0010)");
+    } else if (probe.error) {
+      fail("Could not read horses", probe.error);
+    } else {
+      const HORSE_FIXTURES = [
+        {
+          key: "owned",
+          name: "Phase 2 Fixture Owned Horse",
+          barn_name: "Fixture Owned",
+          owner_family_id: family.id,
+          breed: "Hanoverian",
+          dob: "2015-04-01",
+          notes: "Owner-visible note. A riding family must never read this line.",
+        },
+        {
+          key: "ridden",
+          name: "Phase 2 Fixture Ridden Horse",
+          barn_name: "Fixture Ridden",
+          owner_family_id: controlFamily.id,
+          breed: "Dutch Warmblood",
+          dob: "2013-05-02",
+          notes: "Another family's private note. Delete before go-live.",
+        },
+        {
+          key: "barn",
+          name: "Phase 2 Fixture Barn Horse",
+          barn_name: "Fixture Barn",
+          owner_family_id: null,
+          breed: "Quarter Horse",
+          dob: "2012-06-03",
+          notes: "Barn-owned schooling note. Staff and admin only.",
+        },
+        {
+          key: "unrelated",
+          name: "Phase 2 Fixture Unrelated Horse",
+          barn_name: "Fixture Unrelated",
+          owner_family_id: controlFamily.id,
+          breed: "Trakehner",
+          dob: "2011-07-04",
+          notes: "Belongs to a family the fixture parent has nothing to do with.",
+        },
+      ];
+
+      for (const fixture of HORSE_FIXTURES) {
+        const { key, ...row } = fixture;
+
+        const { data: existing } = await supabase
+          .from("horses")
+          .select("*")
+          .eq("name", row.name)
+          .maybeSingle();
+
+        if (existing) {
+          // Re-assert the columns the tests depend on, in case a previous run
+          // (or a failed deny test) left them changed.
+          const { data, error } = await supabase
+            .from("horses")
+            .update({ ...row, active: true, photo_url: `/brand/fixture-${key}.png` })
+            .eq("id", existing.id)
+            .select()
+            .single();
+          if (error) fail(`Could not refresh the "${row.name}" fixture`, error);
+          horses[key] = data;
+          continue;
+        }
+
+        const { data, error } = await supabase
+          .from("horses")
+          .insert({ ...row, active: true, photo_url: `/brand/fixture-${key}.png` })
+          .select()
+          .single();
+        if (error) fail(`Could not create the horse "${row.name}"`, error);
+        horses[key] = data;
+      }
+
+      // Rider links. The parent's rider is on the ridden and barn horses; the
+      // control rider is on the unrelated horse, so a link EXISTS on it — the
+      // parent's blindness to it is about whose rider, not about links being
+      // empty.
+      const LINKS = [
+        [horses.ridden.id, rider.id],
+        [horses.barn.id, rider.id],
+        [horses.unrelated.id, controlRider.id],
+        // The control rider is on the barn horse too, so the SECOND parent also
+        // has a basics tier. Without it their basics list would be empty and
+        // "the other family sees only basics" would be untestable from that
+        // side — it would pass against a function that returns nothing at all.
+        [horses.barn.id, controlRider.id],
+      ];
+      for (const [horseId, riderId] of LINKS) {
+        const { data: existing } = await supabase
+          .from("horse_riders")
+          .select("id")
+          .eq("horse_id", horseId)
+          .eq("rider_id", riderId)
+          .maybeSingle();
+        if (existing) continue;
+
+        const { error } = await supabase
+          .from("horse_riders")
+          .insert({ horse_id: horseId, rider_id: riderId });
+        if (error) fail("Could not link a fixture rider to a fixture horse", error);
+      }
+
+      // Feed plans. The owned horse has a chart the parent MUST read; the
+      // ridden horse has one they must NOT — feed access follows ownership,
+      // not riding, and only a plan on a horse they demonstrably ride can
+      // prove that.
+      const PLANS = [
+        {
+          key: "ownedAm",
+          horse_id: horses.owned.id,
+          meal: "am",
+          description: "2 scoops fixture feed",
+          supplements: "Fixture joint supplement",
+          special_instructions: "Soak for 10 minutes.",
+        },
+        {
+          key: "ownedPm",
+          horse_id: horses.owned.id,
+          meal: "pm",
+          description: "1 scoop fixture feed",
+          supplements: "",
+          special_instructions: "",
+        },
+        {
+          key: "riddenAm",
+          horse_id: horses.ridden.id,
+          meal: "am",
+          description: "Another family's feed chart",
+          supplements: "",
+          special_instructions: "",
+        },
+        {
+          key: "unrelatedAm",
+          horse_id: horses.unrelated.id,
+          meal: "am",
+          description: "Unrelated family's feed chart",
+          supplements: "",
+          special_instructions: "",
+        },
+      ];
+
+      const feedPlans = {};
+      for (const plan of PLANS) {
+        const { key, ...row } = plan;
+
+        const { data: existing } = await supabase
+          .from("feed_plans")
+          .select("id")
+          .eq("horse_id", row.horse_id)
+          .eq("meal", row.meal)
+          .eq("active", true)
+          .maybeSingle();
+
+        if (existing) {
+          feedPlans[key] = existing.id;
+          continue;
+        }
+
+        const { data, error } = await supabase
+          .from("feed_plans")
+          .insert({ ...row, active: true })
+          .select()
+          .single();
+        if (error) fail(`Could not create the "${key}" feed plan fixture`, error);
+        feedPlans[key] = data.id;
+      }
+
+      horses.feedPlans = feedPlans;
+      console.log(`  horses        4 (owned, ridden, barn, unrelated) + 4 feed plans`);
+    }
+  }
 
   // --- clear the time-clock ledger --------------------------------------------
   //
@@ -341,6 +563,10 @@ async function main() {
     controlRiderId: controlRider.id,
     levelCount: LEVELS.length,
     announcements,
+    // Phase 2 slice 1. Empty when migration 0010 is not applied yet, which is
+    // what makes the horses section of the suite report a SKIP rather than a
+    // pass.
+    horses,
   };
 
   mkdirSync(here, { recursive: true });

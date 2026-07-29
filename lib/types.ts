@@ -212,6 +212,66 @@ export type TimesheetApproval = {
   external_ref: unknown;
 };
 
+export type Horse = {
+  id: string;
+  created_at: string;
+  name: string;
+  barn_name: string | null;
+  /** Null = barn-owned. Non-null gives that family full read on this row. */
+  owner_family_id: string | null;
+  photo_url: string | null;
+  breed: string | null;
+  dob: string | null;
+  active: boolean;
+  notes: string | null;
+};
+
+/**
+ * What a family sees for a horse their rider rides but they do not own.
+ *
+ * This is not "a Horse with fewer fields chosen by the UI" — it is the entire
+ * return type of horses_basics(), and the database cannot produce breed, dob or
+ * notes through it. Keeping it a separate type stops anyone reaching for
+ * `horse.notes` on a row that will never carry one.
+ */
+export type HorseBasics = {
+  id: string;
+  name: string;
+  barn_name: string | null;
+  photo_url: string | null;
+};
+
+export type HorseRider = {
+  id: string;
+  created_at: string;
+  horse_id: string;
+  rider_id: string;
+};
+
+export const MEALS = ["am", "lunch", "pm"] as const;
+export type Meal = (typeof MEALS)[number];
+
+export function isMeal(value: unknown): value is Meal {
+  return typeof value === "string" && (MEALS as readonly string[]).includes(value);
+}
+
+export const MEAL_LABELS: Record<Meal, string> = {
+  am: "Morning",
+  lunch: "Lunch",
+  pm: "Evening",
+};
+
+export type FeedPlan = {
+  id: string;
+  created_at: string;
+  horse_id: string;
+  meal: Meal;
+  description: string;
+  supplements: string;
+  special_instructions: string;
+  active: boolean;
+};
+
 export type Notification = {
   id: string;
   profile_id: string;

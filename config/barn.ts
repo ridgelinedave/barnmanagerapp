@@ -97,7 +97,12 @@ export const barn = {
     // Phase 1 slice 2 — shipped. Migration 0006 applied, policy suite green
     // (137 passed / 0 failed / 0 skipped).
     tasks: true,
-    horses: false,
+    /**
+     * Phase 2 slice 1 — shipped. Migration 0010 applied, Security Advisor
+     * clean, policy suite green (347 passed / 0 failed / 0 skipped), including
+     * the three-tier horse visibility checked from BOTH families' logins.
+     */
+    horses: true,
     /**
      * Phase 1 slices 3a + 3b — shipped. Migrations 0007 and 0008 applied,
      * policy suite green (241 passed / 0 failed / 0 skipped), including the
