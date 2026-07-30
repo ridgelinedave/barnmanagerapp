@@ -65,6 +65,44 @@ export const barn = {
     cream: "#F6F1E7",
     ink: "#2B2B2B",
 
+    /**
+     * CHROME — the charcoal the app's header, tab bar and launch field are cut
+     * from. Deliberately NOT the same value as `ink`: text ink and a chrome
+     * surface doing the same job at the same value makes the header read as
+     * "big text block" rather than a separate plane. This is a touch deeper and
+     * a touch warmer, so the gold sits on it the way it sits on the sign.
+     *
+     * Measured: white 17.22:1 · gold 9.26:1 · cream 15.30:1.
+     */
+    charcoal: "#1C1B18",
+
+    /**
+     * SECONDARY — the pasture green. One value doing two jobs, which is why
+     * this particular green: it clears AA as TEXT on cream (8.68:1) *and* as a
+     * SURFACE carrying white (9.77:1) or gold (5.25:1). Used for confirmations,
+     * "done" states, and the quiet labels on a board.
+     */
+    forest: "#2F4A34",
+
+    /** Cancellations, overdue care, destructive actions. 6.73:1 on cream. */
+    danger: "#9B2C1F",
+
+    /**
+     * Secondary text. A measured 6.48:1 on cream rather than a percentage of
+     * ink — "muted grey at 60% opacity" is how body copy quietly fails AA.
+     */
+    muted: "#5B564C",
+
+    /** Hairline. Not a text colour, so no ratio applies; it must simply be seen. */
+    line: "#E4DCCB",
+
+    /** Tinted grounds for chips, callouts and tiles. All carry ink or their own deep tone. */
+    goldSoft: "#F6EDD4",
+    forestSoft: "#E7EDE5",
+    dangerSoft: "#F6E5E2",
+    /** Inset tiles inside a card — the stat-tile ground. */
+    sunk: "#F1ECE0",
+
     logoSrc: "/brand/crouse-logo.png",
   },
 

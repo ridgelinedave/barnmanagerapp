@@ -1,27 +1,132 @@
 @import "tailwindcss";
 
 /*
- * Brand colours are NOT defined here. They come from /config/barn.ts and are
- * written onto <html> as inline custom properties by app/layout.tsx, so a clone
- * only has to edit the config file. The fallbacks below exist purely so the
- * stylesheet is valid on its own.
+ * ============================================================================
+ * THE CROUSE DESIGN SYSTEM
+ * ============================================================================
+ *
+ * WHERE VALUES LIVE, AND WHY THE SPLIT:
+ *
+ *   COLOUR lives in /config/barn.ts. It is barn-specific — a second barn has a
+ *   different sign, a different gold, a different green — and the root layout
+ *   writes it onto <html> as custom properties. The fallbacks below exist only
+ *   so this stylesheet is valid on its own; the config always wins at runtime.
+ *
+ *   EVERYTHING ELSE lives here. Spacing rhythm, corner radii, elevation and the
+ *   type scale are not barn facts; they are how this app is built. A clone
+ *   re-skins by editing one config file and inherits the craft unchanged.
+ *
+ * Every colour pairing below was measured, not eyeballed. The ratios are
+ * recorded next to the values in config/barn.ts.
  */
+
 :root {
   --brand-gold: #dabc51;
   --brand-gold-deep: #776628;
   --brand-cream: #f6f1e7;
   --brand-ink: #2b2b2b;
+  --brand-charcoal: #1c1b18;
+  --brand-forest: #2f4a34;
+  --brand-danger: #9b2c1f;
+  --brand-muted: #5b564c;
+  --brand-line: #e4dccb;
+  --brand-gold-soft: #f6edd4;
+  --brand-forest-soft: #e7ede5;
+  --brand-danger-soft: #f6e5e2;
+  --brand-sunk: #f1ece0;
 }
 
 @theme inline {
+  /* --- Brand ------------------------------------------------------------ */
   /* Surface gold — backgrounds and badges. Always pair with ink text. */
-  --color-brand-gold: var(--brand-gold);
-  /* Text gold — links, active tab labels. Meets AA on cream and on white. */
-  --color-brand-gold-deep: var(--brand-gold-deep);
-  --color-brand-cream: var(--brand-cream);
-  --color-brand-ink: var(--brand-ink);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-gold: var(--brand-gold);
+  /* Text gold — links, active labels. AA on cream and on white. */
+  --color-gold-deep: var(--brand-gold-deep);
+  --color-gold-soft: var(--brand-gold-soft);
+  --color-forest: var(--brand-forest);
+  --color-forest-soft: var(--brand-forest-soft);
+  --color-danger: var(--brand-danger);
+  --color-danger-soft: var(--brand-danger-soft);
+
+  /* --- Semantic surfaces ------------------------------------------------ */
+  /* The page itself. */
+  --color-ground: var(--brand-cream);
+  /* A card sitting on the ground. */
+  --color-surface: #ffffff;
+  /* A tile sunk INTO a card — stat tiles, read-only rows. */
+  --color-sunk: var(--brand-sunk);
+  /* Header, tab bar, launch field. */
+  --color-chrome: var(--brand-charcoal);
+
+  /* --- Semantic text ---------------------------------------------------- */
+  --color-ink: var(--brand-ink);
+  --color-muted: var(--brand-muted);
+  --color-line: var(--brand-line);
+
+  /* --- Type ------------------------------------------------------------- */
+  /*
+   * Barlow Condensed carries every heading; Barlow carries every word you
+   * actually read. One superfamily in two widths, which is the sanctioned way
+   * to pair (two DIFFERENT humanist sans-serifs is the mistake — similar but
+   * not identical reads as an accident).
+   *
+   * Both are SIL Open Font License, self-hosted by next/font: no network call,
+   * no layout shift, works offline in the installed PWA.
+   */
+  --font-display: var(--font-barlow-condensed), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-barlow), ui-sans-serif, system-ui, sans-serif;
+
+  /* Screen titles in the header. */
+  --text-display: 1.9375rem;
+  --text-display--line-height: 1.05;
+  --text-display--letter-spacing: -0.015em;
+  --text-display--font-weight: 700;
+
+  /* Card and section titles. */
+  --text-title: 1.4375rem;
+  --text-title--line-height: 1.15;
+  --text-title--letter-spacing: -0.01em;
+  --text-title--font-weight: 700;
+
+  --text-heading: 1.1875rem;
+  --text-heading--line-height: 1.25;
+  --text-heading--font-weight: 600;
+
+  /* 16px floor: anything smaller triggers iOS zoom-on-focus in inputs. */
+  --text-body: 1rem;
+  --text-body--line-height: 1.55;
+
+  --text-label: 0.875rem;
+  --text-label--line-height: 1.4;
+  --text-label--font-weight: 500;
+
+  --text-caption: 0.8125rem;
+  --text-caption--line-height: 1.45;
+
+  /*
+   * The board label — "TODAY AT THE BARN". Condensed, tracked, small.
+   * A deliberate device used on grouped boards, NOT an eyebrow above every
+   * section; that reflex is the thing that reads as generated.
+   */
+  --text-eyebrow: 0.75rem;
+  --text-eyebrow--line-height: 1;
+  --text-eyebrow--letter-spacing: 0.09em;
+  --text-eyebrow--font-weight: 700;
+
+  /* --- Radius ----------------------------------------------------------- */
+  --radius-chip: 999px;
+  --radius-control: 0.75rem;
+  --radius-card: 1rem;
+  --radius-sheet: 1.5rem;
+
+  /* --- Elevation -------------------------------------------------------- */
+  /*
+   * Cards on cream get a hairline, not a shadow — a shadow on a warm ground
+   * turns muddy. Elevation is reserved for things that genuinely float.
+   */
+  --shadow-raised: 0 1px 2px rgb(28 27 24 / 0.05), 0 6px 16px rgb(28 27 24 / 0.05);
+  --shadow-sheet: 0 -10px 40px rgb(28 27 24 / 0.22);
+  --shadow-chrome: 0 1px 0 rgb(28 27 24 / 0.08);
 }
 
 html {
@@ -33,11 +138,44 @@ body {
   background: var(--brand-cream);
   color: var(--brand-ink);
   -webkit-text-size-adjust: 100%;
+  /* Barlow's default figures are proportional; tabular keeps columns of times
+     and counts from jittering as they update. */
+  font-variant-numeric: tabular-nums;
 }
 
-/* Respect the iOS home indicator / notch for the fixed tab bar. */
+/* Respect the iOS home indicator / notch. */
 .safe-bottom {
   padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+/*
+ * Focus: visible, on-brand, and never removed. Gold reads on both the cream
+ * ground and the charcoal chrome, so one ring works everywhere.
+ */
+:focus-visible {
+  outline: 2px solid var(--brand-gold);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Headings take the condensed face by default so no screen has to remember. */
+h1,
+h2,
+h3 {
+  font-family: var(--font-barlow-condensed), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Even line lengths on titles; fewer orphans in prose. */
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+p {
+  text-wrap: pretty;
 }
 
 @media (prefers-reduced-motion: reduce) {

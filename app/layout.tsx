@@ -1,12 +1,39 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Barlow, Barlow_Condensed } from "next/font/google";
 import type { CSSProperties } from "react";
 import "./globals.css";
 import { barn } from "@/config/barn";
 import { ServiceWorkerRegistrar } from "@/components/ServiceWorkerRegistrar";
 
-const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
-const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
+/**
+ * The typefaces.
+ *
+ * Barlow Condensed for anything that announces (screen titles, card titles,
+ * board labels) and Barlow for anything that is read. Both are SIL Open Font
+ * License and both are SELF-HOSTED by next/font — the files are served from
+ * this origin, so there is no Google request, no third-party cookie, and the
+ * installed PWA still renders correctly with no network at all.
+ *
+ * `display: "swap"` with the fallback metrics next/font computes means text is
+ * never invisible while the face loads and the swap does not shift the layout.
+ *
+ * Geist was here before. It is a fine typeface and it is also the typeface
+ * every Next.js app ships with by default, which is most of why this app read
+ * as generated rather than made.
+ */
+const barlowCondensed = Barlow_Condensed({
+  variable: "--font-barlow-condensed",
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
+  display: "swap",
+});
+
+const barlow = Barlow({
+  variable: "--font-barlow",
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: barn.name,
@@ -51,12 +78,28 @@ const APPLE_SPLASH = [
   { w: 750, h: 1334, cssW: 375, cssH: 667, ratio: 2 },
 ];
 
-/** Brand tokens flow from /config/barn.ts into CSS, not the other way round. */
+/**
+ * Brand tokens flow from /config/barn.ts into CSS, not the other way round.
+ *
+ * This is the whole re-skin surface: a second barn edits its config and every
+ * card, chip, header and empty state follows. Nothing downstream may hard-code
+ * a colour — globals.css maps these into Tailwind theme tokens and components
+ * only ever name the token.
+ */
 const brandVars = {
   "--brand-gold": barn.brand.gold,
   "--brand-gold-deep": barn.brand.goldDeep,
   "--brand-cream": barn.brand.cream,
   "--brand-ink": barn.brand.ink,
+  "--brand-charcoal": barn.brand.charcoal,
+  "--brand-forest": barn.brand.forest,
+  "--brand-danger": barn.brand.danger,
+  "--brand-muted": barn.brand.muted,
+  "--brand-line": barn.brand.line,
+  "--brand-gold-soft": barn.brand.goldSoft,
+  "--brand-forest-soft": barn.brand.forestSoft,
+  "--brand-danger-soft": barn.brand.dangerSoft,
+  "--brand-sunk": barn.brand.sunk,
 } as CSSProperties;
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
@@ -64,7 +107,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html
       lang="en"
       style={brandVars}
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${barlow.variable} ${barlowCondensed.variable} h-full antialiased`}
     >
       <head>
         {APPLE_SPLASH.map((s) => (
@@ -76,7 +119,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           />
         ))}
       </head>
-      <body className="font-sans min-h-full flex flex-col">
+      <body className="font-sans text-body min-h-full flex flex-col">
         <ServiceWorkerRegistrar />
         {children}
       </body>
