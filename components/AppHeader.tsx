@@ -58,8 +58,9 @@ export function AppHeader({
         {subject ? (
           <div className="flex min-w-0 flex-1 items-center gap-3">
             {subject.photoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element -- signed
-              // storage URL, per-request; not a static asset the loader can cache.
+              /* Signed, per-request storage URL — next/image would proxy a
+                 one-time link it cannot cache. */
+              /* eslint-disable-next-line @next/next/no-img-element */
               <img
                 src={subject.photoUrl}
                 alt=""

@@ -4,6 +4,10 @@ import { StubScreen } from "@/components/StubScreen";
 import { LessonCard } from "@/components/LessonCard";
 import { BookRiderForm, GenerateInstancesButton, OneOffLessonForm } from "@/components/ScheduleAdmin";
 import { FillSlotForm, SendRemindersButton } from "@/components/FillSlotForm";
+import { Card, Chip, ChipRow, EmptyState, SectionHeader } from "@/components/ui/primitives";
+import { Button, ButtonLink } from "@/components/ui/Button";
+import { Icon } from "@/components/ui/Icon";
+import { SheetTrigger } from "@/components/ui/Sheet";
 import { requireTab, currentRole } from "@/lib/guard";
 import {
   listInstancesForDate,
@@ -95,38 +99,68 @@ export default async function SchedulePage({
     ),
   );
 
+  const isToday = date === barnToday();
+
   return (
     <TabPage title="Schedule">
-      <nav className="flex items-center gap-2" aria-label="Change day">
+      {/*
+       * The day stepper. A whole-width bar rather than two small arrows: this is
+       * the control that gets used most on this screen, often one-handed while
+       * holding a lead rope, so both targets are 48px and the day itself is the
+       * loudest thing on the row.
+       */}
+      <nav aria-label="Change day" className="flex items-stretch gap-2">
         <Link
           href={`/schedule?date=${addBarnDays(date, -1)}`}
-          className="flex min-h-11 items-center rounded-xl border border-brand-ink/20 bg-white px-3 text-sm font-semibold"
+          aria-label="Previous day"
+          className="flex min-h-12 w-12 shrink-0 items-center justify-center rounded-control border border-line bg-surface text-ink"
         >
-          ‹ Prev
+          <Icon name="chevron" className="size-5 rotate-180" strokeWidth={2} />
         </Link>
-        <span className="flex-1 text-center text-base font-semibold">
-          {formatBarnDayLabel(date)}
-        </span>
+
+        <div className="flex min-w-0 flex-1 flex-col items-center justify-center rounded-control border border-line bg-surface px-2 py-1.5">
+          <span className="truncate font-display text-heading leading-tight text-ink">
+            {formatBarnDayLabel(date)}
+          </span>
+          {isToday ? (
+            <span className="font-display text-eyebrow uppercase text-gold-deep">Today</span>
+          ) : (
+            <Link href="/schedule" className="text-caption text-gold-deep underline underline-offset-2">
+              Back to today
+            </Link>
+          )}
+        </div>
+
         <Link
           href={`/schedule?date=${addBarnDays(date, 1)}`}
-          className="flex min-h-11 items-center rounded-xl border border-brand-ink/20 bg-white px-3 text-sm font-semibold"
+          aria-label="Next day"
+          className="flex min-h-12 w-12 shrink-0 items-center justify-center rounded-control border border-line bg-surface text-ink"
         >
-          Next ›
+          <Icon name="chevron" className="size-5" strokeWidth={2} />
         </Link>
       </nav>
 
-      {date !== barnToday() && (
-        <Link href="/schedule" className="text-center text-sm font-semibold text-brand-gold-deep underline">
-          Back to today
-        </Link>
-      )}
+      <ChipRow>
+        <Chip
+          value={`${instances.length} ${instances.length === 1 ? "lesson" : "lessons"}`}
+          icon="calendar"
+          tone={instances.length === 0 ? "neutral" : "forest"}
+        />
+        {isAdmin && fillable.length > 0 && (
+          <Chip value={`${fillable.length} with a free seat`} icon="alert" tone="gold" />
+        )}
+      </ChipRow>
 
       {instances.length === 0 ? (
-        <p className="rounded-2xl border border-brand-ink/10 bg-white p-4 text-sm text-brand-ink/70">
-          {isAdmin
-            ? "No lessons on this day. Generate from the weekly schedule, or add a one-off below."
-            : "No lessons scheduled."}
-        </p>
+        <EmptyState
+          title={isToday ? "Nothing on today" : "Nothing on this day"}
+          body={
+            isAdmin
+              ? "Generate the day from the weekly schedule below, or add a one-off if something has come up."
+              : "No lessons are scheduled. Check another day with the arrows above."
+          }
+          emoji="🌾"
+        />
       ) : (
         instances.map((instance) => (
           <LessonCard
@@ -152,12 +186,15 @@ export default async function SchedulePage({
                 <BookRiderForm instanceId={instance.id} riders={riderOptions} />
                 <form action={instance.status === "cancelled" ? restoreInstance : cancelInstance}>
                   <input type="hidden" name="id" value={instance.id} />
-                  <button
+                  {/* Cancelling is destructive and reads as such; restoring is
+                      an ordinary action and should not. */}
+                  <Button
                     type="submit"
-                    className="min-h-11 w-full rounded-xl border border-brand-ink/20 bg-white text-sm font-semibold"
+                    block
+                    variant={instance.status === "cancelled" ? "secondary" : "danger"}
                   >
                     {instance.status === "cancelled" ? "Restore this lesson" : "Cancel this lesson"}
-                  </button>
+                  </Button>
                 </form>
               </div>
             )}
@@ -167,22 +204,28 @@ export default async function SchedulePage({
 
       {isAdmin && (
         <>
-          <section className="flex flex-col gap-3 rounded-2xl border border-brand-ink/10 bg-white p-4">
-            <h2 className="text-base font-semibold">Build the schedule</h2>
-            <GenerateInstancesButton />
-            <SendRemindersButton date={date} />
-            <Link
-              href="/manage/lesson-templates"
-              className="flex min-h-11 items-center justify-center rounded-xl border border-brand-ink/20 px-4 text-sm font-semibold"
-            >
-              Edit the weekly schedule
-            </Link>
+          <section className="flex flex-col gap-3">
+            <SectionHeader title="Run the day" />
+            <Card className="flex flex-col gap-2.5 p-4">
+              <GenerateInstancesButton />
+              <SendRemindersButton date={date} />
+              <ButtonLink href="/manage/lesson-templates" block icon="calendar">
+                Edit the weekly schedule
+              </ButtonLink>
+            </Card>
           </section>
 
-          <section className="flex flex-col gap-3 rounded-2xl border border-brand-ink/10 bg-white p-4">
-            <h2 className="text-base font-semibold">One-off on {formatBarnDayLabel(date)}</h2>
+          {/*
+           * A one-off is an exception, not part of the day's rhythm — so it is
+           * a sheet you pull up when you need it rather than a permanent form
+           * parked at the bottom of every schedule screen.
+           */}
+          <SheetTrigger
+            label={`Add a one-off on ${formatBarnDayLabel(date)}`}
+            title={`One-off on ${formatBarnDayLabel(date)}`}
+          >
             <OneOffLessonForm date={date} instructors={instructorOptions} levels={levelOptions} />
-          </section>
+          </SheetTrigger>
         </>
       )}
     </TabPage>

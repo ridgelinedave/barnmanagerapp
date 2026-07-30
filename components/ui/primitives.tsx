@@ -65,9 +65,12 @@ export function Board({
         )}
         <h2 className="font-display text-eyebrow uppercase text-white">{label}</h2>
         {action && (
+          /* The hit area is 44px even though the label is 19px: padding plus a
+             negative margin gives the finger a real target without inflating
+             the bar. A text link that only looks tappable is not tappable. */
           <Link
             href={action.href}
-            className="ml-auto text-caption font-medium text-gold underline-offset-4 hover:underline"
+            className="-my-2.5 ml-auto flex min-h-11 shrink-0 items-center text-caption font-medium text-gold underline-offset-4 hover:underline"
           >
             {action.label}
           </Link>
@@ -125,9 +128,10 @@ export function SectionHeader({
       <h2 className="font-display text-heading text-ink">{title}</h2>
       {count && <p className="text-caption text-muted">{count}</p>}
       {action && (
+        /* Same 44px hit area, same trick. */
         <Link
           href={action.href}
-          className="ml-auto shrink-0 text-label font-medium text-gold-deep underline-offset-4 hover:underline"
+          className="-my-2 ml-auto flex min-h-11 shrink-0 items-center text-label font-medium text-gold-deep underline-offset-4 hover:underline"
         >
           {action.label}
         </Link>

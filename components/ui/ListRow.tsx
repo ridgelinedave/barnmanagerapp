@@ -27,9 +27,10 @@ export function Avatar({
   const text = { sm: "text-caption", md: "text-heading", lg: "text-title" } as const;
 
   if (src) {
+    /* Storage URLs are signed per request and differ per viewer, so next/image
+       cannot cache or optimise them — it would proxy a one-time URL. */
     return (
-      // eslint-disable-next-line @next/next/no-img-element -- storage paths are
-      // signed at request time and vary per user; the loader cannot cache them.
+      /* eslint-disable-next-line @next/next/no-img-element */
       <img
         src={src}
         alt=""

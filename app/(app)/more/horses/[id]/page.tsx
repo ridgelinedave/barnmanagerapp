@@ -5,24 +5,41 @@ import { CareTimeline } from "@/components/CareTimeline";
 import { CareLogForm } from "@/components/CareLogForm";
 import { DocumentList } from "@/components/DocumentList";
 import { DocumentUploadForm } from "@/components/HorseDocuments";
+import {
+  Board,
+  Card,
+  Chip,
+  ChipRow,
+  EmptyState,
+  FactList,
+  SectionHeader,
+  Sunk,
+} from "@/components/ui/primitives";
+import { InlineRow } from "@/components/ui/ListRow";
+import { SheetTrigger } from "@/components/ui/Sheet";
 import { listHorseDocuments } from "@/lib/documents";
 import { currentRole } from "@/lib/guard";
 import { getHorse, listFeedPlans, listHorseRiders } from "@/lib/horses";
 import { listCareEvents, loggerNames, upcoming } from "@/lib/care";
 import { barnToday, formatBarnDayLabel } from "@/lib/dates";
 import { CARE_TYPE_LABELS, MEAL_LABELS } from "@/lib/types";
-import { featureEnabled } from "@/config/barn";
+import { barn, featureEnabled } from "@/config/barn";
 
 export const metadata = { title: "Horse" };
 
 /**
- * A horse's record, read-only.
+ * A horse's record.
  *
- * There is no role branch guarding the fields here, and there does not need to
- * be: getHorse() returns null for anyone RLS does not let read the row, and the
- * only families it lets through are the owners. A family whose rider merely
- * rides the horse never reaches this page — their card does not link, and the
- * query behind it would return nothing if they typed the URL.
+ * ONE SCROLL, NOT EIGHT TABS. The incumbent files a horse behind About /
+ * Feeding / Turnout / Health / Weight / Hoof / Training / FlyOps, and most of
+ * them open on "no record" — eight taps to find out there is nothing to find.
+ * Here everything the barn knows is on one page in the order it gets asked
+ * about, and a section that has nothing in it does not render at all. The page
+ * gets longer as a horse's history does, which is the right way round.
+ *
+ * There is no role branch guarding the fields: getHorse() returns null for
+ * anyone RLS does not let read the row, and the only families it lets through
+ * are owners. A family whose rider merely rides the horse never reaches here.
  */
 export default async function HorseDetailPage({
   params,
@@ -36,6 +53,7 @@ export default async function HorseDetailPage({
   const horse = await getHorse(id);
   if (!horse) notFound();
 
+  const isBarn = role !== "parent";
   const careOn = featureEnabled("care");
   const documentsOn = featureEnabled("documents");
   const [plans, riders, care, loggers, documents] = await Promise.all([
@@ -44,157 +62,194 @@ export default async function HorseDetailPage({
     careOn ? listCareEvents(id) : Promise.resolve([]),
     // The "logged by" line is a barn detail. A family sees what was done and
     // when, not which employee wrote it up.
-    careOn && role !== "parent" ? loggerNames() : Promise.resolve(undefined),
+    careOn && isBarn ? loggerNames() : Promise.resolve(undefined),
     // Storage RLS filters this: the barn sees the folder, the owning family
     // sees the folder, anyone else gets an empty list.
     documentsOn ? listHorseDocuments(id) : Promise.resolve([]),
   ]);
   const activePlans = plans.filter((p) => p.active);
   const due = upcoming(care);
+  const today = barnToday();
+
+  // A horse's birthday is asked about for the YEAR — the weekday is noise, and
+  // formatBarnDayLabel drops the year entirely, which would leave "Wed, Apr 1".
+  const born = horse.dob
+    ? new Intl.DateTimeFormat("en-US", {
+        timeZone: barn.timezone,
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      }).format(new Date(`${horse.dob}T12:00:00Z`))
+    : null;
 
   const facts: [string, string][] = [
-    horse.barn_name ? ["Barn name", horse.barn_name] : null,
     horse.breed ? ["Breed", horse.breed] : null,
-    horse.dob ? ["Born", horse.dob] : null,
-    !horse.active ? ["Status", "Retired"] : null,
+    born ? ["Born", born] : null,
   ].filter((f): f is [string, string] => f !== null);
 
+  // The header carries the identity, so the meta line is the two facts a person
+  // standing in the aisle actually needs: what it is and who rides it.
+  const headerMeta = [horse.breed, riders.length > 0 ? riders.map((r) => r.name).join(", ") : null]
+    .filter(Boolean)
+    .join(" · ");
+
   return (
-    <TabPage title={horse.name}>
+    <TabPage
+      title={horse.name}
+      back="/more/horses"
+      subject={{ name: horse.name, meta: headerMeta || undefined, photoUrl: horse.photo_url }}
+    >
+      {/* Status at a glance — the things that change, before the things that don't. */}
+      <ChipRow>
+        {horse.barn_name && horse.barn_name !== horse.name && (
+          <Chip label="Barn name" value={horse.barn_name} />
+        )}
+        {!horse.active && <Chip value="Retired" tone="neutral" />}
+        {due.length > 0 && (
+          <Chip
+            value={`${due.length} due soon`}
+            icon="alert"
+            tone={due.some((e) => (e.due_next ?? "") < today) ? "danger" : "gold"}
+          />
+        )}
+        {activePlans.length > 0 && (
+          <Chip value={`${activePlans.length} meals`} icon="bucket" tone="forest" />
+        )}
+      </ChipRow>
+
+      {/* What is coming up. Only rendered when there IS something coming up. */}
+      {careOn && due.length > 0 && (
+        <Board label="Coming up" emoji="📌">
+          {due.map((event) => {
+            const overdue = (event.due_next ?? "") < today;
+            return (
+              <InlineRow
+                key={event.id}
+                icon={overdue ? "alert" : "clock"}
+                tone={overdue ? "danger" : "ink"}
+                label={CARE_TYPE_LABELS[event.type]}
+                value={`${overdue ? "Overdue " : ""}${formatBarnDayLabel(event.due_next!)}`}
+              />
+            );
+          })}
+        </Board>
+      )}
+
       {facts.length > 0 && (
-        <section className="rounded-2xl border border-brand-ink/10 bg-white p-4">
-          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-            {facts.map(([label, value]) => (
-              <div key={label} className="contents">
-                <dt className="text-brand-ink/60">{label}</dt>
-                <dd className="min-w-0 break-words">{value}</dd>
+        <Card className="p-4">
+          <FactList facts={facts} />
+          {horse.notes && (
+            <p className="mt-3 whitespace-pre-wrap border-t border-line pt-3 text-caption text-ink">
+              {horse.notes}
+            </p>
+          )}
+        </Card>
+      )}
+
+      {/* Feed. The single most-consulted thing on a horse's page at 6am. */}
+      <section className="flex flex-col gap-3">
+        <SectionHeader
+          title="Feed chart"
+          count={activePlans.length === 0 ? undefined : `${activePlans.length} meals`}
+        />
+        {activePlans.length === 0 ? (
+          <EmptyState
+            title="No feed chart yet"
+            body={
+              isBarn
+                ? "Set the morning and evening feeds on this horse and they will appear on the feed board."
+                : "The barn has not set a feed chart for this horse yet."
+            }
+            emoji="🪣"
+          />
+        ) : (
+          <Card className="flex flex-col gap-3 p-4">
+            {activePlans.map((plan) => (
+              <div key={plan.id}>
+                <h3 className="font-display text-heading text-ink">{MEAL_LABELS[plan.meal]}</h3>
+                <p className="mt-0.5 text-caption text-ink">{plan.description}</p>
+                {plan.supplements && (
+                  <p className="mt-0.5 text-caption text-muted">
+                    <span className="font-medium text-ink">Supplements:</span> {plan.supplements}
+                  </p>
+                )}
+                {plan.special_instructions && (
+                  <Sunk tone="gold" className="mt-2">
+                    <p className="text-caption font-medium">{plan.special_instructions}</p>
+                  </Sunk>
+                )}
               </div>
             ))}
-          </dl>
-        </section>
-      )}
-
-      {horse.notes && (
-        <section className="rounded-2xl border border-brand-ink/10 bg-white p-4">
-          <h2 className="text-base font-semibold">Notes</h2>
-          <p className="mt-1 whitespace-pre-wrap text-sm text-brand-ink/85">{horse.notes}</p>
-        </section>
-      )}
-
-      <section className="flex flex-col gap-3">
-        <h2 className="text-base font-semibold">Feed chart</h2>
-        {activePlans.length === 0 ? (
-          <p className="rounded-2xl border border-brand-ink/10 bg-white p-4 text-sm text-brand-ink/70">
-            No feed chart set up yet.
-          </p>
-        ) : (
-          activePlans.map((plan) => (
-            <div key={plan.id} className="rounded-2xl border border-brand-ink/15 bg-white p-4">
-              <h3 className="text-base font-semibold">{MEAL_LABELS[plan.meal]}</h3>
-              <p className="mt-1 text-sm text-brand-ink/85">{plan.description}</p>
-              {plan.supplements && (
-                <p className="mt-1 text-sm text-brand-ink/70">
-                  <span className="font-medium">Supplements:</span> {plan.supplements}
-                </p>
-              )}
-              {plan.special_instructions && (
-                <p className="mt-2 rounded-xl bg-brand-gold/25 p-3 text-sm font-medium text-brand-ink">
-                  {plan.special_instructions}
-                </p>
-              )}
-            </div>
-          ))
+          </Card>
         )}
       </section>
 
       {careOn && (
-        <>
-          {due.length > 0 && (
-            <section className="rounded-2xl border border-brand-ink/10 bg-white p-4">
-              <h2 className="text-base font-semibold">Coming up</h2>
-              <ul className="mt-2 flex flex-col gap-1">
-                {due.map((event) => (
-                  <li key={event.id} className="text-sm text-brand-ink/85">
-                    <span className="font-medium">{CARE_TYPE_LABELS[event.type]}</span> — due{" "}
-                    {formatBarnDayLabel(event.due_next!)}
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-
-          <section className="flex flex-col gap-3">
-            <div className="flex items-baseline gap-2">
-              <h2 className="text-base font-semibold">Care history</h2>
-              <p className="text-sm text-brand-ink/60">
-                {care.length === 0 ? "Nothing logged" : `${care.length} record(s)`}
-              </p>
-            </div>
-
-            <CareTimeline
-              events={care}
-              today={barnToday()}
-              loggerNames={loggers}
-              emptyMessage={
-                role === "parent"
-                  ? "Nothing logged for this horse yet."
-                  : "Nothing logged yet. Add the first record below."
-              }
-            />
-
-            {role !== "parent" && (
-              <div className="rounded-2xl border border-brand-ink/10 bg-white p-4">
-                <h3 className="mb-3 text-sm font-semibold text-brand-ink/70">Log care</h3>
-                <CareLogForm horseId={horse.id} today={barnToday()} />
-              </div>
-            )}
-          </section>
-        </>
-      )}
-
-      {documentsOn && (
         <section className="flex flex-col gap-3">
-          <div className="flex items-baseline gap-2">
-            <h2 className="text-base font-semibold">Documents</h2>
-            <p className="text-sm text-brand-ink/60">
-              {documents.length === 0 ? "None yet" : `${documents.length}`}
-            </p>
-          </div>
-
-          <DocumentList
-            documents={documents}
-            horseId={horse.id}
-            canDelete={role !== "parent"}
-            emptyMessage={
-              role === "parent"
-                ? "No documents for this horse yet."
-                : "No documents yet. Add the first below."
-            }
+          <SectionHeader
+            title="Care history"
+            count={care.length === 0 ? undefined : `${care.length} records`}
           />
 
-          {role !== "parent" && (
-            <div className="rounded-2xl border border-brand-ink/10 bg-white p-4">
+          {/* Logging is a note, not a detour — so it is a sheet over this page
+              rather than a form pushed to the bottom of it. */}
+          {isBarn && (
+            <SheetTrigger label="Log care" title="Log care" variant="primary">
+              <CareLogForm horseId={horse.id} today={today} />
+            </SheetTrigger>
+          )}
+
+          {care.length === 0 ? (
+            <EmptyState
+              title="Nothing logged yet"
+              body={
+                isBarn
+                  ? "Vaccines, worming, farrier and vet visits go here. The first one you log starts the history."
+                  : "When the barn logs a vaccine, a farrier visit or a vet call, it will show up here."
+              }
+              emoji="🩺"
+            />
+          ) : (
+            <CareTimeline events={care} today={today} loggerNames={loggers} />
+          )}
+        </section>
+      )}
+
+      {documentsOn && (documents.length > 0 || isBarn) && (
+        <section className="flex flex-col gap-3">
+          <SectionHeader
+            title="Documents"
+            count={documents.length === 0 ? undefined : `${documents.length}`}
+          />
+          {documents.length === 0 ? (
+            <EmptyState
+              title="No papers on file"
+              body="Coggins, registration papers and vet reports live here. The owning family can read them; nobody else can."
+              emoji="📄"
+            />
+          ) : (
+            <DocumentList documents={documents} horseId={horse.id} canDelete={isBarn} />
+          )}
+          {isBarn && (
+            <Card className="p-4">
               <DocumentUploadForm horseId={horse.id} />
-            </div>
+            </Card>
           )}
         </section>
       )}
 
       {riders.length > 0 && (
-        <section className="rounded-2xl border border-brand-ink/10 bg-white p-4">
-          <h2 className="text-base font-semibold">Riders</h2>
-          <p className="mt-1 text-sm text-brand-ink/70">
-            {riders.map((r) => r.name).join(", ")}
-          </p>
-        </section>
+        <Card className="p-4">
+          <h2 className="font-display text-heading text-ink">Who rides</h2>
+          <p className="mt-1 text-caption text-muted">{riders.map((r) => r.name).join(", ")}</p>
+        </Card>
       )}
 
-      <Link href="/more/horses" className="py-2 text-center text-sm font-medium underline">
-        Back to horses
-      </Link>
-
       {role === "staff" && (
-        <Link href="/tasks/feed" className="py-2 text-center text-sm font-medium underline">
+        <Link
+          href="/tasks/feed"
+          className="py-1 text-center text-label font-medium text-gold-deep underline underline-offset-4"
+        >
           Today&apos;s feed board
         </Link>
       )}
