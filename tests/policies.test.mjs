@@ -4288,6 +4288,124 @@ async function main() {
   }
 
   // ===========================================================================
+  // STANDING GUARD — the barn always has at least one admin (migration 0016)
+  //
+  // The Team panel's server action already refuses to demote the last admin,
+  // but that is a read-then-write: two admins demoting each other in the same
+  // instant could both pass. Migration 0016 moves the rule into a trigger,
+  // which is the one place a race cannot slip through.
+  //
+  // POSITIVE CONTROL FIRST, as everywhere else here: a demotion that leaves an
+  // admin standing must SUCCEED. Without it, a trigger that refused every
+  // demotion — or a policy that refused every profile write — would pass the
+  // deny cases and look correct.
+  //
+  // Every change below is reverted before the section ends, so the fixtures are
+  // in exactly the state the next run expects. Nothing here is conditional:
+  // conditional assertions make the suite's totals drift between runs.
+  // ===========================================================================
+  console.log("\n\n═══ STANDING GUARD — the barn always has at least one admin ═══\n");
+  {
+    const adminProfileId = users.admin.profileId;
+    const staffProfileId = users.staff.profileId;
+
+    const adminCount = async () => {
+      const { count } = await admin
+        .from("profiles")
+        .select("id", { count: "exact", head: true })
+        .eq("role", "admin");
+      return count ?? 0;
+    };
+
+    check("control: the barn starts with exactly one admin", (await adminCount()) === 1);
+
+    // --- CONTROL 1: promoting a second admin is allowed ----------------------
+    const { error: promoteError } = await admin
+      .from("profiles")
+      .update({ role: "admin", family_id: null })
+      .eq("id", staffProfileId);
+    check(
+      "control: admin CAN promote the staff fixture to admin",
+      !promoteError,
+      promoteError?.message,
+    );
+    check("control: there are now two admins", (await adminCount()) === 2);
+
+    // --- CONTROL 2: demoting one of TWO admins is allowed --------------------
+    // This is the assertion that proves the trigger is discriminating rather
+    // than simply refusing every demotion.
+    const { error: demoteError } = await admin
+      .from("profiles")
+      .update({ role: "staff" })
+      .eq("id", staffProfileId);
+    check(
+      "control: demoting one of two admins SUCCEEDS — the trigger is not a blanket refusal",
+      !demoteError,
+      demoteError?.message,
+    );
+    check("control: one admin is left", (await adminCount()) === 1);
+
+    // --- DENY: the last admin cannot be demoted ------------------------------
+    const { error: lastDemote } = await admin
+      .from("profiles")
+      .update({ role: "staff" })
+      .eq("id", adminProfileId);
+    check(
+      "demoting the LAST admin is REFUSED",
+      Boolean(lastDemote),
+      lastDemote ? "" : "the update was accepted — the barn would have zero admins",
+    );
+    check(
+      "the refusal is the 23514 check violation, not an incidental failure",
+      lastDemote?.code === "23514",
+      `got ${lastDemote?.code}: ${lastDemote?.message}`,
+    );
+
+    // --- DENY: the last admin cannot be deleted ------------------------------
+    // A separate path with its own branch in the trigger. Deleting the row
+    // leaves zero admins just as surely as demoting it.
+    const { error: lastDelete } = await admin
+      .from("profiles")
+      .delete()
+      .eq("id", adminProfileId);
+    check(
+      "deleting the LAST admin is REFUSED",
+      Boolean(lastDelete),
+      lastDelete ? "" : "the delete was accepted — the barn would have zero admins",
+    );
+    check(
+      "that refusal is 23514 too",
+      lastDelete?.code === "23514",
+      `got ${lastDelete?.code}: ${lastDelete?.message}`,
+    );
+
+    // NOTE — the legitimate hand-over (promote a successor, THEN step down) is
+    // NOT exercised here, deliberately. Doing it would demote the admin fixture
+    // itself, and every restore statement afterwards runs on that same session,
+    // which by then is no longer an admin: the privileged-columns trigger would
+    // refuse to put it back and the fixtures would be left broken for the next
+    // run. It is also the same fact as control 2 above — with two admins in
+    // place, a demotion is allowed. Proven, not skipped.
+
+    // --- Restore the fixtures exactly as they were --------------------------
+    // Both refusals above changed nothing, so only the promote/demote pair has
+    // to be undone — and it already was. This re-asserts it rather than
+    // trusting it, because a suite that leaves the database drifted fails the
+    // NEXT run, in a section that has nothing to do with the cause.
+    const restoredAdmins = await adminCount();
+    const { data: restoredStaff } = await admin
+      .from("profiles")
+      .select("role")
+      .eq("id", staffProfileId)
+      .single();
+    check(
+      "the fixtures are restored — one admin, staff is staff again",
+      restoredAdmins === 1 && restoredStaff?.role === "staff",
+      `admins=${restoredAdmins}, staff role=${restoredStaff?.role}`,
+    );
+  }
+
+  // ===========================================================================
   // STANDING GUARD — function exposure
   //
   // Data-driven from the migrations, so it covers functions added later without

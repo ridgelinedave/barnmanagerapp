@@ -13,7 +13,7 @@
 `events` are on. The `design-pass` branch is **merged in** (fast-forward, no
 conflicts), and the **Team panel** is built on top of it.
 
-**Suite: 521 passed, 0 failed, 0 skipped**, run twice with no re-seed. Advisor
+**Suite: 532 passed, 0 failed, 0 skipped**, run twice with no re-seed. Advisor
 **clean across 8 lints**. Plus `test:pdf` (12) and `test:ical` (30).
 
 The green gate is now one command, and it includes the Advisor:
@@ -32,6 +32,7 @@ npm run db:gate    # seed → test:policies → test:policies (no re-seed) → d
 | — security lockdown | 0015 | — | Live |
 | — design pass (UI only) | — | — | Merged |
 | — Team panel (admin UI) | **none needed** | — | Live |
+| — at-least-one-admin rule | 0016 | — | Live |
 
 ---
 
@@ -70,12 +71,9 @@ and how:
   "All permissions included with admin" instead of three unticked boxes that
   would imply the opposite. The toggles render for staff, which is where they
   are the real lever. Parents get no flag row at all.
-- **The last admin cannot be demoted.** Guarded **server-side** in the action,
-  not client-side, so a stale tab cannot walk past it — plus a disabled button
-  and a danger callout in the UI. **Honest limitation:** it is a read-then-write,
-  so two admins demoting each other in the same instant could both pass. Closing
-  that needs a constraint trigger, which is new SQL, which this slice
-  deliberately does not add. Listed under WHAT NEEDS DAVID.
+- **The last admin cannot be demoted.** Guarded in two places — see migration
+  0016 below. The action's check exists for the *message*; the trigger is the
+  guarantee.
 
 No delete-person, by design.
 
@@ -103,6 +101,69 @@ Measured at **390px and 320px**: no overflow, no target under 44px, no AA
 contrast failure — including inside all 30 bottom sheets, which had to be
 force-opened to measure because a closed `<dialog>` is `display:none`. **Zero
 emoji** in the rendered page.
+
+---
+
+## Migration 0016 — "at least one admin" is now a database rule
+
+`20260731000100_at_least_one_admin.sql`. An AFTER UPDATE OR DELETE trigger on
+`profiles` that refuses any change leaving zero admins, for **everyone**,
+service-role included. The app's check was a read-then-write and could not see
+a race; this is the one place a race cannot pass.
+
+**Why the advisory lock and not just a count.** Under READ COMMITTED (Supabase's
+default) two concurrent transactions each still see the *other* admin in place,
+so both counts return 1 and both demotions commit. `pg_advisory_xact_lock`
+serialises them, and because a statement issued after the lock takes a fresh
+snapshot, the second transaction sees the first one's committed demotion and
+raises.
+
+**One line was added to the SQL as drafted, and it was not optional.**
+
+```sql
+revoke all on function public.enforce_at_least_one_admin() from public, anon, authenticated;
+```
+
+Migration 0015 swept every SECURITY DEFINER function in `public` and revoked
+EXECUTE from all three roles — but a sweep only covers what existed when it ran.
+Postgres grants EXECUTE to PUBLIC on every *new* function and Supabase layers
+its own default grants to `anon` and `authenticated` on top, so this function
+would have been born open. That is not a theory: `db:advisor` lint
+`0028_anon_security_definer_function_executable` tests
+`has_function_privilege('anon', p.oid, 'EXECUTE')` against every `prosecdef`
+function in `public`, so **without that line the green gate would have gone
+red.** Confirmed empirically — an identical definer function created without a
+revoke came out `anon`-executable. A trigger function needs no grant to fire, so
+nothing is granted back.
+
+**What the tests assert** (`tests/policies.test.mjs`, new standing-guard
+section, 10 assertions), positive control before every deny:
+
+| | |
+|---|---|
+| control | the barn starts with exactly one admin |
+| control | admin can promote the staff fixture to admin |
+| control | there are now two admins |
+| **control** | **demoting one of two admins SUCCEEDS** — proves the trigger discriminates rather than refusing every demotion |
+| control | one admin is left |
+| deny | demoting the LAST admin is refused |
+| deny | …with errcode **23514**, not an incidental failure |
+| deny | deleting the LAST admin is refused |
+| deny | …with 23514 too |
+| restore | fixtures are back to one admin, staff is staff |
+
+The legitimate hand-over (promote a successor, then step down) is **not**
+exercised in the suite, deliberately: it would demote the admin fixture itself,
+and every restore statement afterwards runs on that same session, which by then
+is no longer admin — `profiles_guard_privileged_columns` would refuse to put it
+back and the fixtures would be left broken for the next run. It is the same fact
+as the fourth control above, and it *was* verified directly against the database
+during the build.
+
+The definer-inventory guard needed no change and stayed green: it picked the new
+function up automatically and now reports **10 trigger functions skipped** (was
+9), plus one more auto-generated "anon CANNOT execute" assertion. That is the
+whole of the 521 → 532 jump: 10 new + 1 automatic.
 
 ---
 
@@ -172,13 +233,6 @@ shows phase was not started.
    marked as one in the config and on the screen itself. Different disciplines
    cut them differently and this is the sort of detail a parent notices
    immediately. One line to change once she confirms.
-
-0b. **The last-admin guard is not race-proof.** It stops the ordinary mistake
-   (server-side check, disabled button, danger callout), but two admins
-   demoting each other in the same instant could both slip through, leaving a
-   barn nobody can administer. Making it airtight needs a constraint trigger —
-   new SQL, deliberately not added in a slice that needed none. Say the word
-   and it is a small migration.
 
 1. **A painted-pixel pass on the newly-live surfaces.** Their server output is
    verified — content, scoping, read-only vs editable, signed vs unsigned — and
@@ -608,7 +662,7 @@ npm run db:apply -- <f>  # apply a migration
 npm run db:seed          # test fixtures
 npm run db:gate          # THE GREEN GATE: seed → policies → policies → advisor
 npm run db:advisor       # Supabase security lints (splinter), DB-level only
-npm run test:policies    # the 521-assertion RLS suite
+npm run test:policies    # the 532-assertion RLS suite
 npm run test:pdf         # PDF structure (12)
 npm run test:ical        # feed format, DST conversion, feed scoping (30)
 npm run demo:seed        # walkthrough data  (-- --clean to remove)

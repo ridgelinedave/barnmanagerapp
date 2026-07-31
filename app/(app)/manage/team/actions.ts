@@ -136,11 +136,17 @@ export async function updatePersonRole(
 
   if (role === currentRoleValue && !familyId) return OK("No change.");
 
-  // The last-admin guard. Checked server-side rather than in the browser so a
-  // stale tab cannot walk past it, but it is still a read-then-write: two
-  // admins demoting each other in the same instant could both pass. Making it
-  // airtight needs a constraint trigger, which is new SQL, which this slice
-  // deliberately does not add. See PHASE-2-PROGRESS.md.
+  // The last-admin guard, FIRST of two.
+  //
+  // This one exists for the message, not for the guarantee: it catches the
+  // ordinary mistake early and says something useful about it. The guarantee
+  // is migration 0016's `enforce_at_least_one_admin` trigger, which refuses the
+  // write outright — including the race this check cannot see, where two admins
+  // demote each other in the same instant and both read a count of 1.
+  //
+  // Deleting this check would not make the app unsafe; it would make it rude.
+  // The trigger's own message is readable, so a race still surfaces as a
+  // sentence rather than a stack trace.
   if (currentRoleValue === "admin" && role !== "admin") {
     if ((await adminCount()) <= 1) {
       return FAIL(

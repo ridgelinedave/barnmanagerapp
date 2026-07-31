@@ -14,6 +14,13 @@
 --   7. 20260728000300_lessons.sql
 --   8. 20260728000400_backfill.sql
 --   9. 20260728000500_timeclock.sql
+--   10. 20260728000600_horses.sql
+--   11. 20260728000700_care_events.sql
+--   12. 20260729000100_horse_documents.sql
+--   13. 20260729000200_onboarding_forms.sql
+--   14. 20260729000300_events_ical.sql
+--   15. 20260729000400_lock_down_definer_grants.sql
+--   16. 20260731000100_at_least_one_admin.sql
 
 
 -------------------------------------------------------------------------------
@@ -2521,5 +2528,1524 @@ commit;
 
 -------------------------------------------------------------------------------
 -- END 20260728000500_timeclock.sql
+-------------------------------------------------------------------------------
+
+
+-------------------------------------------------------------------------------
+-- BEGIN 20260728000600_horses.sql
+-------------------------------------------------------------------------------
+
+-- =============================================================================
+-- 0010 — horses + horse_riders + feed_plans (Phase 2, slice 1)
+--
+-- The barn's horses, who is allowed to ride them, and what each one is fed.
+--
+-- THE CENTRAL PROBLEM THIS MIGRATION SOLVES: horse visibility is not a row
+-- rule, it is a COLUMN rule, and RLS is row-level only.
+--
+--   admin / staff        full read on every horse
+--   owner family         full read on the horse they own (breed, dob, notes)
+--   riding family        BASICS ONLY — name, barn_name, photo. Never breed,
+--                        dob or notes, and later never medical or documents
+--   unrelated family     nothing
+--
+-- A single SELECT policy cannot express "these rows, but only these columns".
+-- If the riding family's rows were added to the policy, `select *` would hand
+-- them every column, and the only thing standing between them and another
+-- family's horse's medical history would be the app remembering to ask for
+-- fewer columns. App-side column lists are not a security boundary — the anon
+-- key lets anyone write their own query.
+--
+-- So the base table policy stops at the OWNER. The basics tier is served by
+-- public.horses_basics(), a SECURITY DEFINER function that physically cannot
+-- return breed, dob or notes because they are not in its return type. The
+-- projection is the boundary, and it is enforced by the database.
+--
+-- WHY A FUNCTION RATHER THAN A VIEW: SPEC §6 suggests a view, and a view would
+-- work — but a view over an RLS-protected table has to run as its owner
+-- (security_invoker off) to see rows the caller cannot, and that is exactly the
+-- shape Supabase's Security Advisor flags as `security_definer_view`. A
+-- SECURITY DEFINER function with a pinned empty search_path is the same
+-- privilege boundary, is the pattern already used throughout this schema, and
+-- the Advisor has no lint against it. Same guarantee, clean Advisor.
+--
+-- Idempotent, safe to re-run.
+-- =============================================================================
+
+begin;
+
+-- -----------------------------------------------------------------------------
+-- horses
+--
+-- owner_family_id null = barn-owned. `on delete set null` rather than cascade:
+-- deleting a family must not delete a horse, and a horse with no owning family
+-- IS a barn horse, which is a narrower visibility, not a wider one.
+-- -----------------------------------------------------------------------------
+create table if not exists public.horses (
+  id              uuid primary key default gen_random_uuid(),
+  created_at      timestamptz not null default now(),
+  name            text not null,
+  barn_name       text,
+  owner_family_id uuid references public.families (id) on delete set null,
+  photo_url       text,
+  breed           text,
+  dob             date,
+  active          boolean not null default true,
+  notes           text
+);
+
+alter table public.horses enable row level security;
+
+create index if not exists horses_owner_family_idx on public.horses (owner_family_id);
+create index if not exists horses_active_name_idx on public.horses (active, name);
+
+comment on table public.horses is
+  'Barn and family-owned horses. Parents read their OWN horse here; the basics tier for a horse their rider rides is served by public.horses_basics(), never by this table.';
+comment on column public.horses.owner_family_id is
+  'Null = barn-owned. Non-null grants that family full read on this row.';
+
+-- -----------------------------------------------------------------------------
+-- horse_riders — who is allowed/assigned to ride which horse.
+--
+-- This link is what earns a non-owning family the basics tier, so it is a
+-- permission edge, not just a convenience. Cascades both ways: the link is
+-- meaningless without either end.
+-- -----------------------------------------------------------------------------
+create table if not exists public.horse_riders (
+  id         uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+  horse_id   uuid not null references public.horses (id) on delete cascade,
+  rider_id   uuid not null references public.riders (id) on delete cascade,
+  constraint horse_riders_unique_pair unique (horse_id, rider_id)
+);
+
+alter table public.horse_riders enable row level security;
+
+create index if not exists horse_riders_horse_idx on public.horse_riders (horse_id);
+create index if not exists horse_riders_rider_idx on public.horse_riders (rider_id);
+
+comment on table public.horse_riders is
+  'Rider ↔ horse assignment. A row here is what makes a non-owning family eligible for the basics tier via horses_basics().';
+
+-- -----------------------------------------------------------------------------
+-- feed_plans — the standing feed chart, per horse per meal.
+--
+-- At most ONE ACTIVE plan per horse per meal (partial unique index). Two active
+-- 'am' rows for the same horse would print the horse twice on the morning feed
+-- board with two different instructions, which is how a horse gets fed twice or
+-- not at all. Superseded plans stay as active=false rather than being deleted,
+-- so a feed change six weeks ago is still legible.
+-- -----------------------------------------------------------------------------
+create table if not exists public.feed_plans (
+  id                   uuid primary key default gen_random_uuid(),
+  created_at           timestamptz not null default now(),
+  horse_id             uuid not null references public.horses (id) on delete cascade,
+  meal                 text not null check (meal in ('am', 'lunch', 'pm')),
+  description          text not null default '',
+  supplements          text not null default '',
+  special_instructions text not null default '',
+  active               boolean not null default true
+);
+
+alter table public.feed_plans enable row level security;
+
+create index if not exists feed_plans_horse_idx on public.feed_plans (horse_id);
+create index if not exists feed_plans_board_idx on public.feed_plans (meal) where active;
+
+create unique index if not exists feed_plans_one_active_per_meal
+  on public.feed_plans (horse_id, meal) where active;
+
+comment on table public.feed_plans is
+  'Standing feed chart. One active row per horse per meal; superseded plans are kept as active=false.';
+
+-- =============================================================================
+-- Policy helpers.
+--
+-- Both answer only about the CALLER'S OWN family: neither takes a family as an
+-- argument, so there is no way to ask "does family X own horse Y". They derive
+-- the family from auth.uid() via current_family(), which returns null for
+-- staff, admin and anon — so for those callers both helpers are simply false.
+--
+-- These are policy helpers: an RLS policy's expression is evaluated as the
+-- querying user, so a user who cannot EXECUTE them would be denied everything.
+-- They therefore stay callable by `authenticated` and are allowlisted in the
+-- suite's EXPOSED_BY_DESIGN, exactly like family_owns_rider() before them.
+-- Calling them signed-out returns false, which is the same thing anon learns
+-- from being denied.
+-- =============================================================================
+
+-- Does the calling family OWN this horse?
+create or replace function public.family_owns_horse(horse uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1
+      from public.horses h
+     where h.id = horse
+       and h.owner_family_id is not distinct from public.current_family()
+       and public.current_family() is not null
+  );
+$$;
+
+comment on function public.family_owns_horse(uuid) is
+  'True when the calling family owns the given horse. Basis of the owner tier: full read on the horse and its feed plans.';
+
+-- Does one of the calling family's riders RIDE this horse?
+create or replace function public.family_rides_horse(horse uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1
+      from public.horse_riders hr
+      join public.riders r on r.id = hr.rider_id
+     where hr.horse_id = horse
+       and r.family_id is not distinct from public.current_family()
+       and public.current_family() is not null
+  );
+$$;
+
+comment on function public.family_rides_horse(uuid) is
+  'True when a rider of the calling family is assigned to the given horse. Earns the BASICS tier only — never full read.';
+
+-- =============================================================================
+-- horses_basics() — the basics tier, and the only route to it.
+--
+-- Returns name/barn_name/photo for horses the calling family's riders ride but
+-- does NOT own. breed, dob and notes are absent from the return type, so no
+-- amount of clever querying by the caller can produce them.
+--
+-- Owned horses are deliberately EXCLUDED: the family already reads those in
+-- full from the table, and keeping the two sets disjoint means the parent UI
+-- can render "your horses" and "horses your rider rides" without de-duplicating
+-- — and makes the test for the basics tier unambiguous about which row it is
+-- looking at.
+--
+-- Inactive horses are excluded; a retired horse is not on anyone's list.
+-- =============================================================================
+create or replace function public.horses_basics()
+returns table (id uuid, name text, barn_name text, photo_url text)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select h.id, h.name, h.barn_name, h.photo_url
+    from public.horses h
+   where public.current_family() is not null
+     and h.active
+     and h.owner_family_id is distinct from public.current_family()
+     and public.family_rides_horse(h.id)
+   order by h.name;
+$$;
+
+comment on function public.horses_basics() is
+  'Basics tier (name, barn_name, photo) for horses the calling family rides but does not own. The projection IS the column boundary — breed/dob/notes cannot be returned.';
+
+-- Signed-out callers have no family and would get an empty set anyway; taking
+-- the grant away means they do not get to ask. `from public` alone is not
+-- enough on Supabase — anon and authenticated carry their own default grants.
+revoke all on function public.horses_basics() from public, anon;
+grant execute on function public.horses_basics() to authenticated;
+
+-- =============================================================================
+-- Policies — horses
+--
+--   select  admin/staff: all. Parent: only a horse their family owns.
+--   write   has_permission('manage_horses') — admin implicitly true, and a
+--           senior trainer can be granted the flag without becoming an admin
+--           (SPEC §4). Staff hold it false by default, so staff cannot write.
+--
+-- Note what is absent: the riding family is NOT in the select policy. That
+-- omission is the column boundary — see the header. Adding them here would
+-- quietly hand out breed, dob and notes.
+-- =============================================================================
+drop policy if exists "horses: read (admin/staff all, owner family own)" on public.horses;
+create policy "horses: read (admin/staff all, owner family own)"
+  on public.horses for select to authenticated
+  using (
+    (select public."current_role"()) in ('admin', 'staff')
+    or (
+      owner_family_id is not null
+      and owner_family_id = (select public.current_family())
+    )
+  );
+
+drop policy if exists "horses: manage insert" on public.horses;
+create policy "horses: manage insert"
+  on public.horses for insert to authenticated
+  with check ((select public.has_permission('manage_horses')));
+
+drop policy if exists "horses: manage update" on public.horses;
+create policy "horses: manage update"
+  on public.horses for update to authenticated
+  using ((select public.has_permission('manage_horses')))
+  with check ((select public.has_permission('manage_horses')));
+
+drop policy if exists "horses: manage delete" on public.horses;
+create policy "horses: manage delete"
+  on public.horses for delete to authenticated
+  using ((select public.has_permission('manage_horses')));
+
+-- =============================================================================
+-- Policies — horse_riders
+--
+-- A parent sees the links belonging to their OWN riders: which horse their
+-- child is on is their business. They never see who else rides it — that would
+-- name another family's rider.
+-- =============================================================================
+drop policy if exists "horse_riders: read (admin/staff all, family own riders)" on public.horse_riders;
+create policy "horse_riders: read (admin/staff all, family own riders)"
+  on public.horse_riders for select to authenticated
+  using (
+    (select public."current_role"()) in ('admin', 'staff')
+    or (
+      (select public."current_role"()) = 'parent'
+      and public.family_owns_rider(rider_id)
+    )
+  );
+
+drop policy if exists "horse_riders: manage insert" on public.horse_riders;
+create policy "horse_riders: manage insert"
+  on public.horse_riders for insert to authenticated
+  with check ((select public.has_permission('manage_horses')));
+
+drop policy if exists "horse_riders: manage update" on public.horse_riders;
+create policy "horse_riders: manage update"
+  on public.horse_riders for update to authenticated
+  using ((select public.has_permission('manage_horses')))
+  with check ((select public.has_permission('manage_horses')));
+
+drop policy if exists "horse_riders: manage delete" on public.horse_riders;
+create policy "horse_riders: manage delete"
+  on public.horse_riders for delete to authenticated
+  using ((select public.has_permission('manage_horses')));
+
+-- =============================================================================
+-- Policies — feed_plans
+--
+-- The owning family reads its own horse's feed chart: a boarder paying for
+-- feed is entitled to know what the horse is being fed. A riding family is
+-- not — feed and supplements shade into medical, and they do not own the horse.
+-- =============================================================================
+drop policy if exists "feed_plans: read (admin/staff all, owner family own horse)" on public.feed_plans;
+create policy "feed_plans: read (admin/staff all, owner family own horse)"
+  on public.feed_plans for select to authenticated
+  using (
+    (select public."current_role"()) in ('admin', 'staff')
+    or (
+      (select public."current_role"()) = 'parent'
+      and public.family_owns_horse(horse_id)
+    )
+  );
+
+drop policy if exists "feed_plans: manage insert" on public.feed_plans;
+create policy "feed_plans: manage insert"
+  on public.feed_plans for insert to authenticated
+  with check ((select public.has_permission('manage_horses')));
+
+drop policy if exists "feed_plans: manage update" on public.feed_plans;
+create policy "feed_plans: manage update"
+  on public.feed_plans for update to authenticated
+  using ((select public.has_permission('manage_horses')))
+  with check ((select public.has_permission('manage_horses')));
+
+drop policy if exists "feed_plans: manage delete" on public.feed_plans;
+create policy "feed_plans: manage delete"
+  on public.feed_plans for delete to authenticated
+  using ((select public.has_permission('manage_horses')));
+
+commit;
+
+-------------------------------------------------------------------------------
+-- END 20260728000600_horses.sql
+-------------------------------------------------------------------------------
+
+
+-------------------------------------------------------------------------------
+-- BEGIN 20260728000700_care_events.sql
+-------------------------------------------------------------------------------
+
+-- =============================================================================
+-- 0011 — care_events (Phase 2, slice 2)
+--
+-- Every vaccine, Coggins, dental, worming, farrier visit, vet call, medication
+-- and wound, per horse, with what is due next.
+--
+-- THIS IS THE MOST SENSITIVE TABLE IN THE APP. A horse's medical history is
+-- the owner's business and the barn's business, and nobody else's. Two rules
+-- follow from that, and both are deliberately stricter than the horses table:
+--
+--   1. THERE IS NO BASICS TIER. A family whose rider merely rides a horse sees
+--      ZERO care rows. Not a redacted view, not names-only — nothing. Horse
+--      visibility needed a projection function because "some columns" is not
+--      expressible as a row policy; care needs no such thing, because the
+--      answer is not "fewer columns", it is "no rows". The parent branch of the
+--      SELECT policy is family_owns_horse() and must NEVER become
+--      family_rides_horse().
+--
+--   2. STAFF INSERT, AND ONLY INSERT. No UPDATE policy and no DELETE policy for
+--      staff, the same append-only discipline as `punches`: a care log that the
+--      person who wrote it can quietly rewrite is not a medical record. A
+--      correction is made by the barn.
+--
+-- WHAT IS DELIBERATELY NOT COPIED FROM `punches`: performed_at is NOT pinned to
+-- now(). A punch is an assertion about the present and a client-supplied time
+-- is a way to invent paid hours; a care event is routinely logged after the
+-- fact ("the vet came Tuesday"), so a past date is the normal case, not an
+-- attack. `logged_by` IS forced to the caller, because attribution is what
+-- makes the record worth anything.
+--
+-- Idempotent, safe to re-run.
+-- =============================================================================
+
+begin;
+
+-- -----------------------------------------------------------------------------
+-- care_events
+-- -----------------------------------------------------------------------------
+create table if not exists public.care_events (
+  id           uuid primary key default gen_random_uuid(),
+  created_at   timestamptz not null default now(),
+  horse_id     uuid not null references public.horses (id) on delete cascade,
+  type         text not null check (
+                 type in ('vaccine', 'coggins', 'dental', 'deworm',
+                          'farrier', 'vet', 'medication', 'wound', 'other')
+               ),
+  description  text not null default '',
+  -- The day the care happened. Routinely in the past; see the header.
+  performed_at date not null,
+  -- When it next falls due. Null for one-off events (a wound, a vet call).
+  due_next     date,
+  -- Forced to the caller by the trigger below. Nullable because the seed and
+  -- future server-side jobs run without a profile.
+  logged_by    uuid references public.profiles (id) on delete set null
+);
+
+alter table public.care_events enable row level security;
+
+create index if not exists care_events_horse_time_idx
+  on public.care_events (horse_id, performed_at desc);
+
+-- Partial: only rows that HAVE a due date are ever scanned by the due-soon
+-- surface, and most of the table eventually will not.
+create index if not exists care_events_due_next_idx
+  on public.care_events (due_next) where due_next is not null;
+
+comment on table public.care_events is
+  'Per-horse care and medical history. Staff may INSERT only; there is no UPDATE or DELETE policy for staff. A family whose rider merely rides the horse sees NOTHING here — no basics tier exists for care.';
+comment on column public.care_events.performed_at is
+  'The day the care happened — legitimately in the past, so unlike punches.punched_at it is NOT pinned to now().';
+comment on column public.care_events.logged_by is
+  'Forced to the calling profile by care_events_guard_insert(). Never trust a client-supplied value here.';
+
+-- =============================================================================
+-- Insert guard.
+--
+-- Two jobs:
+--   * pin `logged_by` to the caller. "Who logged this medication" is the whole
+--     value of the attribution, and a client can put any profile id in the
+--     column. Overwritten rather than rejected — the app has no reason to send
+--     it, and a mismatch is not something the person on the yard can fix.
+--   * restate the insert rule, so a WITH CHECK loosened in a later migration
+--     cannot fail open silently. Same reasoning as punches_guard_insert().
+--
+-- performed_at is deliberately left alone. See the file header.
+-- =============================================================================
+create or replace function public.care_events_guard_insert()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_role    text;
+  v_profile uuid;
+begin
+  -- Service-role / server-side call (the seed, a future cron); already outside
+  -- RLS, and has no profile to attribute to.
+  if auth.uid() is null then
+    return new;
+  end if;
+
+  select p.role, p.id into v_role, v_profile
+    from public.profiles p where p.user_id = auth.uid();
+
+  if v_role is null or v_role not in ('admin', 'staff') then
+    raise exception 'Only the barn may log care for a horse.' using errcode = '42501';
+  end if;
+
+  new.logged_by := v_profile;
+
+  return new;
+end;
+$$;
+
+comment on function public.care_events_guard_insert() is
+  'Forces care_events.logged_by to the calling profile and restates the insert rule, so attribution cannot be spoofed and a loosened WITH CHECK cannot fail open.';
+
+drop trigger if exists care_events_guard_insert on public.care_events;
+
+create trigger care_events_guard_insert
+  before insert on public.care_events
+  for each row
+  execute function public.care_events_guard_insert();
+
+-- =============================================================================
+-- Policies — care_events
+--
+--   select  admin/staff: all. Parent: only for a horse their family OWNS.
+--   insert  admin and staff — the barn logs care.
+--   update  has_permission('manage_horses')
+--   delete  has_permission('manage_horses')
+--
+-- Note what is absent: no UPDATE and no DELETE reachable by a plain staff
+-- member, who holds manage_horses false. They log; the barn corrects.
+-- =============================================================================
+drop policy if exists "care_events: read (admin/staff all, owner family own horse)" on public.care_events;
+create policy "care_events: read (admin/staff all, owner family own horse)"
+  on public.care_events for select to authenticated
+  using (
+    (select public."current_role"()) in ('admin', 'staff')
+    or (
+      (select public."current_role"()) = 'parent'
+      -- OWNS, never rides. Changing this to family_rides_horse() would hand a
+      -- riding family another family's horse's medical history.
+      and public.family_owns_horse(horse_id)
+    )
+  );
+
+drop policy if exists "care_events: barn insert" on public.care_events;
+create policy "care_events: barn insert"
+  on public.care_events for insert to authenticated
+  with check ((select public."current_role"()) in ('admin', 'staff'));
+
+drop policy if exists "care_events: manage update" on public.care_events;
+create policy "care_events: manage update"
+  on public.care_events for update to authenticated
+  using ((select public.has_permission('manage_horses')))
+  with check ((select public.has_permission('manage_horses')));
+
+drop policy if exists "care_events: manage delete" on public.care_events;
+create policy "care_events: manage delete"
+  on public.care_events for delete to authenticated
+  using ((select public.has_permission('manage_horses')));
+
+-- =============================================================================
+-- enqueue_care_due_digest() — admin only, idempotent. Returns rows created.
+--
+-- Notifies every admin of care falling due in the next 30 days, AND of anything
+-- already overdue. Idempotency is by (profile_id, type, link_path), and the
+-- link carries the care event id, so re-running never tells an admin the same
+-- Coggins is due twice.
+--
+-- THERE IS NO LOWER BOUND ON due_next, deliberately (amended after review). An
+-- item that lapses is the one most worth telling someone about; excluding the
+-- past would have meant the digest went quiet at exactly the moment the care
+-- became overdue. The screen and the digest now agree on what counts as
+-- outstanding.
+--
+-- THE 30-DAY WINDOW IS ALSO IN THE APP, in lib/care.ts. Two homes for one
+-- number is a drift risk and is called out in both places; it is not in
+-- config/barn.ts because that file is for barn-specific FACTS (colours,
+-- timezone, geofence), not product rules a clone would keep.
+--
+-- SEMANTICS WORTH KNOWING: idempotency is per care item FOREVER, not per
+-- digest cycle — matching enqueue_lesson_reminders(). Once an admin has been
+-- told a Coggins is due, they are not told again. That is right for an
+-- admin-triggered button and WRONG for the weekly digest SPEC §8 describes:
+-- a weekly job on this function goes quiet after the first week. Revisit when
+-- the cron lands — most likely by scoping the idempotency key to the week.
+--
+-- TODO (deferred): the nightly/weekly cron. Admin-triggered for now.
+-- TODO (deferred): email mirror via Resend, honouring notification_prefs.
+-- =============================================================================
+create or replace function public.enqueue_care_due_digest()
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_created integer;
+begin
+  if (select public."current_role"()) is distinct from 'admin' then
+    raise exception 'Only an admin may send the care digest.' using errcode = '42501';
+  end if;
+
+  insert into public.notifications (profile_id, type, title, body, link_path)
+  select p.id,
+         'care_due',
+         h.name || ' — ' || ce.type || ' due',
+         'Due ' || to_char(ce.due_next, 'Dy DD Mon') || '.',
+         '/manage/care?event=' || ce.id
+    from public.care_events ce
+    join public.horses h on h.id = ce.horse_id and h.active
+    join public.profiles p on p.role = 'admin'
+   where ce.due_next is not null
+     -- No lower bound: overdue care is included. See the header.
+     and ce.due_next <= current_date + 30
+     and not exists (
+       select 1 from public.notifications n
+        where n.profile_id = p.id
+          and n.type = 'care_due'
+          and n.link_path = '/manage/care?event=' || ce.id
+     );
+
+  get diagnostics v_created = row_count;
+  return v_created;
+end;
+$$;
+
+comment on function public.enqueue_care_due_digest() is
+  'Notifies admins of care due within 30 days. Idempotent per care item. Admin-gated internally; the cron that should call it is deferred.';
+
+-- Entry point: gated internally on role, so it is granted to authenticated and
+-- taken away from everyone else. `from public` alone is not enough on Supabase
+-- — anon carries its own default grant.
+revoke all on function public.enqueue_care_due_digest() from public, anon;
+grant execute on function public.enqueue_care_due_digest() to authenticated;
+
+commit;
+
+-------------------------------------------------------------------------------
+-- END 20260728000700_care_events.sql
+-------------------------------------------------------------------------------
+
+
+-------------------------------------------------------------------------------
+-- BEGIN 20260729000100_horse_documents.sql
+-------------------------------------------------------------------------------
+
+-- =============================================================================
+-- 0012 — the `documents` Storage bucket and its policies (Phase 2, slice 3)
+--
+-- Coggins certificates, registration papers, vet reports, signed waivers. The
+-- legal vault.
+--
+-- TABLE RLS DOES NOT COVER STORAGE (SPEC §6). Storage is its own schema with
+-- its own table, `storage.objects`, and its own policies. A bucket left public
+-- is readable by anyone with the URL — no session, no policy evaluation, no
+-- audit. So:
+--
+--   * the bucket is created with public = false, and the insert is written as
+--     an UPSERT that re-asserts public = false. Re-running this migration is
+--     therefore also the fix if anyone ever flips it in the dashboard.
+--   * every access decision is a policy on storage.objects, scoped to this
+--     bucket by name.
+--
+-- WHO SEES WHAT — mirrors care_events, not horses:
+--
+--   admin / staff        everything in the bucket
+--   owner family         documents for a horse they OWN, and their own family
+--                        folder. Read only.
+--   riding family        NOTHING. Documents are medical-sensitive, so this
+--                        follows care: family_owns_horse(), NEVER
+--                        family_rides_horse().
+--   anon                 nothing, and the bucket is private so there is no URL
+--                        that bypasses the question.
+--
+-- PATH CONVENTION IS THE SECURITY BOUNDARY, so it is parsed in one place:
+--
+--   horse_<uuid>/<filename>    documents about a horse
+--   family_<uuid>/<filename>   documents about a family (waivers, forms)
+--
+-- A path that does not match either shape is readable by the barn only. That
+-- is the safe default: an unrecognised path grants nothing to a family.
+--
+-- Idempotent, safe to re-run.
+-- =============================================================================
+
+begin;
+
+-- -----------------------------------------------------------------------------
+-- The bucket. Private, and re-asserted private on every re-run.
+-- -----------------------------------------------------------------------------
+insert into storage.buckets (id, name, public)
+values ('documents', 'documents', false)
+on conflict (id) do update set public = false;
+
+-- =============================================================================
+-- public.family_may_read_document(object_name)
+--
+-- The whole family-facing access rule, in one function, so the four policies
+-- below cannot drift apart from each other.
+--
+-- Answers only about the CALLER'S OWN family: there is no family argument, and
+-- current_family() is null for staff, admin and anon, so for them it is simply
+-- false (they are covered by the role branch of the policy instead).
+--
+-- The uuid is regex-checked BEFORE it is cast. A malformed path would otherwise
+-- raise inside a policy, which turns a "no" into a failed query for everyone
+-- touching that row.
+-- =============================================================================
+create or replace function public.family_may_read_document(object_name text)
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_prefix text := split_part(coalesce(object_name, ''), '/', 1);
+  v_ref    uuid;
+begin
+  if public.current_family() is null then
+    return false;
+  end if;
+
+  -- horse_<uuid>/... — the OWNING family only. Never a riding family: this is
+  -- the same boundary as care_events, for the same reason.
+  if v_prefix ~ '^horse_[0-9a-fA-F-]{36}$' then
+    v_ref := substring(v_prefix from 7)::uuid;
+    return public.family_owns_horse(v_ref);
+  end if;
+
+  -- family_<uuid>/... — that family only.
+  if v_prefix ~ '^family_[0-9a-fA-F-]{36}$' then
+    v_ref := substring(v_prefix from 8)::uuid;
+    return v_ref = public.current_family();
+  end if;
+
+  -- Unrecognised path: the barn can see it, no family can.
+  return false;
+end;
+$$;
+
+comment on function public.family_may_read_document(text) is
+  'True when the calling family may read this documents/ object, by path convention (horse_<uuid>/ they own, or family_<uuid>/ that is theirs). Owner-only — a riding family never qualifies.';
+
+-- =============================================================================
+-- Policies on storage.objects, scoped to the documents bucket.
+--
+-- storage.objects already has RLS enabled by Supabase; these add to whatever
+-- else is on the table, which is why every one of them is pinned to
+-- `bucket_id = 'documents'` — a policy that forgot the bucket would silently
+-- widen access to every other bucket in the project.
+-- =============================================================================
+drop policy if exists "documents: read (barn all, family own scope)" on storage.objects;
+create policy "documents: read (barn all, family own scope)"
+  on storage.objects for select to authenticated
+  using (
+    bucket_id = 'documents'
+    and (
+      (select public."current_role"()) in ('admin', 'staff')
+      or (
+        (select public."current_role"()) = 'parent'
+        and public.family_may_read_document(name)
+      )
+    )
+  );
+
+-- The barn uploads. Families never write to the vault — a document a family
+-- can add is a document the barn did not verify.
+drop policy if exists "documents: barn insert" on storage.objects;
+create policy "documents: barn insert"
+  on storage.objects for insert to authenticated
+  with check (
+    bucket_id = 'documents'
+    and (select public."current_role"()) in ('admin', 'staff')
+  );
+
+drop policy if exists "documents: barn update" on storage.objects;
+create policy "documents: barn update"
+  on storage.objects for update to authenticated
+  using (
+    bucket_id = 'documents'
+    and (select public."current_role"()) in ('admin', 'staff')
+  )
+  with check (
+    bucket_id = 'documents'
+    and (select public."current_role"()) in ('admin', 'staff')
+  );
+
+drop policy if exists "documents: barn delete" on storage.objects;
+create policy "documents: barn delete"
+  on storage.objects for delete to authenticated
+  using (
+    bucket_id = 'documents'
+    and (select public."current_role"()) in ('admin', 'staff')
+  );
+
+commit;
+
+-------------------------------------------------------------------------------
+-- END 20260729000100_horse_documents.sql
+-------------------------------------------------------------------------------
+
+
+-------------------------------------------------------------------------------
+-- BEGIN 20260729000200_onboarding_forms.sql
+-------------------------------------------------------------------------------
+
+-- =============================================================================
+-- 0013 — form_templates + form_submissions (Phase 2, slice 4)
+--
+-- Waivers, liability releases, emergency contacts, boarding agreements. The
+-- barn defines a template once; each family gets a submission to fill and sign.
+--
+-- THE PROPERTY THAT MATTERS: a signature must mean something. Everything here
+-- exists to stop a submission being marked complete without one, or being
+-- edited after it was signed:
+--
+--   * a parent may only ever touch their OWN family's submissions   (policy)
+--   * they may not move a submission to another family, or point it at another
+--     template or another family's rider                            (trigger)
+--   * status may only go pending -> complete, and only WITH a signature; the
+--     signature timestamp is set by the database, never by the client (trigger)
+--   * once complete, a parent cannot edit it at all                 (trigger)
+--
+-- The row policy decides WHICH rows; the trigger decides which CHANGES. Neither
+-- is sufficient alone — this is the same split as profiles, tasks and
+-- lesson_riders.
+--
+-- STAFF SEE NOTHING HERE. These are legal and personal documents between the
+-- family and the barn owner; an employee has no reason to read them.
+--
+-- Idempotent, safe to re-run.
+-- =============================================================================
+
+begin;
+
+-- -----------------------------------------------------------------------------
+-- form_templates — the barn's blank forms.
+--
+-- `schema` is a jsonb array of field definitions, rendered by the app:
+--   [{"key":"emergency_contact","label":"Emergency contact","type":"text",
+--     "required":true}, ...]
+-- Kept as jsonb rather than modelled as columns because the barn will add
+-- fields we have not thought of, and a form field is not a schema change.
+-- -----------------------------------------------------------------------------
+create table if not exists public.form_templates (
+  id          uuid primary key default gen_random_uuid(),
+  created_at  timestamptz not null default now(),
+  name        text not null,
+  description text not null default '',
+  schema      jsonb not null default '[]'::jsonb,
+  -- Required forms are the ones a family must complete to be fully onboarded.
+  required    boolean not null default true,
+  -- 'family' — one per household. 'rider' — one per rider in the household.
+  applies_to  text not null default 'family' check (applies_to in ('family', 'rider')),
+  active      boolean not null default true,
+  constraint form_templates_schema_is_array check (jsonb_typeof(schema) = 'array')
+);
+
+alter table public.form_templates enable row level security;
+
+create index if not exists form_templates_active_idx on public.form_templates (active, name);
+
+comment on table public.form_templates is
+  'Blank forms the barn asks families to complete. `schema` is a jsonb array of field definitions rendered by the app.';
+
+-- -----------------------------------------------------------------------------
+-- form_submissions — one family's answers to one template.
+-- -----------------------------------------------------------------------------
+create table if not exists public.form_submissions (
+  id          uuid primary key default gen_random_uuid(),
+  created_at  timestamptz not null default now(),
+  template_id uuid not null references public.form_templates (id) on delete cascade,
+  family_id   uuid not null references public.families (id) on delete cascade,
+  -- Set only for 'rider' templates.
+  rider_id    uuid references public.riders (id) on delete cascade,
+  data        jsonb not null default '{}'::jsonb,
+  signed_name text,
+  signed_at   timestamptz,
+  status      text not null default 'pending' check (status in ('pending', 'complete')),
+  -- The PDF written to the documents vault on completion. Null until then.
+  document_path text,
+  -- A completed submission carries a signature. Enforced here as well as in the
+  -- trigger, so a service-role script cannot create a signature-less "complete"
+  -- row either.
+  constraint form_submissions_complete_is_signed check (
+    status = 'pending'
+    or (signed_at is not null and signed_name is not null and length(btrim(signed_name)) > 0)
+  ),
+  constraint form_submissions_one_per_scope unique nulls not distinct (template_id, family_id, rider_id)
+);
+
+alter table public.form_submissions enable row level security;
+
+create index if not exists form_submissions_family_idx on public.form_submissions (family_id, status);
+create index if not exists form_submissions_template_idx on public.form_submissions (template_id);
+
+comment on table public.form_submissions is
+  'One family''s answers to one template. Parents fill and sign their own; staff see nothing. Completion requires a signature (CHECK + trigger).';
+comment on column public.form_submissions.document_path is
+  'Path in the private `documents` bucket of the signed PDF. Written server-side on completion.';
+
+-- =============================================================================
+-- Guard trigger — which CHANGES a parent may make.
+--
+-- The policy already restricts which ROWS they can see and update. This decides
+-- what a permitted update is allowed to do, which a row policy cannot express.
+-- =============================================================================
+create or replace function public.form_submissions_guard()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_role   text;
+  v_family uuid;
+begin
+  -- Service-role / server-side (the seed, the PDF writer); already outside RLS.
+  if auth.uid() is null then
+    return new;
+  end if;
+
+  select p.role, p.family_id into v_role, v_family
+    from public.profiles p where p.user_id = auth.uid();
+
+  if v_role = 'admin' then
+    return new;
+  end if;
+
+  if v_role is distinct from 'parent' then
+    raise exception 'Only the family may complete their own forms.' using errcode = '42501';
+  end if;
+
+  if tg_op = 'INSERT' then
+    if new.family_id is distinct from v_family then
+      raise exception 'You can only start a form for your own family.' using errcode = '42501';
+    end if;
+    -- A form starts blank and unsigned, whatever the client says. Without this
+    -- a parent could INSERT a row that is already 'complete' and skip the
+    -- signature path entirely.
+    new.status := 'pending';
+    new.signed_at := null;
+    new.signed_name := null;
+    new.document_path := null;
+    return new;
+  end if;
+
+  -- UPDATE from here.
+  if old.family_id is distinct from v_family then
+    raise exception 'That form belongs to another family.' using errcode = '42501';
+  end if;
+
+  -- Immutable identity: a family may answer a form, not re-point it at a
+  -- different template, a different household, or another family's rider.
+  if new.family_id is distinct from old.family_id
+     or new.template_id is distinct from old.template_id
+     or new.rider_id is distinct from old.rider_id then
+    raise exception 'A form cannot be moved to another family, rider or template.'
+      using errcode = '42501';
+  end if;
+
+  -- Signed means signed. Corrections are the barn's to make.
+  if old.status = 'complete' then
+    raise exception 'That form is already signed. Ask the barn if it needs changing.'
+      using errcode = '42501';
+  end if;
+
+  if new.status = 'complete' then
+    if new.signed_name is null or length(btrim(new.signed_name)) = 0 then
+      raise exception 'Type your name to sign the form.' using errcode = '42501';
+    end if;
+    -- The signing time is the database's to state, not the client's.
+    new.signed_at := now();
+  else
+    -- Still in progress: no signature may be recorded.
+    new.signed_at := null;
+    new.signed_name := null;
+  end if;
+
+  -- The PDF path is written server-side after signing, never by the family.
+  new.document_path := old.document_path;
+
+  return new;
+end;
+$$;
+
+comment on function public.form_submissions_guard() is
+  'Decides which CHANGES a parent may make to their own submission: identity columns are immutable, completion requires a signature, signed_at is set by the database, and a signed form cannot be edited.';
+
+drop trigger if exists form_submissions_guard on public.form_submissions;
+
+create trigger form_submissions_guard
+  before insert or update on public.form_submissions
+  for each row
+  execute function public.form_submissions_guard();
+
+-- =============================================================================
+-- Policies — form_templates
+--
+--   select  admin, and parents (they have to render the form they are filling)
+--   write   admin only
+--
+-- Staff are absent on purpose.
+-- =============================================================================
+drop policy if exists "form_templates: read (admin all, parents active)" on public.form_templates;
+create policy "form_templates: read (admin all, parents active)"
+  on public.form_templates for select to authenticated
+  using (
+    (select public."current_role"()) = 'admin'
+    or ((select public."current_role"()) = 'parent' and active)
+  );
+
+drop policy if exists "form_templates: admin insert" on public.form_templates;
+create policy "form_templates: admin insert"
+  on public.form_templates for insert to authenticated
+  with check ((select public."current_role"()) = 'admin');
+
+drop policy if exists "form_templates: admin update" on public.form_templates;
+create policy "form_templates: admin update"
+  on public.form_templates for update to authenticated
+  using ((select public."current_role"()) = 'admin')
+  with check ((select public."current_role"()) = 'admin');
+
+drop policy if exists "form_templates: admin delete" on public.form_templates;
+create policy "form_templates: admin delete"
+  on public.form_templates for delete to authenticated
+  using ((select public."current_role"()) = 'admin');
+
+-- =============================================================================
+-- Policies — form_submissions
+--
+--   select  admin all; parent their own family's
+--   insert  admin; parent for their own family
+--   update  admin; parent for their own family (the trigger decides what a
+--           permitted update may actually change)
+--   delete  admin only — a family cannot make a signed form disappear
+-- =============================================================================
+drop policy if exists "form_submissions: read (admin all, parent own family)" on public.form_submissions;
+create policy "form_submissions: read (admin all, parent own family)"
+  on public.form_submissions for select to authenticated
+  using (
+    (select public."current_role"()) = 'admin'
+    or (
+      (select public."current_role"()) = 'parent'
+      and family_id = (select public.current_family())
+    )
+  );
+
+drop policy if exists "form_submissions: insert (admin, parent own family)" on public.form_submissions;
+create policy "form_submissions: insert (admin, parent own family)"
+  on public.form_submissions for insert to authenticated
+  with check (
+    (select public."current_role"()) = 'admin'
+    or (
+      (select public."current_role"()) = 'parent'
+      and family_id = (select public.current_family())
+    )
+  );
+
+drop policy if exists "form_submissions: update (admin, parent own family)" on public.form_submissions;
+create policy "form_submissions: update (admin, parent own family)"
+  on public.form_submissions for update to authenticated
+  using (
+    (select public."current_role"()) = 'admin'
+    or (
+      (select public."current_role"()) = 'parent'
+      and family_id = (select public.current_family())
+    )
+  )
+  with check (
+    (select public."current_role"()) = 'admin'
+    or (
+      (select public."current_role"()) = 'parent'
+      and family_id = (select public.current_family())
+    )
+  );
+
+drop policy if exists "form_submissions: admin delete" on public.form_submissions;
+create policy "form_submissions: admin delete"
+  on public.form_submissions for delete to authenticated
+  using ((select public."current_role"()) = 'admin');
+
+-- =============================================================================
+-- ensure_family_onboarding(family) — admin only, idempotent. Returns rows made.
+--
+-- Creates one pending submission per required active template for a family:
+-- 'family' templates once, 'rider' templates once per active rider. This is
+-- what turns "the barn added a new waiver" into "every family sees it on their
+-- checklist" without anyone hand-creating rows.
+--
+-- Idempotent through the unique constraint on (template_id, family_id,
+-- rider_id) — NULLS NOT DISTINCT, so a family-scoped row cannot be duplicated
+-- by a null rider_id either.
+-- =============================================================================
+create or replace function public.ensure_family_onboarding(family uuid)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_created integer;
+begin
+  if (select public."current_role"()) is distinct from 'admin' then
+    raise exception 'Only an admin may set up a family''s onboarding.' using errcode = '42501';
+  end if;
+
+  insert into public.form_submissions (template_id, family_id, rider_id)
+  select t.id, family, null
+    from public.form_templates t
+   where t.active and t.required and t.applies_to = 'family'
+  union all
+  select t.id, family, r.id
+    from public.form_templates t
+    cross join public.riders r
+   where t.active and t.required and t.applies_to = 'rider'
+     and r.family_id = family and r.active
+  on conflict do nothing;
+
+  get diagnostics v_created = row_count;
+  return v_created;
+end;
+$$;
+
+comment on function public.ensure_family_onboarding(uuid) is
+  'Creates the pending submissions a family owes: one per required active family template, one per rider for rider templates. Admin-gated, idempotent.';
+
+revoke all on function public.ensure_family_onboarding(uuid) from public, anon;
+grant execute on function public.ensure_family_onboarding(uuid) to authenticated;
+
+commit;
+
+-------------------------------------------------------------------------------
+-- END 20260729000200_onboarding_forms.sql
+-------------------------------------------------------------------------------
+
+
+-------------------------------------------------------------------------------
+-- BEGIN 20260729000300_events_ical.sql
+-------------------------------------------------------------------------------
+
+-- =============================================================================
+-- 0014 — events + ical_tokens (Phase 2, slice 5)
+--
+-- Shows, clinics, farrier and vet days, closures — the things on the barn
+-- calendar that are not lessons. Plus the per-user token that lets a family
+-- subscribe to their own schedule in Google or Apple Calendar.
+--
+-- TWO DIFFERENT SECURITY PROBLEMS IN ONE MIGRATION, worth keeping apart:
+--
+--   `events` is ordinary RLS: admin writes, staff read everything, parents read
+--   what is marked visible to everyone. A staff-only event (the vet coming to
+--   discuss a lame horse) must not appear on a family's calendar.
+--
+--   `ical_tokens` is a BEARER CREDENTIAL. Anyone holding the token can read
+--   that person's calendar over plain HTTP with no session at all — that is the
+--   entire point, because Google Calendar cannot log in. Two consequences:
+--
+--     * the token is readable ONLY by the person it belongs to. Not by admin,
+--       not by staff. A token an employee can read is an employee who can
+--       subscribe to a family's schedule forever, and revoking their account
+--       would not revoke that.
+--     * it must be regenerable, so a leaked URL can be killed. Rotating is an
+--       UPDATE of the token column by its owner.
+--
+-- The feed endpoint itself runs server-side with the service role — it has to,
+-- since there is no session — and re-implements the visibility rules in the
+-- route handler. That is called out in the route: RLS is not protecting it, so
+-- the scoping is the code's job there.
+--
+-- Idempotent, safe to re-run.
+-- =============================================================================
+
+begin;
+
+-- -----------------------------------------------------------------------------
+-- events
+-- -----------------------------------------------------------------------------
+create table if not exists public.events (
+  id          uuid primary key default gen_random_uuid(),
+  created_at  timestamptz not null default now(),
+  type        text not null default 'other' check (
+                type in ('show', 'clinic', 'farrier', 'vet', 'closure', 'other')
+              ),
+  title       text not null,
+  description text not null default '',
+  start_at    timestamptz not null,
+  end_at      timestamptz,
+  location    text not null default '',
+  visibility  text not null default 'all' check (visibility in ('all', 'staff')),
+  constraint events_ends_after_it_starts check (end_at is null or end_at >= start_at)
+);
+
+alter table public.events enable row level security;
+
+create index if not exists events_start_idx on public.events (start_at);
+create index if not exists events_visibility_idx on public.events (visibility, start_at);
+
+comment on table public.events is
+  'Barn calendar entries that are not lessons. visibility=''staff'' is internal and must never reach a family feed.';
+
+-- -----------------------------------------------------------------------------
+-- ical_tokens — one per profile. The token IS the credential.
+-- -----------------------------------------------------------------------------
+create table if not exists public.ical_tokens (
+  id         uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+  profile_id uuid not null unique references public.profiles (id) on delete cascade,
+  token      uuid not null unique default gen_random_uuid(),
+  -- Bumped on rotation, so a leaked URL can be shown to have been replaced.
+  rotated_at timestamptz
+);
+
+alter table public.ical_tokens enable row level security;
+
+create index if not exists ical_tokens_token_idx on public.ical_tokens (token);
+
+comment on table public.ical_tokens is
+  'Per-profile calendar subscription token. A BEARER CREDENTIAL: readable only by its owner — never by staff or admin — because holding it grants read access to that person''s schedule with no session.';
+
+-- =============================================================================
+-- Policies — events
+--
+--   select  admin/staff: everything. Parent: visibility='all' only.
+--   write   admin, or has_permission('manage_schedule') — the same flag that
+--           governs the lesson calendar, since this is the same calendar.
+-- =============================================================================
+drop policy if exists "events: read (staff all, families public)" on public.events;
+create policy "events: read (staff all, families public)"
+  on public.events for select to authenticated
+  using (
+    (select public."current_role"()) in ('admin', 'staff')
+    or (
+      (select public."current_role"()) = 'parent'
+      and visibility = 'all'
+    )
+  );
+
+drop policy if exists "events: manage insert" on public.events;
+create policy "events: manage insert"
+  on public.events for insert to authenticated
+  with check ((select public.has_permission('manage_schedule')));
+
+drop policy if exists "events: manage update" on public.events;
+create policy "events: manage update"
+  on public.events for update to authenticated
+  using ((select public.has_permission('manage_schedule')))
+  with check ((select public.has_permission('manage_schedule')));
+
+drop policy if exists "events: manage delete" on public.events;
+create policy "events: manage delete"
+  on public.events for delete to authenticated
+  using ((select public.has_permission('manage_schedule')));
+
+-- =============================================================================
+-- Policies — ical_tokens: strictly own-row, for everyone.
+--
+-- There is deliberately NO admin branch on the read policy. An admin who could
+-- read a family's token could subscribe to their calendar silently and forever;
+-- the barn owner has legitimate access to the same data through the app, and
+-- does not need the bearer credential to get it.
+-- =============================================================================
+drop policy if exists "ical_tokens: read own" on public.ical_tokens;
+create policy "ical_tokens: read own"
+  on public.ical_tokens for select to authenticated
+  using (profile_id = (select public.current_profile()));
+
+drop policy if exists "ical_tokens: create own" on public.ical_tokens;
+create policy "ical_tokens: create own"
+  on public.ical_tokens for insert to authenticated
+  with check (profile_id = (select public.current_profile()));
+
+-- Rotation. The USING half stops someone updating another person's row; the
+-- WITH CHECK half stops them re-pointing their own row at another profile.
+drop policy if exists "ical_tokens: rotate own" on public.ical_tokens;
+create policy "ical_tokens: rotate own"
+  on public.ical_tokens for update to authenticated
+  using (profile_id = (select public.current_profile()))
+  with check (profile_id = (select public.current_profile()));
+
+drop policy if exists "ical_tokens: delete own" on public.ical_tokens;
+create policy "ical_tokens: delete own"
+  on public.ical_tokens for delete to authenticated
+  using (profile_id = (select public.current_profile()));
+
+-- =============================================================================
+-- ical_token_guard() — the token is the database's to mint, not the client's.
+--
+-- Without this, a caller could INSERT their row with a token they chose (say,
+-- all zeroes, or one they had already shared) and rotation could set it to a
+-- known value. Both are ways to turn an unguessable credential into a guessable
+-- one. On insert the column default already generates it; this makes the value
+-- unforgeable rather than merely defaulted.
+-- =============================================================================
+create or replace function public.ical_token_guard()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  -- Service-role / server-side; nothing to attribute or defend against here.
+  if auth.uid() is null then
+    return new;
+  end if;
+
+  if tg_op = 'INSERT' then
+    new.token := gen_random_uuid();
+    new.rotated_at := null;
+    return new;
+  end if;
+
+  -- UPDATE: the only meaningful change is "give me a new one".
+  if new.token is distinct from old.token then
+    new.token := gen_random_uuid();
+    new.rotated_at := now();
+  end if;
+
+  new.profile_id := old.profile_id;
+
+  return new;
+end;
+$$;
+
+comment on function public.ical_token_guard() is
+  'Forces ical_tokens.token to a server-generated uuid on insert and on rotation, so a client can never choose — and therefore never predict or re-use — a calendar credential.';
+
+drop trigger if exists ical_token_guard on public.ical_tokens;
+
+create trigger ical_token_guard
+  before insert or update on public.ical_tokens
+  for each row
+  execute function public.ical_token_guard();
+
+commit;
+
+-------------------------------------------------------------------------------
+-- END 20260729000300_events_ical.sql
+-------------------------------------------------------------------------------
+
+
+-------------------------------------------------------------------------------
+-- BEGIN 20260729000400_lock_down_definer_grants.sql
+-------------------------------------------------------------------------------
+
+-- =============================================================================
+-- 0015 — take back the default grants on every SECURITY DEFINER function
+--
+-- WHY: `npm run db:advisor` (splinter lint 0028) reported that all 26 unrevoked
+-- SECURITY DEFINER functions in `public` were EXECUTE-able by `anon`. That is
+-- not something anyone wrote — Postgres grants EXECUTE to PUBLIC by default and
+-- Supabase ships a *separate* default-privileges grant to `anon` and
+-- `authenticated`. Every function we did not explicitly close was open.
+--
+-- Nothing was exploitable when it was found: the trigger functions are not
+-- reachable over PostgREST at all, the admin entry points raise on their own
+-- role checks, and the policy helpers return null/false for a caller with no
+-- identity. The one real (small) leak was `instance_taken_seats(uuid)`, which
+-- handed a seat count to anyone who knew a lesson's uuid.
+--
+-- "Not currently exploitable" is exactly what was true of backfill_book_rider
+-- until it wasn't, and 26 standing warnings is how a real one hides. So this
+-- closes the default rather than allowlisting it.
+--
+-- THE SHAPE: revoke from all three roles by SWEEPING pg_proc, then grant back
+-- to `authenticated` by name. Two consequences worth stating:
+--
+--   * the sweep covers functions added in FUTURE migrations automatically —
+--     re-running this file after adding one closes it.
+--   * the default for anything new is now CLOSED. A function added later and
+--     not named below is executable by nobody but the owner, which is the
+--     right way round: forgetting to close something used to be silent,
+--     forgetting to open something is a loud, immediate failure.
+--
+-- Guarded by tests/policies.test.mjs, which now asserts behaviourally that NO
+-- definer function in `public` is executable by anon, and by `db:advisor` in
+-- the green gate.
+--
+-- Idempotent, safe to re-run.
+-- =============================================================================
+
+begin;
+
+-- -----------------------------------------------------------------------------
+-- 1. Close everything.
+--
+-- `from public, anon, authenticated` names all three deliberately: revoking
+-- from PUBLIC alone does NOT remove Supabase's separate role grants, which is
+-- the exact mistake this migration exists to correct.
+-- -----------------------------------------------------------------------------
+do $$
+declare
+  fn record;
+begin
+  for fn in
+    select p.oid::regprocedure as signature
+      from pg_catalog.pg_proc p
+      join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public'
+       and p.prosecdef
+     order by p.proname
+  loop
+    execute format(
+      'revoke all on function %s from public, anon, authenticated',
+      fn.signature
+    );
+  end loop;
+end $$;
+
+-- -----------------------------------------------------------------------------
+-- 2. Re-open exactly what a signed-in session calls.
+--
+-- POLICY HELPERS — these MUST be executable by `authenticated`, because an RLS
+-- policy's expression is evaluated as the querying user; a user who cannot run
+-- the helper is denied every table that calls it. They take no role argument
+-- and answer only about the caller, so exposing them to a signed-in user
+-- reveals nothing that user could not already read.
+--
+-- They are NOT granted to anon: RLS policies here are all `to authenticated`,
+-- so a signed-out request is refused before any helper would run. Anon needs
+-- none of them.
+-- -----------------------------------------------------------------------------
+grant execute on function public."current_role"() to authenticated;
+grant execute on function public.current_family() to authenticated;
+grant execute on function public.current_profile() to authenticated;
+grant execute on function public.has_permission(text) to authenticated;
+grant execute on function public.family_owns_rider(uuid) to authenticated;
+grant execute on function public.family_owns_horse(uuid) to authenticated;
+grant execute on function public.family_rides_horse(uuid) to authenticated;
+grant execute on function public.family_sees_instance(uuid) to authenticated;
+grant execute on function public.family_may_read_document(text) to authenticated;
+
+-- -----------------------------------------------------------------------------
+-- ENTRY POINTS — called by the app over RPC, each gated INTERNALLY on the
+-- caller's role. The grant lets a signed-in user reach the function; the
+-- function itself decides whether they may do the thing.
+-- -----------------------------------------------------------------------------
+grant execute on function public.generate_tasks_for_date(date) to authenticated;
+grant execute on function public.generate_lesson_instances(date, date) to authenticated;
+grant execute on function public.send_backfill_offers(uuid, uuid[]) to authenticated;
+grant execute on function public.respond_to_backfill_offer(uuid, boolean) to authenticated;
+grant execute on function public.admin_assign_backfill(uuid, uuid) to authenticated;
+grant execute on function public.enqueue_lesson_reminders(date) to authenticated;
+grant execute on function public.enqueue_care_due_digest() to authenticated;
+grant execute on function public.ensure_family_onboarding(uuid) to authenticated;
+grant execute on function public.eligible_backfill_riders(uuid) to authenticated;
+grant execute on function public.instance_taken_seats(uuid) to authenticated;
+grant execute on function public.horses_basics() to authenticated;
+
+-- -----------------------------------------------------------------------------
+-- DELIBERATELY NOT GRANTED — do not "fix" these by adding a grant:
+--
+--   backfill_book_rider, notify_rider_family, notify_admins
+--     Internal primitives. backfill_book_rider being reachable is the bug this
+--     whole discipline exists because of.
+--
+--   the nine trigger functions (punches_guard_insert, form_submissions_guard,
+--   ical_token_guard, care_events_guard_insert, profiles_guard_privileged_columns,
+--   tasks_guard_staff_columns, announcements_fan_out_notifications,
+--   lesson_riders_guard_parent_updates, lesson_riders_notify_cancellation)
+--     Triggers are invoked by the table, not by a caller. They need no grant to
+--     fire, and PostgREST cannot call them anyway.
+-- -----------------------------------------------------------------------------
+
+commit;
+
+-------------------------------------------------------------------------------
+-- END 20260729000400_lock_down_definer_grants.sql
+-------------------------------------------------------------------------------
+
+
+-------------------------------------------------------------------------------
+-- BEGIN 20260731000100_at_least_one_admin.sql
+-------------------------------------------------------------------------------
+
+-- =============================================================================
+-- 0016 — the barn must always have at least one admin
+--
+-- The Team panel already refuses to demote the last admin in its server action;
+-- that stops the ordinary mistake but not two admins demoting each other in the
+-- same instant. This closes it at the database, the one place a race can't pass.
+-- Fires for everyone, service-role included: we never want zero admins.
+--
+-- WHY AN ADVISORY LOCK AND NOT JUST A COUNT: under READ COMMITTED (Supabase's
+-- default) two concurrent transactions each see the OTHER admin still in place,
+-- so both counts return 1 and both demotions commit. Taking the lock serialises
+-- them, and because a new statement after the lock takes a fresh snapshot, the
+-- second transaction sees the first one's committed demotion and fails.
+--
+-- Idempotent, safe to re-run.
+-- =============================================================================
+
+begin;
+
+create or replace function public.enforce_at_least_one_admin()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_admins integer;
+begin
+  if tg_op = 'DELETE' then
+    if old.role is distinct from 'admin' then
+      return old;
+    end if;
+  else
+    if old.role is distinct from 'admin' or new.role = 'admin' then
+      return new;
+    end if;
+  end if;
+
+  -- Serialise every admin-removing operation so two cannot race past each other.
+  -- Under READ COMMITTED (Supabase default) the count after the lock takes a
+  -- fresh snapshot, so the second concurrent demotion sees the first and fails.
+  perform pg_advisory_xact_lock(hashtext('crouse.at_least_one_admin'));
+
+  select count(*) into v_admins from public.profiles where role = 'admin';
+
+  if v_admins = 0 then
+    raise exception
+      'The barn must always have at least one admin. Make someone else an admin first.'
+      using errcode = '23514';
+  end if;
+
+  if tg_op = 'DELETE' then
+    return old;
+  end if;
+  return new;
+end;
+$$;
+
+comment on function public.enforce_at_least_one_admin() is
+  'Refuses any demotion or deletion that would leave zero admins. Advisory-lock serialised so concurrent demotions cannot both slip through.';
+
+-- -----------------------------------------------------------------------------
+-- Close the default grants on the function this migration just created.
+--
+-- NOT OPTIONAL, and not present in the SQL this migration was drafted from.
+-- Migration 0015 swept every SECURITY DEFINER function in `public` and revoked
+-- EXECUTE from all three roles — but a sweep only covers what existed when it
+-- ran. Postgres grants EXECUTE to PUBLIC on every new function, and Supabase
+-- ships separate default-privilege grants to `anon` and `authenticated` on top,
+-- so this function would have been born open.
+--
+-- That is not theoretical: `npm run db:advisor` lint
+-- 0028_anon_security_definer_function_executable tests
+-- has_function_privilege('anon', p.oid, 'EXECUTE') against every prosecdef
+-- function in `public`, so omitting this turns the green gate red.
+--
+-- All three roles are named deliberately: revoking from PUBLIC alone does NOT
+-- remove Supabase's role grants. A trigger function needs no grant to fire —
+-- the table invokes it, not a caller — so nothing is granted back.
+-- -----------------------------------------------------------------------------
+revoke all on function public.enforce_at_least_one_admin() from public, anon, authenticated;
+
+drop trigger if exists enforce_at_least_one_admin on public.profiles;
+
+create trigger enforce_at_least_one_admin
+  after update or delete on public.profiles
+  for each row
+  execute function public.enforce_at_least_one_admin();
+
+commit;
+
+-------------------------------------------------------------------------------
+-- END 20260731000100_at_least_one_admin.sql
 -------------------------------------------------------------------------------
 
