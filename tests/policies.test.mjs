@@ -4396,27 +4396,67 @@ async function main() {
       );
 
       // Revoked and expired are refused by the same predicate.
+      //
+      // Each is created PENDING and then moved into its state by an UPDATE,
+      // not born that way. That is not ceremony: invites_token_guard forces
+      // accepted_at and revoked_at to null on INSERT, so an invite cannot be
+      // created already-revoked — a fact this test originally got wrong and
+      // the suite caught. Revoking is an update, which the guard leaves alone.
       for (const [label, patch] of [
         ["revoked", { revoked_at: new Date().toISOString() }],
         ["expired", { expires_at: new Date(Date.now() - 86_400_000).toISOString() }],
       ]) {
         const { data: made } = await admin
           .from("invites")
-          .insert({
-            role: "staff",
-            full_name: `Policy Test ${label}`,
-            expires_at: future,
-            ...patch,
-          })
+          .insert({ role: "staff", full_name: `Policy Test ${label}`, expires_at: future })
           .select()
           .single();
         if (made) madeInvites.push(made.id);
+
+        const { data: moved } = await admin
+          .from("invites")
+          .update(patch)
+          .eq("id", made?.id ?? "")
+          .select()
+          .single();
+
+        // Prove the setup actually took before trusting the deny below — a
+        // deny test whose fixture never reached the state passes for free.
+        const field = label === "revoked" ? "revoked_at" : "expires_at";
+        check(
+          `control: the ${label} fixture really is ${label}`,
+          label === "revoked"
+            ? Boolean(moved?.revoked_at)
+            : new Date(moved?.expires_at ?? 0).getTime() < Date.now(),
+          `${field} = ${moved?.[field]}`,
+        );
 
         const { data: attempt } = await claim(made?.id ?? "");
         check(
           `claiming a ${label} invite matches ZERO rows`,
           (attempt?.length ?? 0) === 0,
           `matched ${attempt?.length}`,
+        );
+      }
+
+      // The guard's own rule, asserted directly rather than left implicit.
+      {
+        const { data: born } = await admin
+          .from("invites")
+          .insert({
+            role: "staff",
+            full_name: "Policy Test Born Pending",
+            expires_at: future,
+            revoked_at: new Date().toISOString(),
+            accepted_at: new Date().toISOString(),
+          })
+          .select()
+          .single();
+        if (born) madeInvites.push(born.id);
+        check(
+          "an invite CANNOT be created already-revoked or already-accepted — it is born pending",
+          born?.revoked_at === null && born?.accepted_at === null,
+          `revoked_at=${born?.revoked_at}, accepted_at=${born?.accepted_at}`,
         );
       }
 

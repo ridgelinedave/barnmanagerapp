@@ -207,18 +207,19 @@ export const barn = {
      */
     lessons: true,
     /**
-     * Phase 2, provisioning slice — BUILT BUT OFF, awaiting David's audit.
+     * Phase 2, provisioning slice — shipped. Migration 0017 audited and
+     * applied 2026-07-31, advisor clean, policy suite green including the
+     * invites section, and both live checks passed: a claim carrying a
+     * tampered `role=admin` produced the INVITED role, and a claim on an
+     * email that already has an account was refused rather than linked.
      *
-     * Migration 0017 is written and NOT applied. This flag gates both the
-     * Team panel's invite UI and the public `/invite/<token>` claim route.
-     *
-     * It is the switch that matters most in this app: the claim route creates
-     * an auth user from an unauthenticated request. Turning it on without the
-     * migration applied gives a screen that errors; turning it on WITH the
-     * migration applied opens that route to the internet. Both halves get
-     * audited before this becomes true.
+     * This flag gates both the Team panel's invite UI and the public
+     * `/invite/<token>` claim route — the one route in this app that creates
+     * an auth user from an unauthenticated request. Turning it off kills every
+     * outstanding invite link, which is the switch to reach for if a token is
+     * ever leaked before revoking it individually is enough.
      */
-    invites: false,
+    invites: true,
     shows: false,
     invoices: false,
     shop: false,

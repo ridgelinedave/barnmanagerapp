@@ -13,15 +13,14 @@
 `events` are on. The `design-pass` branch is **merged in** (fast-forward, no
 conflicts), and the **Team panel** is built on top of it.
 
-**Suite: 533 passed, 0 failed, 1 section SKIPPED**, run twice with no re-seed.
-Advisor **clean across 8 lints**. Plus `test:pdf` (12), `test:ical` (30) and
+**Suite: 559 passed, 0 failed, 0 skipped**, run twice with no re-seed. Advisor
+**clean across 8 lints**. Plus `test:pdf` (12), `test:ical` (30) and
 `test:invites` (27).
 
-**The skip is deliberate and is not a pass.** The invites section is gated on
-its table existing, and migration 0017 is written but NOT applied pending
-David's audit. The suite says so itself rather than reporting green:
-*"All runnable policy assertions passed — but a section was SKIPPED, so this is
-not a full pass."* Applying 0017 turns that section on with no other change.
+Migration 0017 was audited, applied on 2026-07-31, and `features.invites` is
+**on**. The invites RLS section switched itself on as designed (gated on the
+table existing, not on the flag), taking the suite from 533-with-a-skip to
+**559 with none**.
 
 The green gate is now one command, and it includes the Advisor:
 
@@ -40,7 +39,7 @@ npm run db:gate    # seed → test:policies → test:policies (no re-seed) → d
 | — design pass (UI only) | — | — | Merged |
 | — Team panel (admin UI) | **none needed** | — | Live |
 | — at-least-one-admin rule | 0016 | — | Live |
-| — invites / provisioning | **0017 NOT APPLIED** | `invites` **off** | Awaiting audit |
+| — invites / provisioning | 0017 | `invites` **on** | Live |
 
 ---
 
@@ -112,12 +111,11 @@ emoji** in the rendered page.
 
 ---
 
-## Invites / provisioning — BUILT, NOT LIVE, awaiting audit
+## Invites / provisioning — LIVE
 
-**Nothing about this slice is switched on.** Migration 0017 is written and not
-applied; `features.invites` is `false`; `_ALL.generated.sql` has deliberately
-NOT been regenerated, because that file is the paste-to-set-up bundle and
-regenerating it would smuggle an unaudited migration into it.
+Migration 0017 audited and applied 2026-07-31, `_ALL.generated.sql`
+regenerated, `features.invites` on, advisor clean, suite green including the
+invites section, and **both live checks passed** (see below).
 
 **The shape, and why it is forced.** `profiles.user_id` is NOT NULL and
 references `auth.users`, so a profile cannot exist before its login does. But
@@ -197,7 +195,7 @@ boundary in both directions, flag normalisation per role, the share message, and
 a check that the invalid-token string contains none of *expire / revoke / used /
 already / exist / accept*.
 
-The RLS suite's `invites` section (**skipped until 0017 is applied**) covers what
+The RLS suite's `invites` section (**29 assertions, now running**) covers what
 the database guarantees: a client-chosen token is overwritten on insert and on
 regenerate, `created_by` is pinned, the three CHECKs refuse an incoherent invite,
 the claim predicate matches exactly one pending row and **zero** on a second
@@ -208,10 +206,51 @@ standing rule is that it never uses the service key, because a test that
 bypasses RLS proves nothing about RLS. The claim predicate is identical either
 way.
 
-**What the tests do NOT cover, stated rather than implied:** the claim route's
-own logic — that it never reads the role from the request, and that a duplicate
-email is refused. That needs an HTTP-level run against an applied migration.
-The commands are in WHAT NEEDS DAVID.
+**One thing the suite got wrong, and the suite caught it.** The revoked-invite
+deny test originally created its fixture already-revoked in a single INSERT and
+failed — because `invites_token_guard` forces `accepted_at` and `revoked_at` to
+null on insert, so an invite cannot be *born* revoked. The trigger was right and
+the test was wrong. The fixture now becomes revoked by UPDATE (which the guard
+leaves alone, so revoking still works), a control asserts the fixture really
+reached that state before the deny is trusted, and the guard's born-pending rule
+is now asserted directly instead of left implicit.
+
+### The two live checks the suite cannot reach — both passed
+
+Run against the dev server on 2026-07-31 with real invites created through an
+admin session, then cleaned up.
+
+**(a) A tampered claim gets the INVITED role, not the requested one.** A staff
+invite (`manage_horses` on) was opened and the form was given extra fields
+before submitting: `role=admin`, `manage_shows=on`, `manage_schedule=on`,
+`manage_horses=on`, `full_name=Tampered Name`,
+`family_id=00000000-0000-0000-0000-000000000000`. The created profile:
+
+| sent by the tampered client | stored |
+|---|---|
+| `role=admin` | **staff** — the invited role |
+| `manage_shows=on`, `manage_schedule=on` | **false, false** |
+| `family_id=0000…` | **null** |
+| `full_name=Tampered Name` | **LIVECHECK Tamper Probe** — the invite's |
+| *(not sent)* | `manage_horses=true`, from the invite |
+
+Every injected field was ignored. Not rejected — never read.
+
+**(b) An email that already has an account is refused, not linked.** Claiming a
+second invite with `phase0.admin@example.com` returned *"That email already has
+an account here — contact the barn."* Verified afterwards: no second auth user,
+no second profile, the admin fixture's profile unchanged, its original password
+still working, and the password the claim tried to set rejected. The invite's
+`accepted_at` went back to **null** — the failed attempt released the claim
+rather than burning it, which is the behaviour the route is written for.
+
+### A real bug these checks found
+
+`/invite` was **not** in `PUBLIC_PATHS` in `lib/supabase/middleware.ts`, so the
+middleware redirected the signed-out recipient to `/sign-in` — making the entire
+flow unreachable for exactly the person it exists for. Nothing in the RLS suite
+could have caught it: it is middleware, not a policy. Fixed, with a note on that
+list that anything added to it is reachable by the internet with no session.
 
 ---
 
@@ -338,26 +377,7 @@ shows phase was not started.
 
 ## WHAT NEEDS DAVID
 
-**A. Audit migration 0017 and the claim route, then switch invites on.**
-Nothing is applied and nothing is on. After the audit, in order:
-
-```bash
-npm run db:apply -- supabase/migrations/20260731000200_invites.sql
-npm run db:combine          # _ALL was deliberately left stale until now
-npm run db:gate             # the invites section switches itself on
-npm run db:verify           # `invites` moves from pending to checked
-```
-
-Then flip `features.invites` to `true` in `config/barn.ts` and move `invites`
-from `PENDING_TABLES` to `EXPECTED_TABLES` in `scripts/db-verify.mjs`.
-
-**Then run the two end-to-end checks the suite cannot reach** (they need the
-route, not the table): create an invite in the panel, open the link, and (i)
-submit with a browser-tampered `role=admin` field — the profile must come out
-with the invited role; (ii) claim with an email that already has an account —
-must be refused, not linked.
-
-**B. A separate small migration, not folded into this slice.**
+**A. A separate small migration, not folded into the invites slice.**
 `has_permission()` honours a `manage_*` flag on a **parent** row — verified, see
 above. `profiles` has no CHECK stopping that combination the way `invites` now
 does. The fix mirrors 0017:
@@ -807,7 +827,7 @@ npm run db:apply -- <f>  # apply a migration
 npm run db:seed          # test fixtures
 npm run db:gate          # THE GREEN GATE: seed → policies → policies → advisor
 npm run db:advisor       # Supabase security lints (splinter), DB-level only
-npm run test:policies    # the RLS suite (533 + the invites section once 0017 lands)
+npm run test:policies    # the 559-assertion RLS suite
 npm run test:pdf         # PDF structure (12)
 npm run test:ical        # feed format, DST conversion, feed scoping (30)
 npm run test:invites     # invite status, expiry, flag rules, the one bad-token message (27)

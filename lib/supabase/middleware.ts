@@ -10,8 +10,17 @@ import { devRoleFromRequestCookie } from "@/lib/dev-role";
  * fetches a URL. The unguessable per-user token in the path is what
  * authenticates the request, and the route handler re-implements the
  * visibility rules itself, since RLS cannot help a request with no session.
+ *
+ * `/invite` is here for the same shape of reason and a blunter one: the person
+ * following an invite link HAS no account — that is what the link is for.
+ * Bouncing them to /sign-in makes the whole flow unreachable. The unguessable
+ * token in the path is the authorisation, and the page and its claim action
+ * validate it themselves; anything not pending gets one generic message.
+ *
+ * ANYTHING ADDED HERE IS REACHABLE BY THE INTERNET WITH NO SESSION. Only add a
+ * path whose own handler re-states the rules RLS would have applied.
  */
-const PUBLIC_PATHS = ["/sign-in", "/auth", "/api/ical"];
+const PUBLIC_PATHS = ["/sign-in", "/auth", "/api/ical", "/invite"];
 
 function isPublicPath(pathname: string) {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));

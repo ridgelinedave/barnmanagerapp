@@ -71,6 +71,8 @@ const EXPECTED_TABLES = [
   // Phase 2 slice 5 — events and calendar subscriptions.
   "events",
   "ical_tokens",
+  // Phase 2 provisioning slice — invites.
+  "invites",
 ];
 
 /**
@@ -86,8 +88,9 @@ const EXPECTED_TABLES = [
  * just noise.
  */
 const PENDING_TABLES = {
-  // Phase 2 provisioning slice — migration 0017, awaiting David's audit.
-  invites: "migration 0017 (invites) has not been applied yet",
+  // Empty: migration 0017 was audited and applied on 2026-07-31, so `invites`
+  // moved up into EXPECTED_TABLES and is now checked as strictly as any other.
+  // Keep the mechanism — the next audited-pending migration needs it.
 };
 const EXPECTED_FUNCTIONS = [
   "current_role",
