@@ -1,6 +1,8 @@
 "use client";
 
 import { useActionState } from "react";
+import { Button } from "@/components/ui/Button";
+import { FormFeedback } from "@/components/ui/Field";
 import {
   ensureFamilyOnboarding,
   type OnboardingState,
@@ -22,24 +24,11 @@ export function EnsureOnboardingButton({ familyId }: { familyId: string }) {
     <form action={formAction} className="flex flex-col gap-2">
       <input type="hidden" name="family_id" value={familyId} />
 
-      <button
-        type="submit"
-        disabled={pending}
-        className="min-h-12 rounded-xl bg-brand-gold px-4 text-base font-semibold text-brand-ink disabled:opacity-60"
-      >
+      <Button type="submit" variant="primary" block disabled={pending} icon="document">
         {pending ? "Setting up…" : "Set up their paperwork"}
-      </button>
+      </Button>
 
-      {state.error && (
-        <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-800">
-          {state.error}
-        </p>
-      )}
-      {state.message && (
-        <p role="status" className="rounded-xl bg-green-50 p-3 text-sm text-green-900">
-          {state.message}
-        </p>
-      )}
+      <FormFeedback error={state.error} message={state.message} />
     </form>
   );
 }

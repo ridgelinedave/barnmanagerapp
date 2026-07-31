@@ -1,12 +1,14 @@
 "use client";
 
 import { useActionState } from "react";
+import { Button } from "@/components/ui/Button";
+import { FormFeedback } from "@/components/ui/Field";
 import { createEvent, type EventState } from "@/app/(app)/manage/events/actions";
 import { EVENT_TYPES, EVENT_TYPE_LABELS } from "@/lib/types";
 
 const EMPTY: EventState = { error: null, message: null };
 
-const FIELD = "min-h-12 rounded-xl border border-brand-ink/20 bg-white px-3 text-base";
+const FIELD = "min-h-12 w-full rounded-control border border-line bg-surface px-3 text-body text-ink";
 
 /**
  * Add something to the barn calendar.
@@ -22,14 +24,14 @@ export function EventForm({ today }: { today: string }) {
   return (
     <form action={formAction} className="flex flex-col gap-3">
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="event-title" className="text-sm font-medium">
+        <label htmlFor="event-title" className="text-label font-medium text-ink">
           What is it
         </label>
         <input id="event-title" name="title" required className={FIELD} />
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="event-type" className="text-sm font-medium">
+        <label htmlFor="event-type" className="text-label font-medium text-ink">
           Kind
         </label>
         <select id="event-type" name="type" defaultValue="clinic" className={FIELD}>
@@ -42,7 +44,7 @@ export function EventForm({ today }: { today: string }) {
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="event-start-date" className="text-sm font-medium">
+        <label htmlFor="event-start-date" className="text-label font-medium text-ink">
           Starts
         </label>
         <input
@@ -64,8 +66,8 @@ export function EventForm({ today }: { today: string }) {
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="event-end-date" className="text-sm font-medium">
-          Ends <span className="font-normal text-brand-ink/50">(optional)</span>
+        <label htmlFor="event-end-date" className="text-label font-medium text-ink">
+          Ends <span className="font-normal text-muted">(optional)</span>
         </label>
         <input id="event-end-date" name="end_date" type="date" className={FIELD} />
         <input
@@ -78,55 +80,42 @@ export function EventForm({ today }: { today: string }) {
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="event-location" className="text-sm font-medium">
-          Where <span className="font-normal text-brand-ink/50">(optional)</span>
+        <label htmlFor="event-location" className="text-label font-medium text-ink">
+          Where <span className="font-normal text-muted">(optional)</span>
         </label>
         <input id="event-location" name="location" className={FIELD} />
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="event-description" className="text-sm font-medium">
-          Details <span className="font-normal text-brand-ink/50">(optional)</span>
+        <label htmlFor="event-description" className="text-label font-medium text-ink">
+          Details <span className="font-normal text-muted">(optional)</span>
         </label>
         <textarea
           id="event-description"
           name="description"
           rows={2}
-          className="rounded-xl border border-brand-ink/20 bg-white p-3 text-base"
+          className="w-full rounded-control border border-line bg-surface p-3 text-body text-ink"
         />
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="event-visibility" className="text-sm font-medium">
+        <label htmlFor="event-visibility" className="text-label font-medium text-ink">
           Who sees it
         </label>
         <select id="event-visibility" name="visibility" defaultValue="all" className={FIELD}>
           <option value="all">Everyone — families and staff</option>
           <option value="staff">Staff only — internal</option>
         </select>
-        <p className="text-xs text-brand-ink/55">
+        <p className="text-caption text-muted">
           Anything set to &ldquo;everyone&rdquo; appears on subscribed family calendars.
         </p>
       </div>
 
-      {state.error && (
-        <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-800">
-          {state.error}
-        </p>
-      )}
-      {state.message && (
-        <p role="status" className="rounded-xl bg-green-50 p-3 text-sm text-green-900">
-          {state.message}
-        </p>
-      )}
+      <FormFeedback error={state.error} message={state.message} />
 
-      <button
-        type="submit"
-        disabled={pending}
-        className="min-h-12 rounded-xl bg-brand-gold px-4 text-base font-semibold text-brand-ink disabled:opacity-60"
-      >
+      <Button type="submit" variant="primary" block disabled={pending}>
         {pending ? "Adding…" : "Add to calendar"}
-      </button>
+      </Button>
     </form>
   );
 }

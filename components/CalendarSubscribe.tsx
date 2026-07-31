@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { Sunk } from "@/components/ui/primitives";
+import { Button } from "@/components/ui/Button";
 
 /**
  * The calendar subscription URL.
@@ -32,14 +34,10 @@ export function CalendarSubscribe({ url }: { url: string }) {
   if (!revealed) {
     return (
       <div className="flex flex-col gap-2">
-        <button
-          type="button"
-          onClick={() => setRevealed(true)}
-          className="min-h-12 rounded-xl border border-brand-ink/20 bg-white px-4 text-base font-semibold"
-        >
+        <Button type="button" onClick={() => setRevealed(true)} variant="secondary" block>
           Show my calendar link
-        </button>
-        <p className="text-xs text-brand-ink/55">
+        </Button>
+        <p className="text-caption text-muted">
           Anyone with this link can see your schedule without signing in, so treat it like a
           password.
         </p>
@@ -49,19 +47,17 @@ export function CalendarSubscribe({ url }: { url: string }) {
 
   return (
     <div className="flex flex-col gap-2">
-      <p className="break-all rounded-xl border border-brand-ink/15 bg-brand-ink/5 p-3 text-xs">
-        {url}
-      </p>
+      {/* break-all, not truncate: a token you cannot read is a token you
+          cannot check against the one in your calendar app. */}
+      <Sunk>
+        <p className="break-all text-caption">{url}</p>
+      </Sunk>
 
-      <button
-        type="button"
-        onClick={copy}
-        className="min-h-12 rounded-xl bg-brand-gold px-4 text-base font-semibold text-brand-ink"
-      >
+      <Button type="button" onClick={copy} variant="primary" block>
         {copied ? "Copied" : "Copy link"}
-      </button>
+      </Button>
 
-      <p className="text-xs text-brand-ink/55">
+      <p className="text-caption text-muted">
         In Google Calendar choose &ldquo;Other calendars → From URL&rdquo;. On iPhone, Settings →
         Calendar → Accounts → Add Account → Other → Add Subscribed Calendar.
       </p>

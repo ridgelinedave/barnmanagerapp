@@ -1,7 +1,9 @@
-import Link from "next/link";
 import { TabPage } from "@/components/TabPage";
 import { StubScreen } from "@/components/StubScreen";
 import { EventForm } from "@/components/EventAdmin";
+import { Card, Chip, ChipRow, EmptyState, SectionHeader } from "@/components/ui/primitives";
+import { Button } from "@/components/ui/Button";
+import { SheetTrigger } from "@/components/ui/Sheet";
 import { requireTab } from "@/lib/guard";
 import { listAllEvents, partitionEvents } from "@/lib/events";
 import { barnToday } from "@/lib/dates";
@@ -43,78 +45,68 @@ export default async function ManageEventsPage() {
   const { upcoming, past } = partitionEvents(await listAllEvents());
 
   return (
-    <TabPage title="Calendar">
+    <TabPage title="Calendar" back="/manage">
       <section className="flex flex-col gap-3">
-        <div className="flex items-baseline gap-2">
-          <h2 className="text-base font-semibold">Coming up</h2>
-          <p className="text-sm text-brand-ink/60">{upcoming.length}</p>
-        </div>
+        <SectionHeader title="Coming up" count={`${upcoming.length}`} />
 
         {upcoming.length === 0 ? (
-          <p className="rounded-2xl border border-brand-ink/10 bg-white p-4 text-sm text-brand-ink/70">
-            Nothing on the calendar yet.
-          </p>
+          <EmptyState
+            title="Nothing on the calendar"
+            body="Shows, clinics, farrier and vet days, closures. Anything marked visible to everyone lands on subscribed family calendars too."
+            emoji="📅"
+          />
         ) : (
           upcoming.map((event) => (
-            <div key={event.id} className="rounded-2xl border border-brand-ink/15 bg-white p-4">
-              <div className="flex items-start gap-2">
-                <div className="min-w-0 flex-1">
-                  <h3 className="text-base font-semibold leading-snug">{event.title}</h3>
-                  <p className="mt-0.5 text-sm text-brand-ink/70">
-                    {EVENT_TYPE_LABELS[event.type]} · {when(event.start_at, event.end_at)}
-                  </p>
-                  {event.location && (
-                    <p className="mt-0.5 text-sm text-brand-ink/60">{event.location}</p>
+            <Card key={event.id} className="p-4">
+              <h3 className="font-display text-heading leading-snug text-ink">{event.title}</h3>
+              <p className="mt-0.5 text-caption text-muted">{when(event.start_at, event.end_at)}</p>
+
+              <div className="mt-1.5">
+                <ChipRow>
+                  <Chip value={EVENT_TYPE_LABELS[event.type]} icon="calendar" />
+                  {event.location && <Chip value={event.location} icon="pin" />}
+                  {/* Staff-only is the chip that matters most on this screen —
+                      it is the difference between internal and forty phones. */}
+                  {event.visibility === "staff" && (
+                    <Chip value="Staff only" icon="alert" tone="gold" />
                   )}
-                </div>
-                {event.visibility === "staff" && (
-                  <span className="shrink-0 rounded-full bg-brand-ink/10 px-2 py-0.5 text-[11px] font-semibold text-brand-ink/70">
-                    Staff only
-                  </span>
-                )}
+                </ChipRow>
               </div>
 
               {event.description && (
-                <p className="mt-2 text-sm text-brand-ink/85">{event.description}</p>
+                <p className="mt-2 text-caption text-ink">{event.description}</p>
               )}
 
               <form action={deleteEvent} className="mt-3">
                 <input type="hidden" name="id" value={event.id} />
-                <button
-                  type="submit"
-                  className="min-h-11 w-full rounded-xl border border-red-300 bg-white text-sm font-semibold text-red-700"
-                >
+                <Button type="submit" variant="danger" block>
                   Remove
-                </button>
+                </Button>
               </form>
-            </div>
+            </Card>
           ))
         )}
       </section>
 
-      <section className="flex flex-col gap-3 rounded-2xl border border-brand-ink/10 bg-white p-4">
-        <h2 className="text-base font-semibold">Add to the calendar</h2>
+      <SheetTrigger label="Add to the calendar" title="New calendar entry" variant="primary">
         <EventForm today={barnToday()} />
-      </section>
+      </SheetTrigger>
 
       {past.length > 0 && (
-        <details className="rounded-2xl border border-brand-ink/10 bg-white p-4">
-          <summary className="min-h-11 cursor-pointer text-sm font-semibold">
+        <details className="rounded-card border border-line bg-surface p-4">
+          <summary className="flex min-h-11 cursor-pointer items-center font-display text-heading text-ink">
             Past ({past.length})
           </summary>
           <ul className="mt-3 flex flex-col gap-2">
             {past.map((event) => (
-              <li key={event.id} className="text-sm text-brand-ink/70">
-                <span className="font-medium">{event.title}</span> — {when(event.start_at, null)}
+              <li key={event.id} className="text-caption text-muted">
+                <span className="font-medium text-ink">{event.title}</span> —{" "}
+                {when(event.start_at, null)}
               </li>
             ))}
           </ul>
         </details>
       )}
-
-      <Link href="/manage" className="py-2 text-center text-sm font-medium underline">
-        Back to Manage
-      </Link>
     </TabPage>
   );
 }

@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { TabPage } from "@/components/TabPage";
 import { FormFill } from "@/components/FormFill";
@@ -29,16 +28,12 @@ export default async function FormPage({ params }: { params: Promise<{ id: strin
   if (!template) notFound();
 
   return (
-    <TabPage title={template.name}>
+    <TabPage title={template.name} back="/more/forms">
       {template.description && (
-        <p className="text-sm text-brand-ink/70">{template.description}</p>
+        <p className="text-caption text-muted">{template.description}</p>
       )}
 
       <FormFill submission={submission} template={template} />
-
-      <Link href="/more/forms" className="py-2 text-center text-sm font-medium underline">
-        Back to forms
-      </Link>
     </TabPage>
   );
 }

@@ -1,7 +1,8 @@
-import Link from "next/link";
 import { TabPage } from "@/components/TabPage";
 import { StubScreen } from "@/components/StubScreen";
 import { EnsureOnboardingButton } from "@/components/FormsAdmin";
+import { Card, Chip, ChipRow, EmptyState, SectionHeader } from "@/components/ui/primitives";
+import { ListRow } from "@/components/ui/ListRow";
 import { requireTab } from "@/lib/guard";
 import { familyProgress, listAllTemplates } from "@/lib/forms";
 import { featureEnabled } from "@/config/barn";
@@ -30,107 +31,93 @@ export default async function ManageFormsPage() {
   const untouched = progress.filter((f) => f.pending === 0 && f.complete === 0);
 
   return (
-    <TabPage title="Forms">
+    <TabPage title="Forms" back="/manage">
       <section className="flex flex-col gap-3">
-        <div className="flex items-baseline gap-2">
-          <h2 className="text-base font-semibold">Still to sign</h2>
-          <p className="text-sm text-brand-ink/60">
-            {incomplete.length === 0 ? "Nobody" : `${incomplete.length} famil${incomplete.length === 1 ? "y" : "ies"}`}
-          </p>
-        </div>
+        <SectionHeader
+          title="Still to sign"
+          count={
+            incomplete.length === 0
+              ? "Nobody"
+              : `${incomplete.length} famil${incomplete.length === 1 ? "y" : "ies"}`
+          }
+        />
 
         {incomplete.length === 0 ? (
-          <p className="rounded-2xl border border-brand-ink/10 bg-white p-4 text-sm text-brand-ink/70">
-            Every family with paperwork has signed it.
-          </p>
+          <EmptyState
+            title="Everyone is up to date"
+            body="Every family with paperwork on their checklist has signed it. Nothing to chase."
+            emoji="✅"
+          />
         ) : (
           incomplete.map((family) => (
-            <div
+            <ListRow
               key={family.familyId}
-              className="flex min-h-16 items-center gap-3 rounded-2xl border border-brand-ink/15 bg-white p-4"
-            >
-              <span className="min-w-0 flex-1">
-                <span className="block text-base font-semibold leading-snug">
-                  {family.familyName}
-                </span>
-                <span className="mt-0.5 block text-sm text-brand-ink/60">
-                  {family.pending} outstanding
-                  {family.complete > 0 ? ` · ${family.complete} signed` : ""}
-                </span>
-              </span>
-              <span className="shrink-0 rounded-full bg-brand-gold/30 px-2 py-0.5 text-[11px] font-semibold text-brand-ink">
-                {family.pending}
-              </span>
-            </div>
+              title={family.familyName}
+              meta={`${family.pending} outstanding${family.complete > 0 ? ` · ${family.complete} signed` : ""}`}
+              trailing={<Chip value={`${family.pending}`} icon="alert" tone="gold" />}
+            />
           ))
         )}
       </section>
 
       {done.length > 0 && (
         <section className="flex flex-col gap-3">
-          <h2 className="text-sm font-semibold text-brand-ink/60">
-            Fully signed ({done.length})
-          </h2>
+          <SectionHeader title="Fully signed" count={`${done.length}`} />
           {done.map((family) => (
-            <div
+            <ListRow
               key={family.familyId}
-              className="flex min-h-14 items-center gap-3 rounded-2xl border border-brand-ink/10 bg-brand-ink/5 p-4"
-            >
-              <span className="min-w-0 flex-1 text-base font-medium">{family.familyName}</span>
-              <span className="shrink-0 text-sm text-brand-ink/60">{family.complete} signed</span>
-            </div>
+              title={family.familyName}
+              muted
+              trailing={<Chip value={`${family.complete} signed`} icon="check" tone="forest" />}
+            />
           ))}
         </section>
       )}
 
       {untouched.length > 0 && (
         <section className="flex flex-col gap-3">
-          <h2 className="text-sm font-semibold text-brand-ink/60">
-            No paperwork yet ({untouched.length})
-          </h2>
-          <p className="text-sm text-brand-ink/70">
+          <SectionHeader title="No paperwork yet" count={`${untouched.length}`} />
+          <p className="text-caption text-muted">
             These families have no submissions at all. Set their checklist up below.
           </p>
           {untouched.map((family) => (
-            <div
-              key={family.familyId}
-              className="flex flex-col gap-3 rounded-2xl border border-brand-ink/15 bg-white p-4"
-            >
-              <span className="text-base font-medium">{family.familyName}</span>
+            <Card key={family.familyId} className="flex flex-col gap-3 p-4">
+              <span className="font-display text-heading text-ink">{family.familyName}</span>
               <EnsureOnboardingButton familyId={family.familyId} />
-            </div>
+            </Card>
           ))}
         </section>
       )}
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-base font-semibold">Templates</h2>
+        <SectionHeader title="Templates" count={`${templates.length}`} />
         {templates.length === 0 ? (
-          <p className="rounded-2xl border border-brand-ink/10 bg-white p-4 text-sm text-brand-ink/70">
-            No templates yet. They are created directly in the database for now.
-          </p>
+          <EmptyState
+            title="No templates yet"
+            body="Waivers and forms are seeded straight into the database for now — there is no authoring screen. Ask David to add one."
+            emoji="📝"
+          />
         ) : (
           templates.map((template) => (
-            <div
-              key={template.id}
-              className={`rounded-2xl border p-4 ${
-                template.active ? "border-brand-ink/15 bg-white" : "border-brand-ink/10 bg-brand-ink/5"
-              }`}
-            >
-              <h3 className="text-base font-semibold leading-snug">{template.name}</h3>
-              <p className="mt-0.5 text-sm text-brand-ink/70">
-                {template.applies_to === "rider" ? "One per rider" : "One per family"}
-                {template.required ? " · Required" : " · Optional"}
-                {template.active ? "" : " · Inactive"}
-              </p>
-            </div>
+            <Card key={template.id} className={`p-4 ${template.active ? "" : "bg-sunk"}`}>
+              <h3 className="font-display text-heading leading-snug text-ink">{template.name}</h3>
+              <div className="mt-1.5">
+                <ChipRow>
+                  <Chip
+                    value={template.applies_to === "rider" ? "One per rider" : "One per family"}
+                  />
+                  <Chip
+                    value={template.required ? "Required" : "Optional"}
+                    icon={template.required ? "alert" : "check"}
+                    tone={template.required ? "gold" : "neutral"}
+                  />
+                  {!template.active && <Chip value="Inactive" icon="clock" tone="neutral" />}
+                </ChipRow>
+              </div>
+            </Card>
           ))
         )}
       </section>
-
-      <Link href="/manage" className="py-2 text-center text-sm font-medium underline">
-        Back to Manage
-      </Link>
     </TabPage>
   );
 }
