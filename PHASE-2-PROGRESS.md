@@ -2,7 +2,7 @@
 
 **Branch:** `phase-2` · branched from `phase-1-complete` (`54cdd11`)
 **`main` untouched** at `840dc18` (verified Phase 0 state)
-**Date:** 2026-07-29
+**Date:** 2026-07-29, updated 2026-07-31 (design pass merged, Team panel added)
 **Nothing is deployed.** All of this runs locally against the live Supabase project.
 
 ---
@@ -10,7 +10,8 @@
 ## Headline
 
 **All five slices are live.** `horses`, `care`, `documents`, `forms` and
-`events` are on.
+`events` are on. The `design-pass` branch is **merged in** (fast-forward, no
+conflicts), and the **Team panel** is built on top of it.
 
 **Suite: 521 passed, 0 failed, 0 skipped**, run twice with no re-seed. Advisor
 **clean across 8 lints**. Plus `test:pdf` (12) and `test:ical` (30).
@@ -29,6 +30,79 @@ npm run db:gate    # seed → test:policies → test:policies (no re-seed) → d
 | 4 — onboarding forms + PDF vault | 0013 | `forms` **on** | Live |
 | 5 — events + iCal feed | 0014 | `events` **on** | Live |
 | — security lockdown | 0015 | — | Live |
+| — design pass (UI only) | — | — | Merged |
+| — Team panel (admin UI) | **none needed** | — | Live |
+
+---
+
+## Team panel — the admin UI over the Phase 0 identity tables
+
+**No SQL. Zero new migrations, policies, functions or triggers.**
+
+This slice is a screen over four tables that migration 0001 created and 0003
+policed on day one: `profiles`, `families`, `riders`, `levels`. All four
+already carry admin-full / staff-read / parent-own-scope policies, and
+`profiles` already carries the `profiles_guard_privileged_columns` trigger that
+stops a non-admin editing their own role or flags. There was nothing left to
+secure, so nothing was added.
+
+The definer-function inventory printed by the suite is **unchanged** — 3
+internal, 20 entry points, 9 triggers — which is the mechanical proof that no
+SECURITY DEFINER function was introduced.
+
+`/manage/team`, admin only, three sections:
+
+**A — People.** Every profile, sorted admin → staff → parent. Role changes,
+permission-flag toggles, name and phone. Three rules the screen has to respect,
+and how:
+
+- **`family_id` must be null unless the role is `parent`.** Confirmed against
+  the live database rather than read off the DDL: `update profiles set
+  role='staff'` on a parent **is refused** by
+  `profiles_family_only_for_parents`, and the same update **with `family_id =
+  null` in the same statement succeeds**. So `updatePersonRole()` clears the
+  family in the same statement — not as tidiness, but because the two-statement
+  version cannot work. The sheet warns before you submit, and a rejection comes
+  back as a sentence ("Only parents belong to a family…") rather than a raw
+  constraint name.
+- **An admin implicitly holds all three flags** (`has_permission()` returns
+  true for admin without reading the columns), so an admin row shows
+  "All permissions included with admin" instead of three unticked boxes that
+  would imply the opposite. The toggles render for staff, which is where they
+  are the real lever. Parents get no flag row at all.
+- **The last admin cannot be demoted.** Guarded **server-side** in the action,
+  not client-side, so a stale tab cannot walk past it — plus a disabled button
+  and a danger callout in the UI. **Honest limitation:** it is a read-then-write,
+  so two admins demoting each other in the same instant could both pass. Closing
+  that needs a constraint trigger, which is new SQL, which this slice
+  deliberately does not add. Listed under WHAT NEEDS DAVID.
+
+No delete-person, by design.
+
+**B — Families & riders.** Families (name, notes, rider count) and their riders
+(level, active, photo, notes). Neither has a login, so both are created freely.
+
+**There is no age column and there must never be one.** Age is derived from
+`dob` at read time (`ageFromDob()` / `ageGroupFor()` in `lib/dates.ts`) — a
+stored age is wrong within a year of being typed. The derivation compares
+`YYYY-MM-DD` strings rather than subtracting milliseconds, which gets DST and
+leap-day birthdays right for free. Verified end to end: a rider born
+2013-09-15, read on 2026-07-31 (before the birthday), renders age 12 → bracket
+"11–13".
+
+**The bracket boundaries are a PLACEHOLDER** in `config/barn.ts`
+(`riderAgeGroups`), flagged on-screen and below. They are common show
+divisions, not Belle's.
+
+**C — Levels.** Add, rename, reorder. Reorder rewrites the whole list's `sort`
+values rather than swapping two numbers: `sort` defaults to 0 and nothing
+enforces uniqueness, so two levels can hold the same value and swapping equal
+numbers moves nothing while looking like it worked.
+
+Measured at **390px and 320px**: no overflow, no target under 44px, no AA
+contrast failure — including inside all 30 bottom sheets, which had to be
+force-opened to measure because a closed `<dialog>` is `display:none`. **Zero
+emoji** in the rendered page.
 
 ---
 
@@ -91,6 +165,20 @@ shows phase was not started.
 ---
 
 ## WHAT NEEDS DAVID
+
+0. **Confirm the rider age brackets** (Team panel, section B). `config/barn.ts`
+   → `riderAgeGroups` currently reads **10 & under / 11–13 / 14–17 / Adult**.
+   Those are common show divisions, **not Belle's** — they are a placeholder,
+   marked as one in the config and on the screen itself. Different disciplines
+   cut them differently and this is the sort of detail a parent notices
+   immediately. One line to change once she confirms.
+
+0b. **The last-admin guard is not race-proof.** It stops the ordinary mistake
+   (server-side check, disabled button, danger callout), but two admins
+   demoting each other in the same instant could both slip through, leaving a
+   barn nobody can administer. Making it airtight needs a constraint trigger —
+   new SQL, deliberately not added in a slice that needed none. Say the word
+   and it is a small migration.
 
 1. **A painted-pixel pass on the newly-live surfaces.** Their server output is
    verified — content, scoping, read-only vs editable, signed vs unsigned — and
@@ -488,6 +576,12 @@ shows the fixture horses only. Worth adding before showing Belle.
    `phase-2` both need reviewing and merging when you are happy.
 3. **Confirm the remaining `config/barn.ts` placeholders** — the barn
    geolocation is still `null`, so the clock-in geofence flags nothing.
+
+**The slice that follows the Team panel:** inviting and provisioning logins —
+creating an auth user for a new parent or staff member and linking it to a
+profile. Deliberately NOT in the Team panel, because it touches auth rather
+than these four tables, and creating users is the one thing here that cannot be
+done under the caller's own session.
 
 **Ready to build next (Phase 2, remaining slices):**
 care events with due-soon surfacing and the weekly digest · horse documents in

@@ -113,6 +113,27 @@ export const barn = {
   backfillCutoffMinutes: 120,
 
   /**
+   * PLACEHOLDER — rider age groups.
+   *
+   * A rider's age group is DERIVED from `dob`, never stored: an age column
+   * would be wrong within a year of being typed, and there is exactly one true
+   * source for how old someone is. Only the bracket boundaries are a barn fact,
+   * so only they live here.
+   *
+   * These four brackets are the common horse-show divisions and are a
+   * STARTING POINT, not Belle's. Confirm the real ones with her — different
+   * disciplines cut them differently, and this is the sort of detail a parent
+   * notices immediately. `maxAge` is inclusive; the last entry must be null,
+   * meaning "and up".
+   */
+  riderAgeGroups: [
+    { label: "10 & under", maxAge: 10 },
+    { label: "11–13", maxAge: 13 },
+    { label: "14–17", maxAge: 17 },
+    { label: "Adult", maxAge: null },
+  ] as readonly { label: string; maxAge: number | null }[],
+
+  /**
    * PLACEHOLDER — staff clock-in geofence (Phase 1). Get the farm's real
    * coordinates and an acceptable radius from Belle. Null = geofence disabled.
    */

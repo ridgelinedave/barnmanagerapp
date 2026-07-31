@@ -19,7 +19,14 @@ export const metadata = { title: "Manage" };
  * talking to families. A flat list of eight is a list you read every time; a
  * grouped list is one you learn.
  */
-type Entry = { flag: BarnFeatureFlag; href: string; title: string; meta: string; icon: IconName };
+type Entry = {
+  /** Omitted for screens that manage always-present tables and have no switch. */
+  flag?: BarnFeatureFlag;
+  href: string;
+  title: string;
+  meta: string;
+  icon: IconName;
+};
 
 const TODAY: Entry[] = [
   {
@@ -86,8 +93,26 @@ const FAMILIES: Entry[] = [
   },
 ];
 
+/**
+ * Team sits on its own, below the flagged groups.
+ *
+ * It has no feature flag because it manages the Phase 0 identity tables, which
+ * have been live since the first migration — there is no switch to be off. It
+ * is also the one screen here that is admin-only rather than
+ * permission-flagged: deciding who has permissions is not itself a grantable
+ * permission.
+ */
+const TEAM: Entry[] = [
+  {
+    href: "/manage/team",
+    title: "Team",
+    meta: "Roles and permissions, families and riders, levels",
+    icon: "grid",
+  },
+];
+
 function Group({ title, entries }: { title: string; entries: Entry[] }) {
-  const live = entries.filter((entry) => featureEnabled(entry.flag));
+  const live = entries.filter((entry) => !entry.flag || featureEnabled(entry.flag));
   // A group whose whole contents are switched off does not render at all.
   if (live.length === 0) return null;
 
@@ -119,11 +144,12 @@ export default async function ManagePage() {
       <Group title="Running the day" entries={TODAY} />
       <Group title="Records" entries={RECORDS} />
       <Group title="Families" entries={FAMILIES} />
+      <Group title="The barn" entries={TEAM} />
 
       <StubScreen
         heading="More management tools"
         phase="Phases 2–3"
-        detail="Families and riders, QuickBooks sync and the show tools are still to come."
+        detail="Sending someone an invite to sign in, QuickBooks sync and the show tools are still to come."
       />
     </TabPage>
   );

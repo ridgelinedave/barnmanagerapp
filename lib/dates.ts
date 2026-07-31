@@ -38,6 +38,59 @@ export function formatBarnDayLabel(isoDate: string): string {
   }).format(date);
 }
 
+/**
+ * A date where the YEAR is the point — a birthday, not a shift.
+ *
+ * formatBarnDayLabel() is built for "this week" and drops the year entirely,
+ * which turns a 2011 date of birth into "Wed, Apr 1". Anywhere the year
+ * carries the meaning has to use this instead.
+ */
+export function formatBarnDateFull(isoDate: string): string {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: barn.timezone,
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date(`${isoDate}T12:00:00Z`));
+}
+
+/**
+ * Whole years since `dob`, on the barn's clock.
+ *
+ * Compared as YYYY-MM-DD strings rather than by subtracting milliseconds: a
+ * date of birth is a calendar fact, not an instant, and millisecond arithmetic
+ * gets it wrong by a day around DST and around leap years. Someone born on
+ * Feb 29 has their birthday land on Mar 1 in common years, which is what
+ * string comparison against `MM-DD` gives for free.
+ */
+export function ageFromDob(dob: string, on: string = barnToday()): number | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dob) || !/^\d{4}-\d{2}-\d{2}$/.test(on)) return null;
+
+  const years = Number(on.slice(0, 4)) - Number(dob.slice(0, 4));
+  // Birthday not yet reached this year.
+  const hadBirthday = on.slice(5) >= dob.slice(5);
+  const age = hadBirthday ? years : years - 1;
+
+  // A future date of birth is a typo, not a negative age.
+  return age >= 0 ? age : null;
+}
+
+/**
+ * The rider's age group, from `config/barn.ts`.
+ *
+ * Returns null when there is no date of birth — the caller shows nothing
+ * rather than guessing a bracket, because "Adult" on a nine-year-old is worse
+ * than a blank.
+ */
+export function ageGroupFor(dob: string | null, on: string = barnToday()): string | null {
+  if (!dob) return null;
+  const age = ageFromDob(dob, on);
+  if (age === null) return null;
+
+  const group = barn.riderAgeGroups.find((g) => g.maxAge === null || age <= g.maxAge);
+  return group?.label ?? null;
+}
+
 /** ISO weekday for a barn-local date. 1 = Monday … 7 = Sunday. */
 export function isoWeekday(isoDate: string): number {
   const day = new Date(`${isoDate}T12:00:00Z`).getUTCDay();

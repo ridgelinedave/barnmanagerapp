@@ -21,6 +21,27 @@ export type Profile = {
   created_at: string;
 };
 
+/**
+ * The grantable permission flags (SPEC §4).
+ *
+ * An admin has all three implicitly — `has_permission()` returns true for
+ * admin without reading these columns — so they are the real levers for STAFF,
+ * and are shown as already-included on an admin row rather than as unticked
+ * boxes that would imply the opposite.
+ */
+export const PERMISSION_FLAGS = ["manage_schedule", "manage_horses", "manage_shows"] as const;
+export type PermissionFlag = (typeof PERMISSION_FLAGS)[number];
+
+export const PERMISSION_FLAG_LABELS: Record<PermissionFlag, string> = {
+  manage_schedule: "Schedule",
+  manage_horses: "Horses & feed",
+  manage_shows: "Shows",
+};
+
+export function isPermissionFlag(value: unknown): value is PermissionFlag {
+  return typeof value === "string" && (PERMISSION_FLAGS as readonly string[]).includes(value);
+}
+
 export type Family = {
   id: string;
   name: string;
