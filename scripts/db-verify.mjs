@@ -72,6 +72,23 @@ const EXPECTED_TABLES = [
   "events",
   "ical_tokens",
 ];
+
+/**
+ * Tables whose migration is WRITTEN AND AUDITED-PENDING, not yet applied.
+ *
+ * A table is checked exactly as strictly as any other the moment it exists —
+ * RLS on, policies present — but its absence is reported as "pending" instead
+ * of failing. Without this a written-but-unapplied migration has no safe state:
+ * listing it fails the verifier now, and not listing it fails the verifier the
+ * instant it is applied, because an unlisted table is a failure.
+ *
+ * Move the entry up into EXPECTED_TABLES once it is applied and this line is
+ * just noise.
+ */
+const PENDING_TABLES = {
+  // Phase 2 provisioning slice — migration 0017, awaiting David's audit.
+  invites: "migration 0017 (invites) has not been applied yet",
+};
 const EXPECTED_FUNCTIONS = [
   "current_role",
   "current_family",
@@ -158,7 +175,22 @@ console.log("Tables and RLS");
   // The other direction: a table that exists but nobody listed. Previously
   // this was printed as a note and ignored, which is how the Phase 1 tables
   // went unchecked for three phases. It is now a problem.
-  const unlisted = rows.map((r) => r.table_name).filter((t) => !EXPECTED_TABLES.includes(t));
+  // A pending table is checked as strictly as any other once it exists.
+  for (const [table, why] of Object.entries(PENDING_TABLES)) {
+    const row = found.get(table);
+    if (!row) {
+      console.log(`  [ ] ${table.padEnd(14)} pending — ${why}`);
+      continue;
+    }
+    console.log(
+      `  [${row.rls_enabled ? "x" : "!"}] ${table.padEnd(14)} ${row.rls_enabled ? "RLS on" : "RLS OFF"}, ${row.policy_count} policies`,
+    );
+    if (!row.rls_enabled) flag(`${table} has RLS DISABLED — every row is readable.`);
+    if (row.policy_count === 0) flag(`${table} has RLS on but NO policies — nothing is reachable.`);
+  }
+
+  const known = [...EXPECTED_TABLES, ...Object.keys(PENDING_TABLES)];
+  const unlisted = rows.map((r) => r.table_name).filter((t) => !known.includes(t));
   for (const table of unlisted) {
     const row = found.get(table);
     flag(

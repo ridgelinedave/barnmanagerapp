@@ -21,6 +21,7 @@ export type BarnFeatureFlag =
   | "forms"
   | "events"
   | "lessons"
+  | "invites"
   | "shows"
   | "invoices"
   | "shop";
@@ -205,6 +206,19 @@ export const barn = {
      * takes it.
      */
     lessons: true,
+    /**
+     * Phase 2, provisioning slice — BUILT BUT OFF, awaiting David's audit.
+     *
+     * Migration 0017 is written and NOT applied. This flag gates both the
+     * Team panel's invite UI and the public `/invite/<token>` claim route.
+     *
+     * It is the switch that matters most in this app: the claim route creates
+     * an auth user from an unauthenticated request. Turning it on without the
+     * migration applied gives a screen that errors; turning it on WITH the
+     * migration applied opens that route to the internet. Both halves get
+     * audited before this becomes true.
+     */
+    invites: false,
     shows: false,
     invoices: false,
     shop: false,

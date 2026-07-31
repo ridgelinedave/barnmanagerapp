@@ -19,10 +19,18 @@ import {
   PersonSheetBody,
   RiderForm,
 } from "@/components/TeamAdmin";
+import { InviteForm, InviteRow } from "@/components/InviteAdmin";
 import { requireTab } from "@/lib/guard";
-import { listFamilies, listFamiliesWithRiders, listLevels, listTeam } from "@/lib/team";
+import {
+  listFamilies,
+  listFamiliesWithRiders,
+  listInvites,
+  listLevels,
+  listTeam,
+} from "@/lib/team";
 import { ageGroupFor, formatBarnDateFull } from "@/lib/dates";
-import { barn } from "@/config/barn";
+import { inviteStatus } from "@/lib/invites";
+import { barn, featureEnabled } from "@/config/barn";
 import type { Role } from "@/lib/types";
 
 export const metadata = { title: "Team" };
@@ -47,15 +55,21 @@ export default async function ManageTeamPage() {
   const role = await requireTab("/manage");
   if (role !== "admin") redirect("/home");
 
-  const [team, families, familiesWithRiders, levels] = await Promise.all([
+  const [team, families, familiesWithRiders, levels, invites] = await Promise.all([
     listTeam(),
     listFamilies(),
     listFamiliesWithRiders(),
     listLevels(),
+    listInvites(),
   ]);
 
   const admins = team.filter((person) => person.role === "admin").length;
   const levelName = new Map(levels.map((level) => [level.id, level.name]));
+  const familyName = new Map(families.map((family) => [family.id, family.name]));
+
+  // An accepted invite has become a person in the People section above; keeping
+  // it in the list would show the same human twice, one of them as paperwork.
+  const openInvites = invites.filter((invite) => inviteStatus(invite) !== "accepted");
 
   return (
     <TabPage title="Team" back="/manage">
@@ -75,7 +89,11 @@ export default async function ManageTeamPage() {
         {team.length === 0 ? (
           <EmptyState
             title="Nobody has a login yet"
-            body="Everyone who signs in — Belle, instructors, barn staff and parents — appears here once their account exists. Creating accounts is the next piece of work."
+            body={
+              featureEnabled("invites")
+                ? "Everyone who signs in — Belle, instructors, barn staff and parents — appears here once they've used their invite."
+                : "Everyone who signs in — Belle, instructors, barn staff and parents — appears here once their account exists."
+            }
           />
         ) : (
           team.map((person) => {
@@ -120,6 +138,40 @@ export default async function ManageTeamPage() {
           })
         )}
       </section>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* A2 — Invites                                                        */}
+      {/*                                                                     */}
+      {/* Sits directly under People because it is the same list one step     */}
+      {/* earlier: someone who will be on it once they've signed up.          */}
+      {/* ------------------------------------------------------------------ */}
+      {featureEnabled("invites") && (
+        <section className="flex flex-col gap-3">
+          <SectionHeader title="Invites" count={`${openInvites.length}`} />
+
+          {openInvites.length === 0 ? (
+            <EmptyState
+              title="No invites out"
+              body="Inviting someone creates a link you send them yourself. They pick their own password, and the role you choose here is the one they get."
+            />
+          ) : (
+            <Card className="flex flex-col gap-3 p-4">
+              {openInvites.map((invite) => (
+                <InviteRow
+                  key={invite.id}
+                  invite={invite}
+                  familyName={invite.family_id ? (familyName.get(invite.family_id) ?? null) : null}
+                  barnName={barn.name}
+                />
+              ))}
+            </Card>
+          )}
+
+          <SheetTrigger label="Invite someone" title="New invite" variant="primary">
+            <InviteForm families={families} />
+          </SheetTrigger>
+        </section>
+      )}
 
       {/* ------------------------------------------------------------------ */}
       {/* B — Families and riders                                             */}

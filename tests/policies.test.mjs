@@ -4288,6 +4288,237 @@ async function main() {
   }
 
   // ===========================================================================
+  // invites (migration 0017) — the table that can manufacture a login
+  //
+  // Gated on the TABLE EXISTING rather than on the feature flag, so this runs
+  // by itself the moment the migration is applied — no one has to remember to
+  // come back and switch a test on.
+  //
+  // What this section covers is what the DATABASE guarantees: who may read and
+  // write the table, that the token is the server's to mint, that the CHECKs
+  // refuse an incoherent invite, and that the claim predicate matches exactly
+  // one pending row. The claim ROUTE's own logic — never reading the role from
+  // the request, refusing an email that already has an account — is not
+  // reachable from here; it is exercised end-to-end after the migration is
+  // applied, and that is stated in PHASE-2-PROGRESS.md rather than implied.
+  // ===========================================================================
+  {
+    const probe = await admin.from("invites").select("id").limit(1);
+    const tableMissing = probe.error?.code === "42P01" || /schema cache/i.test(probe.error?.message ?? "");
+
+    if (tableMissing) {
+      console.log("\n\n═══ invites — SKIPPED ═══");
+      console.log("  Migration 0017 has not been applied. Apply it and re-run.");
+      skipped += 1;
+    } else {
+      console.log("\n\n═══ invites — ALLOW ═══\n");
+
+      const madeInvites = [];
+      // A token the CLIENT chooses. If any of it survives, the guard is broken.
+      const CHOSEN = "11111111-1111-1111-1111-111111111111";
+      const future = new Date(Date.now() + 7 * 86_400_000).toISOString();
+
+      const { data: created, error: createError } = await admin
+        .from("invites")
+        .insert({
+          role: "staff",
+          full_name: "Policy Test Invitee",
+          token: CHOSEN,
+          expires_at: future,
+          manage_horses: true,
+        })
+        .select()
+        .single();
+
+      check("admin CAN create an invite", !createError && Boolean(created), createError?.message);
+      if (created) madeInvites.push(created.id);
+
+      check(
+        "the token the client chose was NOT stored — the server minted its own",
+        created?.token !== CHOSEN,
+        `stored ${created?.token}`,
+      );
+      check(
+        "and what it minted is a uuid",
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(created?.token ?? ""),
+        `stored ${created?.token}`,
+      );
+      check(
+        "created_by is pinned to the caller, not left to the client",
+        created?.created_by === users.admin.profileId,
+        `got ${created?.created_by}`,
+      );
+      check("the invited flags are stored as sent", created?.manage_horses === true);
+
+      // --- regenerate mints again, and still not what was asked for ----------
+      const { data: regenerated } = await admin
+        .from("invites")
+        .update({ token: CHOSEN })
+        .eq("id", created?.id ?? "")
+        .select()
+        .single();
+
+      check(
+        "regenerating mints a NEW token, again not the one supplied",
+        Boolean(regenerated) &&
+          regenerated.token !== CHOSEN &&
+          regenerated.token !== created?.token,
+        `was ${created?.token}, now ${regenerated?.token}`,
+      );
+
+      // --- the claim predicate ------------------------------------------------
+      // The exact WHERE the claim route uses. Testing it through the admin
+      // session rather than the service role keeps this suite's rule intact:
+      // it never uses the service key, because a test that bypasses RLS proves
+      // nothing about RLS. The predicate is the same either way.
+      const claim = (id) =>
+        admin
+          .from("invites")
+          .update({ accepted_at: new Date().toISOString() })
+          .eq("id", id)
+          .is("accepted_at", null)
+          .is("revoked_at", null)
+          .gt("expires_at", new Date().toISOString())
+          .select();
+
+      const { data: firstClaim } = await claim(created?.id ?? "");
+      check(
+        "control: claiming a pending invite matches exactly one row",
+        (firstClaim?.length ?? 0) === 1,
+        `matched ${firstClaim?.length}`,
+      );
+
+      const { data: secondClaim } = await claim(created?.id ?? "");
+      check(
+        "a SECOND claim on the same invite matches ZERO rows — one token, one account",
+        (secondClaim?.length ?? 0) === 0,
+        `matched ${secondClaim?.length}`,
+      );
+
+      // Revoked and expired are refused by the same predicate.
+      for (const [label, patch] of [
+        ["revoked", { revoked_at: new Date().toISOString() }],
+        ["expired", { expires_at: new Date(Date.now() - 86_400_000).toISOString() }],
+      ]) {
+        const { data: made } = await admin
+          .from("invites")
+          .insert({
+            role: "staff",
+            full_name: `Policy Test ${label}`,
+            expires_at: future,
+            ...patch,
+          })
+          .select()
+          .single();
+        if (made) madeInvites.push(made.id);
+
+        const { data: attempt } = await claim(made?.id ?? "");
+        check(
+          `claiming a ${label} invite matches ZERO rows`,
+          (attempt?.length ?? 0) === 0,
+          `matched ${attempt?.length}`,
+        );
+      }
+
+      console.log("\n═══ invites — DENY (adversarial) ═══\n");
+
+      // --- the CHECK constraints ---------------------------------------------
+      check(
+        "an invite CANNOT give a staff member a family — mirrors profiles_family_only_for_parents",
+        await writeRefused(
+          admin
+            .from("invites")
+            .insert({
+              role: "staff",
+              full_name: "Should Not Exist",
+              family_id: familyId,
+              expires_at: future,
+            })
+            .select(),
+        ),
+      );
+      check(
+        "an invite CANNOT give a parent a manage_* flag — has_permission() would honour it",
+        await writeRefused(
+          admin
+            .from("invites")
+            .insert({
+              role: "parent",
+              full_name: "Should Not Exist",
+              family_id: familyId,
+              manage_horses: true,
+              expires_at: future,
+            })
+            .select(),
+        ),
+      );
+      check(
+        "an invite CANNOT be created with a blank name",
+        await writeRefused(
+          admin
+            .from("invites")
+            .insert({ role: "staff", full_name: "   ", expires_at: future })
+            .select(),
+        ),
+      );
+
+      // --- RLS: nobody but an admin -------------------------------------------
+      // Reading is the one that matters most: the token is IN the row, so a
+      // staff member who could read this table could create an admin account.
+      for (const [label, client] of [
+        ["staff", staff],
+        ["parent", parent],
+      ]) {
+        const { ids } = await visibleIds(client, "invites");
+        check(
+          `${label} CANNOT read the invites table — the token is in it`,
+          ids.length === 0,
+          `saw ${ids.length} invite(s)`,
+        );
+        check(
+          `${label} CANNOT create an invite`,
+          await writeRefused(
+            client
+              .from("invites")
+              .insert({ role: "admin", full_name: "Self Promotion", expires_at: future })
+              .select(),
+          ),
+        );
+        check(
+          `${label} CANNOT revoke an invite`,
+          await writeRefused(
+            client
+              .from("invites")
+              .update({ revoked_at: new Date().toISOString() })
+              .eq("id", created?.id ?? "")
+              .select(),
+          ),
+        );
+        check(
+          `${label} CANNOT delete an invite`,
+          await writeRefused(client.from("invites").delete().eq("id", created?.id ?? "").select()),
+        );
+      }
+
+      check(
+        "anon CANNOT read the invites table at all",
+        (await visibleIds(anon, "invites")).ids.length === 0,
+      );
+
+      // --- clean up so the next run starts where this one did ------------------
+      for (const id of madeInvites) {
+        await admin.from("invites").delete().eq("id", id);
+      }
+      const { ids: leftovers } = await visibleIds(admin, "invites");
+      check(
+        "the test invites are cleaned up",
+        leftovers.length === 0,
+        `${leftovers.length} left behind`,
+      );
+    }
+  }
+
+  // ===========================================================================
   // STANDING GUARD — the barn always has at least one admin (migration 0016)
   //
   // The Team panel's server action already refuses to demote the last admin,

@@ -2,6 +2,8 @@ import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
 import { supabaseConfigured } from "@/lib/env";
+import { featureEnabled } from "@/config/barn";
+import type { Invite } from "@/lib/invites";
 import type { Family, Level, Profile, Rider } from "@/lib/types";
 
 /**
@@ -110,6 +112,29 @@ export async function listFamiliesWithRiders(): Promise<FamilyWithRiders[]> {
   }
 
   return families.map((family) => ({ ...family, riders: byFamily.get(family.id) ?? [] }));
+}
+
+/**
+ * Every invite, newest first.
+ *
+ * Reads through the caller's own session, so the admin-only SELECT policy is
+ * what returns rows — a staff or parent session gets an empty list rather than
+ * an error, which is the correct answer and not one this function has to
+ * decide. Returns [] when the flag is off so the panel can render before the
+ * migration is applied.
+ */
+export async function listInvites(): Promise<Invite[]> {
+  if (!supabaseConfigured() || !featureEnabled("invites")) return [];
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("invites")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  // A missing table is the expected state until migration 0017 is applied.
+  if (error) return [];
+  return (data ?? []) as Invite[];
 }
 
 export async function listLevels(): Promise<Level[]> {

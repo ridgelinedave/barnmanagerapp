@@ -13,8 +13,15 @@
 `events` are on. The `design-pass` branch is **merged in** (fast-forward, no
 conflicts), and the **Team panel** is built on top of it.
 
-**Suite: 532 passed, 0 failed, 0 skipped**, run twice with no re-seed. Advisor
-**clean across 8 lints**. Plus `test:pdf` (12) and `test:ical` (30).
+**Suite: 533 passed, 0 failed, 1 section SKIPPED**, run twice with no re-seed.
+Advisor **clean across 8 lints**. Plus `test:pdf` (12), `test:ical` (30) and
+`test:invites` (27).
+
+**The skip is deliberate and is not a pass.** The invites section is gated on
+its table existing, and migration 0017 is written but NOT applied pending
+David's audit. The suite says so itself rather than reporting green:
+*"All runnable policy assertions passed — but a section was SKIPPED, so this is
+not a full pass."* Applying 0017 turns that section on with no other change.
 
 The green gate is now one command, and it includes the Advisor:
 
@@ -33,6 +40,7 @@ npm run db:gate    # seed → test:policies → test:policies (no re-seed) → d
 | — design pass (UI only) | — | — | Merged |
 | — Team panel (admin UI) | **none needed** | — | Live |
 | — at-least-one-admin rule | 0016 | — | Live |
+| — invites / provisioning | **0017 NOT APPLIED** | `invites` **off** | Awaiting audit |
 
 ---
 
@@ -101,6 +109,109 @@ Measured at **390px and 320px**: no overflow, no target under 44px, no AA
 contrast failure — including inside all 30 bottom sheets, which had to be
 force-opened to measure because a closed `<dialog>` is `display:none`. **Zero
 emoji** in the rendered page.
+
+---
+
+## Invites / provisioning — BUILT, NOT LIVE, awaiting audit
+
+**Nothing about this slice is switched on.** Migration 0017 is written and not
+applied; `features.invites` is `false`; `_ALL.generated.sql` has deliberately
+NOT been regenerated, because that file is the paste-to-set-up bundle and
+regenerating it would smuggle an unaudited migration into it.
+
+**The shape, and why it is forced.** `profiles.user_id` is NOT NULL and
+references `auth.users`, so a profile cannot exist before its login does. But
+the barn owner has to decide the role, the family and the flags *before* the
+person has an account. Those decisions therefore need somewhere to live in the
+meantime — that is the whole reason `invites` exists. The profile is created at
+the moment of claim, from the invite row.
+
+**The token is a bearer credential**, the same class of thing as
+`ical_tokens.token`: holding it is the entire authorisation to create an account
+with the role written on it. Same guard shape, same reasoning — the client can
+never choose it (`invites_token_guard` mints it on insert AND on regeneration),
+and staff cannot even *read* the table, because a readable token is an account
+someone else can create.
+
+**What the claim route does**, in order, and why each step is where it is:
+
+1. **Load by token, pending only.** Expired / revoked / used / malformed /
+   nonexistent all return null and all produce one identical sentence. Naming
+   the reason would confirm a guessed token was real, and "already used" would
+   confirm there is an account to go after.
+2. **Claim atomically.** A conditional `update … where accepted_at is null and
+   revoked_at is null and expires_at > now()`. That single statement IS the
+   lock: two simultaneous submits race on it and exactly one matches. The claim
+   is **released** if account creation then fails, so a mistyped password does
+   not burn the invite.
+3. **Create the auth user** with `email_confirm: true` — the invite link is the
+   verification, an admin handed it to someone they know. A duplicate email is
+   detected by `createUser` itself rather than by pre-scanning the user list:
+   the scan would be a paginated read of every user on every claim and would
+   *still* be a race. Duplicates are **refused, never linked** — linking would
+   let anyone holding a link escalate an account they do not own.
+4. **Create the profile from the INVITE.** Every value comes from the invite
+   row. The action never reads `role`, `family_id` or the flags from
+   `formData`, so an invitee posting `role=admin` is not rejected — they are
+   simply not consulted. If the profile insert fails, the auth user is
+   **deleted** as well: a login with no profile is a person who can sign in,
+   reach nothing but `/account-pending`, and never retry.
+5. **Sign in** through the cookie-bound client, not the admin one.
+
+⚠ Like the iCal feed, this route runs **unauthenticated with the service role**,
+so RLS protects nothing there and the checks above *are* the boundary. Both the
+route and `lib/invites-server.ts` say so at the top.
+
+**Expiry is 14 days**, as `INVITE_LIFETIME_DAYS` in `lib/invites.ts` — not in
+`config/barn.ts`, because it is a product rule rather than a barn fact; a second
+barn should inherit it, not be asked. The column is NOT NULL with **no default**
+so the rule cannot quietly live in two places.
+
+**Status is derived, never stored** — "expired" is the one status that arrives
+on its own, with no write to trigger an update.
+
+### A real finding this turned up, verified not assumed
+
+`public.has_permission()` short-circuits to true for admin and otherwise reads
+the flag column **without checking that the role is staff**. So a *parent* row
+carrying `manage_horses = true` genuinely holds barn-wide write permission.
+
+Confirmed against the live database, control first: with the flag off the
+parent's insert into `horses` was refused; with it on, **the insert landed**.
+(The first attempt at this probe read back with `.select()` and appeared to
+disprove it — the read-back fails the SELECT policy for a barn-owned horse, so
+it was a false negative. Worth recording, because the same trap will catch the
+next person.)
+
+Nothing exploits this today: the Team panel never sets a flag on a parent, and
+migration 0017's `invites_flags_only_for_staff` CHECK now refuses the
+combination on the one path that creates a profile from stored values.
+**But `profiles` itself still has no equivalent guard.** Listed under WHAT NEEDS
+DAVID as its own small migration, deliberately not folded into this slice.
+
+### Tests
+
+`tests/invites.test.mjs` — **27 assertions, no database**: status precedence
+(accepted beats revoked beats expired; accepted survives expiry), the expiry
+boundary in both directions, flag normalisation per role, the share message, and
+a check that the invalid-token string contains none of *expire / revoke / used /
+already / exist / accept*.
+
+The RLS suite's `invites` section (**skipped until 0017 is applied**) covers what
+the database guarantees: a client-chosen token is overwritten on insert and on
+regenerate, `created_by` is pinned, the three CHECKs refuse an incoherent invite,
+the claim predicate matches exactly one pending row and **zero** on a second
+attempt, and staff / parent / anon cannot read, create, revoke or delete.
+
+It is tested through the **admin session, not the service role** — this suite's
+standing rule is that it never uses the service key, because a test that
+bypasses RLS proves nothing about RLS. The claim predicate is identical either
+way.
+
+**What the tests do NOT cover, stated rather than implied:** the claim route's
+own logic — that it never reads the role from the request, and that a duplicate
+email is refused. That needs an HTTP-level run against an applied migration.
+The commands are in WHAT NEEDS DAVID.
 
 ---
 
@@ -227,7 +338,41 @@ shows phase was not started.
 
 ## WHAT NEEDS DAVID
 
-0. **Confirm the rider age brackets** (Team panel, section B). `config/barn.ts`
+**A. Audit migration 0017 and the claim route, then switch invites on.**
+Nothing is applied and nothing is on. After the audit, in order:
+
+```bash
+npm run db:apply -- supabase/migrations/20260731000200_invites.sql
+npm run db:combine          # _ALL was deliberately left stale until now
+npm run db:gate             # the invites section switches itself on
+npm run db:verify           # `invites` moves from pending to checked
+```
+
+Then flip `features.invites` to `true` in `config/barn.ts` and move `invites`
+from `PENDING_TABLES` to `EXPECTED_TABLES` in `scripts/db-verify.mjs`.
+
+**Then run the two end-to-end checks the suite cannot reach** (they need the
+route, not the table): create an invite in the panel, open the link, and (i)
+submit with a browser-tampered `role=admin` field — the profile must come out
+with the invited role; (ii) claim with an email that already has an account —
+must be refused, not linked.
+
+**B. A separate small migration, not folded into this slice.**
+`has_permission()` honours a `manage_*` flag on a **parent** row — verified, see
+above. `profiles` has no CHECK stopping that combination the way `invites` now
+does. The fix mirrors 0017:
+
+```sql
+alter table public.profiles add constraint profiles_flags_only_for_staff
+  check (role <> 'parent'
+         or (manage_shows = false and manage_schedule = false and manage_horses = false));
+```
+
+Nothing sets it today, so this is a latch on a door nobody is currently opening
+— but it is the kind of thing that hides. Your call whether it rides with 0017
+or goes on its own.
+
+1. **Confirm the rider age brackets** (Team panel, section B). `config/barn.ts`
    → `riderAgeGroups` currently reads **10 & under / 11–13 / 14–17 / Adult**.
    Those are common show divisions, **not Belle's** — they are a placeholder,
    marked as one in the config and on the screen itself. Different disciplines
@@ -662,9 +807,10 @@ npm run db:apply -- <f>  # apply a migration
 npm run db:seed          # test fixtures
 npm run db:gate          # THE GREEN GATE: seed → policies → policies → advisor
 npm run db:advisor       # Supabase security lints (splinter), DB-level only
-npm run test:policies    # the 532-assertion RLS suite
+npm run test:policies    # the RLS suite (533 + the invites section once 0017 lands)
 npm run test:pdf         # PDF structure (12)
 npm run test:ical        # feed format, DST conversion, feed scoping (30)
+npm run test:invites     # invite status, expiry, flag rules, the one bad-token message (27)
 npm run demo:seed        # walkthrough data  (-- --clean to remove)
 ```
 
