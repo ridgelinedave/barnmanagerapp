@@ -1,7 +1,9 @@
-import Link from "next/link";
 import { TabPage } from "@/components/TabPage";
 import { StubScreen } from "@/components/StubScreen";
 import { TaskCard } from "@/components/TaskCard";
+import { EmptyState, SectionHeader } from "@/components/ui/primitives";
+import { ListRow } from "@/components/ui/ListRow";
+import { Icon } from "@/components/ui/Icon";
 import { requireTab } from "@/lib/guard";
 import { listTasksForDate } from "@/lib/tasks";
 import { barnToday, formatBarnDayLabel } from "@/lib/dates";
@@ -34,48 +36,52 @@ export default async function TasksPage() {
   return (
     <TabPage title="Tasks">
       {featureEnabled("horses") && (
-        <Link
+        <ListRow
           href="/tasks/feed"
-          className="flex min-h-16 items-center gap-3 rounded-2xl border border-brand-ink/10 bg-white p-4"
-        >
-          <span className="flex-1">
-            <span className="block text-base font-semibold">Feed board</span>
-            <span className="block text-sm text-brand-ink/60">
-              Who eats what, morning, lunch and evening.
+          title="Feed board"
+          meta="Who eats what, morning, lunch and evening"
+          leading={
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-control bg-sunk text-gold-deep">
+              <Icon name="bucket" className="size-5" />
             </span>
-          </span>
-          <span aria-hidden="true" className="text-brand-ink/40">
-            ›
-          </span>
-        </Link>
+          }
+        />
       )}
 
-      <div className="flex items-baseline gap-2">
-        <h2 className="text-base font-semibold">{formatBarnDayLabel(today)}</h2>
-        <p className="text-sm text-brand-ink/60">
-          {open.length === 0
+      <SectionHeader
+        title={formatBarnDayLabel(today)}
+        count={
+          open.length === 0
             ? tasks.length === 0
               ? "Nothing assigned"
               : "All done"
-            : `${open.length} to do`}
-        </p>
-      </div>
+            : `${open.length} to do`
+        }
+      />
 
       {tasks.length === 0 ? (
-        <p className="rounded-2xl border border-brand-ink/10 bg-white p-4 text-sm text-brand-ink/70">
-          No tasks assigned to you today.
-        </p>
+        <EmptyState
+          title="Nothing on your list"
+          body="Belle assigns the day's jobs from Manage. When something lands with your name on it, it shows up here."
+          emoji="✅"
+        />
       ) : (
         <>
           {open.map((task) => (
             <TaskCard key={task.id} task={task} />
           ))}
 
+          {open.length === 0 && (
+            <EmptyState
+              title="That's the lot"
+              body="Everything assigned to you today is ticked off. Nice work."
+              emoji="🎉"
+            />
+          )}
+
           {done.length > 0 && (
             <>
-              <h3 className="mt-2 text-sm font-semibold text-brand-ink/60">
-                Done ({done.length})
-              </h3>
+              <SectionHeader title="Done" count={`${done.length}`} />
               {done.map((task) => (
                 <TaskCard key={task.id} task={task} />
               ))}

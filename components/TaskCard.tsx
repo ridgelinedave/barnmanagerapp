@@ -1,6 +1,8 @@
 "use client";
 
 import { useActionState } from "react";
+import { Chip } from "@/components/ui/primitives";
+import { Icon } from "@/components/ui/Icon";
 import { setTaskDone, type CompleteState } from "@/app/(app)/tasks/actions";
 import type { Task } from "@/lib/types";
 
@@ -31,51 +33,56 @@ export function TaskCard({
       <input type="hidden" name="id" value={task.id} />
       <input type="hidden" name="done" value={done ? "false" : "true"} />
 
+      {/*
+       * The whole card is the button. A 56px row you can hit anywhere beats a
+       * 24px checkbox you have to aim at — these get ticked off one-handed, in
+       * gloves, often in the dark.
+       */}
       <button
         type="submit"
         disabled={pending}
         aria-pressed={done}
-        className={`flex min-h-14 w-full items-start gap-3 rounded-2xl border p-4 text-left disabled:opacity-60 ${
-          done ? "border-brand-ink/10 bg-brand-ink/5" : "border-brand-ink/15 bg-white"
+        className={`flex min-h-14 w-full items-start gap-3 rounded-card border p-4 text-left transition-[transform,opacity] duration-150 ease-out active:scale-[0.99] disabled:opacity-60 ${
+          done ? "border-line bg-sunk" : "border-line bg-surface"
         }`}
       >
         <span
           aria-hidden="true"
           className={`mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full border-2 ${
-            done ? "border-brand-gold-deep bg-brand-gold-deep text-white" : "border-brand-ink/30"
+            done ? "border-forest bg-forest text-white" : "border-muted/50"
           }`}
         >
-          {done && (
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="size-4">
-              <path d="m5 12.5 4.5 4.5L19 7" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          )}
+          {done && <Icon name="check" className="size-4" strokeWidth={3} />}
         </span>
 
         <span className="min-w-0 flex-1">
           <span
-            className={`block text-base font-semibold leading-snug ${
-              done ? "text-brand-ink/50 line-through" : ""
+            className={`block font-display text-heading leading-snug ${
+              done ? "text-muted line-through" : "text-ink"
             }`}
           >
             {task.title}
           </span>
           {task.description && (
-            <span className="mt-0.5 block text-sm text-brand-ink/70">{task.description}</span>
+            <span className="mt-0.5 block text-caption text-muted">{task.description}</span>
           )}
           {showAssignee && (
-            <span className="mt-1 block text-xs text-brand-ink/55">
-              {assigneeName ? `Assigned to ${assigneeName}` : "Unassigned"}
+            <span className="mt-1.5 block">
+              <Chip
+                value={assigneeName ?? "Unassigned"}
+                icon={assigneeName ? "check" : "alert"}
+                tone={assigneeName ? "neutral" : "gold"}
+              />
             </span>
           )}
           {state.error && (
-            <span role="alert" className="mt-1 block text-xs font-medium text-red-700">
+            <span role="alert" className="mt-1 block text-caption font-medium text-danger">
               {state.error}
             </span>
           )}
         </span>
 
-        <span className="shrink-0 self-center text-xs font-semibold uppercase tracking-wide text-brand-ink/45">
+        <span className="shrink-0 self-center font-display text-eyebrow uppercase text-muted">
           {pending ? "…" : done ? "Undo" : "Done"}
         </span>
       </button>

@@ -1,7 +1,10 @@
-import Link from "next/link";
 import { TabPage } from "@/components/TabPage";
 import { TaskCard } from "@/components/TaskCard";
 import { AdHocTaskForm, GenerateTasksButton, TaskTemplateForm } from "@/components/TaskAdmin";
+import { Card, Chip, EmptyState, SectionHeader } from "@/components/ui/primitives";
+import { Button } from "@/components/ui/Button";
+import { Select } from "@/components/ui/Field";
+import { SheetTrigger } from "@/components/ui/Sheet";
 import { requireTab } from "@/lib/guard";
 import { listTasksForDate, listTaskTemplates, listAssignableProfiles, nameMap } from "@/lib/tasks";
 import { barnToday, formatBarnDayLabel, WEEKDAY_NAMES } from "@/lib/dates";
@@ -29,15 +32,17 @@ export default async function ManageTasksPage() {
   const people = assignable.map((p) => ({ id: p.id, name: p.full_name ?? "Unnamed" }));
 
   return (
-    <TabPage title="Tasks">
+    <TabPage title="Tasks" back="/manage">
       <section className="flex flex-col gap-3">
-        <h2 className="text-base font-semibold">{formatBarnDayLabel(today)}</h2>
+        <SectionHeader title={formatBarnDayLabel(today)} count={`${tasks.length} on the list`} />
         <GenerateTasksButton />
 
         {tasks.length === 0 ? (
-          <p className="rounded-2xl border border-brand-ink/10 bg-white p-4 text-sm text-brand-ink/70">
-            Nothing scheduled today. Generate from templates, or add a one-off below.
-          </p>
+          <EmptyState
+            title="Nothing scheduled today"
+            body="Generate the day from your recurring templates, or add a one-off below if something has come up."
+            emoji="📋"
+          />
         ) : (
           tasks.map((task) => (
             <div key={task.id} className="flex flex-col gap-2">
@@ -47,16 +52,16 @@ export default async function ManageTasksPage() {
                 assigneeName={task.assignee ? names.get(task.assignee) : undefined}
               />
               <div className="flex flex-wrap items-center gap-2">
-                <form action={assignTask} className="flex flex-1 items-center gap-2">
+                <form action={assignTask} className="flex min-w-0 flex-1 items-center gap-2">
                   <input type="hidden" name="id" value={task.id} />
                   <label htmlFor={`assign-${task.id}`} className="sr-only">
                     Assign {task.title}
                   </label>
-                  <select
+                  <Select
                     id={`assign-${task.id}`}
                     name="assignee"
                     defaultValue={task.assignee ?? ""}
-                    className="min-h-11 flex-1 rounded-xl border border-brand-ink/20 bg-white px-3 text-sm"
+                    className="min-w-0 flex-1"
                   >
                     <option value="">Unassigned</option>
                     {people.map((person) => (
@@ -64,22 +69,16 @@ export default async function ManageTasksPage() {
                         {person.name}
                       </option>
                     ))}
-                  </select>
-                  <button
-                    type="submit"
-                    className="min-h-11 rounded-xl border border-brand-ink/20 bg-white px-3 text-sm font-semibold"
-                  >
+                  </Select>
+                  <Button type="submit" variant="secondary">
                     Assign
-                  </button>
+                  </Button>
                 </form>
                 <form action={deleteTask}>
                   <input type="hidden" name="id" value={task.id} />
-                  <button
-                    type="submit"
-                    className="min-h-11 rounded-xl border border-red-300 bg-white px-3 text-sm font-semibold text-red-700"
-                  >
+                  <Button type="submit" variant="danger">
                     Delete
-                  </button>
+                  </Button>
                 </form>
               </div>
             </div>
@@ -87,77 +86,64 @@ export default async function ManageTasksPage() {
         )}
       </section>
 
-      <section className="flex flex-col gap-3 rounded-2xl border border-brand-ink/10 bg-white p-4">
-        <h2 className="text-base font-semibold">Add a one-off task</h2>
+      {/* A one-off is an exception — pulled up when needed, not parked here. */}
+      <SheetTrigger label="Add a one-off task" title="One-off task">
         <AdHocTaskForm assignable={people} />
-      </section>
+      </SheetTrigger>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-base font-semibold">Recurring templates</h2>
+        <SectionHeader title="Recurring templates" count={`${templates.length}`} />
 
         {templates.length === 0 ? (
-          <p className="rounded-2xl border border-brand-ink/10 bg-white p-4 text-sm text-brand-ink/70">
-            No templates yet.
-          </p>
+          <EmptyState
+            title="No templates yet"
+            body="Set up the jobs that happen every day or every week — stalls, turnout, water — and the day generates itself from them."
+            emoji="🔁"
+          />
         ) : (
           templates.map((template) => (
-            <div
+            <Card
               key={template.id}
-              className={`rounded-2xl border p-4 ${
-                template.active ? "border-brand-ink/15 bg-white" : "border-brand-ink/10 bg-brand-ink/5"
-              }`}
+              className={`p-4 ${template.active ? "" : "bg-sunk"}`}
             >
               <div className="flex items-start gap-2">
                 <div className="min-w-0 flex-1">
-                  <h3 className="text-base font-semibold leading-snug">{template.title}</h3>
-                  <p className="mt-0.5 text-sm text-brand-ink/70">
+                  <h3 className="font-display text-heading leading-snug text-ink">
+                    {template.title}
+                  </h3>
+                  <p className="mt-0.5 text-caption text-muted">
                     {recurrenceLabel(template.recurrence, template.weekday)}
                     {template.default_assignee
                       ? ` · ${names.get(template.default_assignee) ?? "Unknown"}`
                       : " · Unassigned"}
                   </p>
                 </div>
-                {!template.active && (
-                  <span className="rounded-full bg-brand-ink/10 px-2 py-0.5 text-[11px] font-semibold text-brand-ink/70">
-                    Paused
-                  </span>
-                )}
+                {!template.active && <Chip value="Paused" icon="clock" tone="neutral" />}
               </div>
 
               <div className="mt-3 flex gap-2">
                 <form action={setTemplateActive} className="flex-1">
                   <input type="hidden" name="id" value={template.id} />
                   <input type="hidden" name="active" value={template.active ? "false" : "true"} />
-                  <button
-                    type="submit"
-                    className="min-h-11 w-full rounded-xl border border-brand-ink/20 bg-white text-sm font-semibold"
-                  >
+                  <Button type="submit" variant="secondary" block>
                     {template.active ? "Pause" : "Resume"}
-                  </button>
+                  </Button>
                 </form>
                 <form action={deleteTaskTemplate}>
                   <input type="hidden" name="id" value={template.id} />
-                  <button
-                    type="submit"
-                    className="min-h-11 rounded-xl border border-red-300 bg-white px-3 text-sm font-semibold text-red-700"
-                  >
+                  <Button type="submit" variant="danger">
                     Delete
-                  </button>
+                  </Button>
                 </form>
               </div>
-            </div>
+            </Card>
           ))
         )}
       </section>
 
-      <section className="flex flex-col gap-3 rounded-2xl border border-brand-ink/10 bg-white p-4">
-        <h2 className="text-base font-semibold">New recurring template</h2>
+      <SheetTrigger label="New recurring template" title="Recurring template">
         <TaskTemplateForm assignable={people} />
-      </section>
-
-      <Link href="/manage" className="py-2 text-center text-sm font-medium underline">
-        Back to Manage
-      </Link>
+      </SheetTrigger>
     </TabPage>
   );
 }
