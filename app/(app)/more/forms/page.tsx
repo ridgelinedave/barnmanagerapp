@@ -13,11 +13,11 @@ export default async function FormsPage() {
   if (!featureEnabled("forms")) {
     return (
       <TabPage title="Forms">
-        <StubScreen heading="Forms" phase="Phase 2">
-          <p className="text-sm text-brand-ink/70">
-            Waivers and barn paperwork, filled in and signed on your phone, land here.
-          </p>
-        </StubScreen>
+        <StubScreen
+          heading="Forms"
+          phase="Phase 2"
+          detail="Waivers and barn paperwork, filled in and signed on your phone."
+        />
       </TabPage>
     );
   }

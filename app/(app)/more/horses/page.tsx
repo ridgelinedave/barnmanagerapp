@@ -28,13 +28,15 @@ export default async function HorseDirectoryPage() {
   if (!featureEnabled("horses")) {
     return (
       <TabPage title="Horses">
-        <StubScreen heading="Horses" phase="Phase 2">
-          <p className="text-sm text-brand-ink/70">
-            {role === "parent"
-              ? "Your horse's record and feed chart land here."
-              : "The horse directory and feed charts land here."}
-          </p>
-        </StubScreen>
+        <StubScreen
+          heading="Horses"
+          phase="Phase 2"
+          detail={
+            role === "parent"
+              ? "Your horse's record and feed chart."
+              : "The horse directory and feed charts."
+          }
+        />
       </TabPage>
     );
   }

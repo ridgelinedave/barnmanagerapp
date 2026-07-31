@@ -14,11 +14,11 @@ export default async function ManageFormsPage() {
   if (!featureEnabled("forms")) {
     return (
       <TabPage title="Forms">
-        <StubScreen heading="Forms" phase="Phase 2">
-          <p className="text-sm text-brand-ink/70">
-            Waiver templates, who has signed, and the signed-copy vault land here.
-          </p>
-        </StubScreen>
+        <StubScreen
+          heading="Forms"
+          phase="Phase 2"
+          detail="Waiver templates, who has signed, and the signed-copy vault."
+        />
       </TabPage>
     );
   }

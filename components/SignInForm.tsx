@@ -3,6 +3,9 @@
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
+import { Callout } from "@/components/ui/primitives";
+import { Button } from "@/components/ui/Button";
+import { Field, FormFeedback, Input } from "@/components/ui/Field";
 import { createClient } from "@/lib/supabase/client";
 import { supabaseConfigured } from "@/lib/env";
 import { barn } from "@/config/barn";
@@ -70,118 +73,106 @@ export function SignInForm() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-sm flex-col gap-6 px-5 py-10">
-      <div className="flex flex-col items-center gap-3 text-center">
+    <div className="flex min-h-dvh flex-col">
+      {/*
+       * The crest on its own charcoal field, exactly as it appears on the
+       * launch screen and the sign. Opening the app and signing in should feel
+       * like the same door, not two different ones.
+       */}
+      <div className="safe-top bg-chrome px-5 pb-9 pt-12 text-center">
         <Image
           src={barn.brand.logoSrc}
-          alt={barn.name}
-          width={64}
-          height={64}
+          alt=""
+          width={72}
+          height={72}
           priority
-          className="size-16"
+          className="mx-auto size-18"
         />
-        <div>
-          <h1 className="text-xl font-semibold">{barn.name}</h1>
-          <p className="mt-1 text-sm text-brand-ink/70">Sign in to your barn account.</p>
-        </div>
+        <h1 className="mt-3 font-display text-display text-white">{barn.name}</h1>
+        <p className="mt-1 text-caption text-white/70">Sign in to your barn account</p>
       </div>
 
-      {!configured && (
-        <p
-          role="status"
-          className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"
+      <div className="mx-auto flex w-full max-w-sm flex-1 flex-col gap-5 px-5 py-7">
+        {!configured && (
+          <Callout tone="danger" icon="alert">
+            Supabase isn&apos;t connected yet. Sign-in is wired but will not work until real keys
+            are in <code className="font-mono">.env.local</code>.
+          </Callout>
+        )}
+
+        {/* Segmented control, one gold pill on a sunk track. */}
+        <div
+          role="tablist"
+          aria-label="Sign-in method"
+          className="flex gap-1 rounded-control bg-sunk p-1"
         >
-          Supabase isn&apos;t connected yet. Sign-in is wired but will not work until real keys
-          are in <code className="font-mono">.env.local</code>.
-        </p>
-      )}
-
-      <div role="tablist" aria-label="Sign-in method" className="flex rounded-xl bg-white p-1">
-        {(
-          [
-            ["magic", "Email link"],
-            ["password", "Password"],
-          ] as const
-        ).map(([value, label]) => (
-          <button
-            key={value}
-            role="tab"
-            type="button"
-            aria-selected={mode === value}
-            onClick={() => {
-              setMode(value);
-              setError(null);
-              setSent(false);
-            }}
-            className={`min-h-11 flex-1 rounded-lg text-sm font-semibold ${
-              mode === value ? "bg-brand-gold text-brand-ink" : "text-brand-ink/70"
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
-      <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate={false}>
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="email" className="text-sm font-medium">
-            Email
-          </label>
-          <input
-            id="email"
-            name="email"
-            type="email"
-            required
-            autoComplete="email"
-            inputMode="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            className="min-h-12 rounded-xl border border-brand-ink/20 bg-white px-3 text-base"
-          />
+          {(
+            [
+              ["magic", "Email link"],
+              ["password", "Password"],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              role="tab"
+              type="button"
+              aria-selected={mode === value}
+              onClick={() => {
+                setMode(value);
+                setError(null);
+                setSent(false);
+              }}
+              className={`min-h-11 flex-1 rounded-[0.5rem] text-label font-semibold transition-colors duration-150 ease-out ${
+                mode === value ? "bg-gold text-ink" : "text-muted"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
         </div>
 
-        {mode === "password" && (
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="password" className="text-sm font-medium">
-              Password
-            </label>
-            <input
-              id="password"
-              name="password"
-              type="password"
+        <form onSubmit={onSubmit} className="flex flex-col gap-4">
+          <Field label="Email" htmlFor="email">
+            <Input
+              id="email"
+              name="email"
+              type="email"
               required
-              autoComplete="current-password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              className="min-h-12 rounded-xl border border-brand-ink/20 bg-white px-3 text-base"
+              autoComplete="email"
+              inputMode="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
             />
-          </div>
-        )}
+          </Field>
 
-        {error && (
-          <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-800">
-            {error}
-          </p>
-        )}
+          {mode === "password" && (
+            <Field label="Password" htmlFor="password">
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                required
+                autoComplete="current-password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+              />
+            </Field>
+          )}
 
-        {sent && (
-          <p role="status" className="rounded-xl bg-green-50 p-3 text-sm text-green-900">
-            Check your email for a sign-in link.
-          </p>
-        )}
+          <FormFeedback
+            error={error}
+            message={sent ? "Check your email for a sign-in link." : null}
+          />
 
-        <button
-          type="submit"
-          disabled={busy}
-          className="min-h-12 rounded-xl bg-brand-gold px-4 text-base font-semibold text-brand-ink disabled:opacity-60"
-        >
-          {busy ? "Working…" : mode === "magic" ? "Email me a link" : "Sign in"}
-        </button>
-      </form>
+          <Button type="submit" variant="primary" block disabled={busy}>
+            {busy ? "Working…" : mode === "magic" ? "Email me a link" : "Sign in"}
+          </Button>
+        </form>
 
-      <p className="text-center text-xs text-brand-ink/60">
-        Accounts are created by the barn. Contact {barn.owner} if you need access.
-      </p>
+        <p className="mt-auto text-center text-caption text-muted">
+          Accounts are created by the barn. Contact {barn.owner} if you need access.
+        </p>
+      </div>
     </div>
   );
 }

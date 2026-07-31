@@ -1,9 +1,12 @@
 import { headers } from "next/headers";
-import Link from "next/link";
 import { TabPage } from "@/components/TabPage";
 import { StubScreen } from "@/components/StubScreen";
 import { InstallPrompt } from "@/components/InstallPrompt";
 import { CalendarSubscribe } from "@/components/CalendarSubscribe";
+import { Card, FactList, SectionHeader } from "@/components/ui/primitives";
+import { ListRow } from "@/components/ui/ListRow";
+import { Button } from "@/components/ui/Button";
+import { Icon, type IconName } from "@/components/ui/Icon";
 import { currentRole } from "@/lib/guard";
 import { getViewer } from "@/lib/session";
 import { myCalendarToken } from "@/lib/events";
@@ -21,16 +24,31 @@ export const metadata = { title: "More" };
 async function baseUrl(): Promise<string> {
   const headerList = await headers();
   const host = headerList.get("x-forwarded-host") ?? headerList.get("host") ?? "localhost:3000";
-  const protocol = headerList.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
+  const protocol =
+    headerList.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
   return `${protocol}://${host}`;
 }
 
-const MORE_BY_ROLE = {
-  parent: "Family profile and riders, forms and documents, FAQ, resources, shop, and notification preferences land here.",
-  staff: "Your timesheet history, the horse directory, and FAQ land here.",
-  admin:
-    "Barn settings, QuickBooks connection status, notification preferences, and CSV utilities land here.",
+const STILL_TO_COME = {
+  parent: "Family profile and riders, FAQ, resources and notification preferences",
+  staff: "The FAQ and your notification preferences",
+  admin: "Barn settings, QuickBooks connection and CSV utilities",
 } as const;
+
+function Row({ href, title, meta, icon }: { href: string; title: string; meta: string; icon: IconName }) {
+  return (
+    <ListRow
+      href={href}
+      title={title}
+      meta={meta}
+      leading={
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-control bg-sunk text-gold-deep">
+          <Icon name={icon} className="size-5" />
+        </span>
+      }
+    />
+  );
+}
 
 export default async function MorePage() {
   const role = await currentRole();
@@ -39,6 +57,9 @@ export default async function MorePage() {
   // viewer has none, so the block simply does not render for them.
   const state = await getViewer();
   const profileId = state.status === "viewer" ? state.viewer.profile?.id : undefined;
+  const email = state.status === "viewer" ? state.viewer.email : null;
+  const name = state.status === "viewer" ? state.viewer.profile?.full_name : null;
+
   const calendarUrl =
     featureEnabled("events") && profileId
       ? await (async () => {
@@ -47,102 +68,102 @@ export default async function MorePage() {
         })()
       : null;
 
+  const hasLinks =
+    (featureEnabled("clockIn") && role !== "parent") ||
+    featureEnabled("horses") ||
+    (featureEnabled("forms") && role === "parent");
+
   return (
     <TabPage title="More">
-      <StubScreen heading="More" phase="Phases 1–3">
-        <p className="text-sm text-brand-ink/70">{MORE_BY_ROLE[role]}</p>
-      </StubScreen>
-
-      {featureEnabled("clockIn") && role !== "parent" && (
-        <Link
-          href="/more/timesheet"
-          className="flex min-h-16 items-center gap-3 rounded-2xl border border-brand-ink/10 bg-white p-4"
-        >
-          <span className="flex-1">
-            <span className="block text-base font-semibold">My timesheet</span>
-            <span className="block text-sm text-brand-ink/60">
-              Your punches and approved hours.
+      {/* Who you are signed in as, first — this is the screen people come to
+          when they are not sure. */}
+      {(name || email) && (
+        <Card className="flex items-center gap-3 p-4">
+          <span
+            aria-hidden="true"
+            className="flex size-11 shrink-0 items-center justify-center rounded-full bg-gold font-display text-heading font-bold text-ink"
+          >
+            {(name ?? email ?? "?").trim().charAt(0).toUpperCase()}
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-display text-heading text-ink">{name ?? "Your account"}</span>
+            <span className="block truncate text-caption text-muted">
+              {email} · <span className="capitalize">{role}</span>
             </span>
           </span>
-          <span aria-hidden="true" className="text-brand-ink/40">
-            ›
-          </span>
-        </Link>
+        </Card>
       )}
 
-      {featureEnabled("horses") && (
-        <Link
-          href="/more/horses"
-          className="flex min-h-16 items-center gap-3 rounded-2xl border border-brand-ink/10 bg-white p-4"
-        >
-          <span className="flex-1">
-            <span className="block text-base font-semibold">
-              {role === "parent" ? "Your horses" : "Horse directory"}
-            </span>
-            <span className="block text-sm text-brand-ink/60">
-              {role === "parent"
-                ? "Your horse's record and feed chart."
-                : "Every horse at the barn, and what they're fed."}
-            </span>
-          </span>
-          <span aria-hidden="true" className="text-brand-ink/40">
-            ›
-          </span>
-        </Link>
-      )}
-
-      {featureEnabled("forms") && role === "parent" && (
-        <Link
-          href="/more/forms"
-          className="flex min-h-16 items-center gap-3 rounded-2xl border border-brand-ink/10 bg-white p-4"
-        >
-          <span className="flex-1">
-            <span className="block text-base font-semibold">Forms</span>
-            <span className="block text-sm text-brand-ink/60">
-              Barn paperwork — fill in and sign on your phone.
-            </span>
-          </span>
-          <span aria-hidden="true" className="text-brand-ink/40">
-            ›
-          </span>
-        </Link>
+      {hasLinks && (
+        <section className="flex flex-col gap-3">
+          <SectionHeader title="Your things" />
+          {featureEnabled("clockIn") && role !== "parent" && (
+            <Row
+              href="/more/timesheet"
+              title="My timesheet"
+              meta="Your punches and approved hours"
+              icon="clock"
+            />
+          )}
+          {featureEnabled("horses") && (
+            <Row
+              href="/more/horses"
+              title={role === "parent" ? "Your horses" : "Horse directory"}
+              meta={
+                role === "parent"
+                  ? "Your horse's record and feed chart"
+                  : "Every horse at the barn, and what they're fed"
+              }
+              icon="horse"
+            />
+          )}
+          {featureEnabled("forms") && role === "parent" && (
+            <Row
+              href="/more/forms"
+              title="Forms"
+              meta="Barn paperwork — fill in and sign on your phone"
+              icon="document"
+            />
+          )}
+        </section>
       )}
 
       {calendarUrl && (
-        <section className="flex flex-col gap-3 rounded-2xl border border-brand-ink/10 bg-white p-4">
-          <h2 className="text-base font-semibold">Subscribe to your calendar</h2>
-          <p className="text-sm text-brand-ink/70">
-            {role === "parent"
-              ? "Your riders' lessons and barn events, in your phone's calendar app."
-              : "Every lesson and barn event, in your phone's calendar app."}
-          </p>
-          <CalendarSubscribe url={calendarUrl} />
+        <section className="flex flex-col gap-3">
+          <SectionHeader title="Your calendar" />
+          <Card className="flex flex-col gap-3 p-4">
+            <p className="text-caption text-muted">
+              {role === "parent"
+                ? "Your riders' lessons and barn events, in your phone's calendar app."
+                : "Every lesson and barn event, in your phone's calendar app."}
+            </p>
+            <CalendarSubscribe url={calendarUrl} />
+          </Card>
         </section>
       )}
 
       <InstallPrompt />
 
-      <section className="rounded-2xl border border-brand-ink/10 bg-white p-4">
-        <h2 className="text-base font-semibold">Barn</h2>
-        <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-          <dt className="text-brand-ink/60">Name</dt>
-          <dd>{barn.name}</dd>
-          <dt className="text-brand-ink/60">Owner</dt>
-          <dd>{barn.owner}</dd>
-          <dt className="text-brand-ink/60">Area</dt>
-          <dd>{barn.area}</dd>
-          <dt className="text-brand-ink/60">Timezone</dt>
-          <dd>{barn.timezone}</dd>
-        </dl>
+      <section className="flex flex-col gap-3">
+        <SectionHeader title="The barn" />
+        <Card className="p-4">
+          <FactList
+            facts={[
+              ["Name", barn.name],
+              ["Owner", barn.owner],
+              ["Where", barn.area],
+              ["Timezone", barn.timezone],
+            ]}
+          />
+        </Card>
       </section>
 
+      <StubScreen heading="Still to come" phase="Phases 2–3" detail={STILL_TO_COME[role]} />
+
       <form action="/auth/sign-out" method="post">
-        <button
-          type="submit"
-          className="min-h-12 w-full rounded-xl border border-brand-ink/20 bg-white px-4 text-sm font-semibold"
-        >
+        <Button type="submit" block variant="secondary">
           Sign out
-        </button>
+        </Button>
       </form>
     </TabPage>
   );

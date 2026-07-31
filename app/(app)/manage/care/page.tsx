@@ -16,11 +16,11 @@ export default async function ManageCarePage() {
   if (!featureEnabled("care")) {
     return (
       <TabPage title="Care due">
-        <StubScreen heading="Care due" phase="Phase 2">
-          <p className="text-sm text-brand-ink/70">
-            Vaccines, Coggins, worming and farrier dates — and what&apos;s coming up — land here.
-          </p>
-        </StubScreen>
+        <StubScreen
+          heading="Care due"
+          phase="Phase 2"
+          detail="Vaccines, Coggins, worming and farrier dates, and what is coming up."
+        />
       </TabPage>
     );
   }

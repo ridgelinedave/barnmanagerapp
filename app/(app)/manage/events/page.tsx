@@ -31,12 +31,11 @@ export default async function ManageEventsPage() {
   if (!featureEnabled("events")) {
     return (
       <TabPage title="Calendar">
-        <StubScreen heading="Calendar" phase="Phase 2">
-          <p className="text-sm text-brand-ink/70">
-            Shows, clinics, farrier and vet days, closures — and calendar subscriptions — land
-            here.
-          </p>
-        </StubScreen>
+        <StubScreen
+          heading="Calendar"
+          phase="Phase 2"
+          detail="Shows, clinics, farrier and vet days, closures and calendar subscriptions."
+        />
       </TabPage>
     );
   }

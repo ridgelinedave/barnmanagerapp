@@ -191,9 +191,11 @@ export default async function HomePage() {
 
           <InstallPrompt />
 
-          <StubScreen heading={HOME_BY_ROLE[role].heading} phase={HOME_BY_ROLE[role].phase}>
-            <p className="text-caption text-muted">{HOME_BY_ROLE[role].detail}</p>
-          </StubScreen>
+          <StubScreen
+            heading={HOME_BY_ROLE[role].heading}
+            phase={HOME_BY_ROLE[role].phase}
+            detail={HOME_BY_ROLE[role].detail}
+          />
         </>
       )}
     </TabPage>

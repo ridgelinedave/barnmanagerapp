@@ -14,11 +14,11 @@ export default async function FeedBoardPage() {
   if (!featureEnabled("horses")) {
     return (
       <TabPage title="Feed board">
-        <StubScreen heading="Feed board" phase="Phase 2">
-          <p className="text-sm text-brand-ink/70">
-            The daily feed list, grouped by meal, lands here.
-          </p>
-        </StubScreen>
+        <StubScreen
+          heading="Feed board"
+          phase="Phase 2"
+          detail="The daily feed list, grouped by meal."
+        />
       </TabPage>
     );
   }

@@ -21,12 +21,11 @@ export default async function LessonsPage() {
   if (!featureEnabled("lessons")) {
     return (
       <TabPage title="Lessons">
-        <StubScreen heading="Upcoming lessons" phase="Phase 1">
-          <p className="text-sm text-brand-ink/70">
-            Your riders&apos; lessons, cancellation, the barn calendar, and the iCal subscribe
-            button land here.
-          </p>
-        </StubScreen>
+        <StubScreen
+          heading="Upcoming lessons"
+          phase="Phase 1"
+          detail="Your riders' lessons, cancelling a spot, and the barn calendar."
+        />
       </TabPage>
     );
   }

@@ -15,11 +15,11 @@ export default async function ManageHorsesPage() {
   if (!featureEnabled("horses")) {
     return (
       <TabPage title="Horses">
-        <StubScreen heading="Horses" phase="Phase 2">
-          <p className="text-sm text-brand-ink/70">
-            Horse records, rider assignments and feed charts land here.
-          </p>
-        </StubScreen>
+        <StubScreen
+          heading="Horses"
+          phase="Phase 2"
+          detail="Horse records, rider assignments and feed charts."
+        />
       </TabPage>
     );
   }

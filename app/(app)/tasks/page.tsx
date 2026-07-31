@@ -15,11 +15,11 @@ export default async function TasksPage() {
   if (!featureEnabled("tasks")) {
     return (
       <TabPage title="Tasks">
-        <StubScreen heading="Today's tasks" phase="Phase 1">
-          <p className="text-sm text-brand-ink/70">
-            Task cards, the daily feed list, and quick care logging land here.
-          </p>
-        </StubScreen>
+        <StubScreen
+          heading="Today's tasks"
+          phase="Phase 1"
+          detail="Your job list, the daily feed board and quick care logging."
+        />
       </TabPage>
     );
   }

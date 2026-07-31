@@ -10,13 +10,15 @@ export default async function ShowsPage() {
 
   return (
     <TabPage title="Shows">
-      <StubScreen heading="Shows" phase="Phase 3">
-        <p className="text-sm text-brand-ink/70">
-          {role === "admin"
-            ? "Show creation, status controls, interest tally and nudges, the entries builder, ride times, the show-day thread, and scores land here."
-            : "Interest polls, your rider's tests and ride times, logistics, the show-day thread, and scores land here."}
-        </p>
-      </StubScreen>
+      <StubScreen
+        heading="Shows"
+        phase="Phase 3"
+        detail={
+          role === "admin"
+            ? "Interest polls, the entries builder, ride times, the show-day thread and scores."
+            : "Interest polls, your rider's tests and ride times, logistics and scores."
+        }
+      />
     </TabPage>
   );
 }

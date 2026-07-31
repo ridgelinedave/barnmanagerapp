@@ -16,11 +16,11 @@ export default async function ClockPage() {
   if (!featureEnabled("clockIn")) {
     return (
       <TabPage title="Clock">
-        <StubScreen heading="Clock in and out" phase="Phase 1">
-          <p className="text-sm text-brand-ink/70">
-            The in/out button, GPS capture, today&apos;s punches, and your week total land here.
-          </p>
-        </StubScreen>
+        <StubScreen
+          heading="Clock in and out"
+          phase="Phase 1"
+          detail="The in/out button, today's punches and your week total."
+        />
       </TabPage>
     );
   }
