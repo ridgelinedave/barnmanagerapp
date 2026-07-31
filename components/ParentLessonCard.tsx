@@ -1,6 +1,9 @@
 "use client";
 
 import { useActionState } from "react";
+import { Callout, Card, Chip, ChipRow } from "@/components/ui/primitives";
+import { Button } from "@/components/ui/Button";
+import { FormFeedback } from "@/components/ui/Field";
 import { cancelBooking, type CancelState } from "@/app/(app)/lessons/actions";
 import { formatTime, formatBarnDayLabel } from "@/lib/dates";
 import type { LessonInstance, LessonRider } from "@/lib/types";
@@ -36,38 +39,58 @@ export function ParentLessonCard({
   const byBarn = instance.status === "cancelled";
 
   return (
-    <article
-      className={`rounded-2xl border p-4 ${
-        cancelled ? "border-brand-ink/10 bg-brand-ink/5" : "border-brand-ink/15 bg-white"
-      }`}
-    >
-      <div className="flex flex-wrap items-baseline gap-x-2">
-        <span className="text-base font-semibold">{riderName}</span>
-        {cancelled && (
-          <span className="ml-auto rounded-full bg-brand-ink/10 px-2 py-0.5 text-[11px] font-semibold text-brand-ink/70">
-            {byBarn ? "Cancelled by the barn" : "Cancelled"}
+    <Card as="article" className={`p-4 ${cancelled ? "bg-sunk" : ""}`}>
+      {/*
+       * The date block leads, because a parent scanning this list is looking
+       * for "when", and the rider's name is the answer to "whose".
+       */}
+      <div className="flex items-start gap-3">
+        <span
+          aria-hidden="true"
+          className={`flex size-12 shrink-0 flex-col items-center justify-center rounded-control leading-none ${
+            cancelled ? "bg-line/60" : "bg-gold-soft"
+          }`}
+        >
+          <span className="font-display text-eyebrow uppercase text-gold-deep">
+            {formatBarnDayLabel(instance.date).split(",")[0]}
           </span>
-        )}
+          <span className="font-display text-heading font-bold text-ink">
+            {instance.date.slice(-2)}
+          </span>
+        </span>
+
+        <div className="min-w-0 flex-1">
+          <p
+            className={`font-display text-heading leading-snug ${
+              cancelled ? "text-muted line-through" : "text-ink"
+            }`}
+          >
+            {formatTime(instance.start_time)} · {riderName}
+          </p>
+          <p className="mt-0.5 text-caption text-muted">
+            {formatBarnDayLabel(instance.date)}
+            {instructorName && !cancelled ? ` · with ${instructorName}` : ""}
+          </p>
+          <div className="mt-1.5">
+            <ChipRow>
+              <Chip value={instance.type === "private" ? "Private" : "Group"} />
+              <Chip value={`${instance.duration_min} min`} icon="clock" />
+              {cancelled && (
+                <Chip
+                  value={byBarn ? "Cancelled by the barn" : "Cancelled"}
+                  icon="alert"
+                  tone="danger"
+                />
+              )}
+            </ChipRow>
+          </div>
+        </div>
       </div>
 
-      <p className={`mt-1 text-sm ${cancelled ? "text-brand-ink/50 line-through" : "text-brand-ink/75"}`}>
-        {formatBarnDayLabel(instance.date)} · {formatTime(instance.start_time)} ·{" "}
-        {instance.duration_min} min {instance.type === "private" ? "private" : "group"}
-      </p>
-
-      {instructorName && !cancelled && (
-        <p className="mt-0.5 text-sm text-brand-ink/60">with {instructorName}</p>
-      )}
-
-      {state.message && (
-        <p role="status" className="mt-3 rounded-xl bg-green-50 p-3 text-sm text-green-900">
-          {state.message}
-        </p>
-      )}
-      {state.error && (
-        <p role="alert" className="mt-3 rounded-xl bg-red-50 p-3 text-sm text-red-800">
-          {state.error}
-        </p>
+      {(state.message || state.error) && (
+        <div className="mt-3">
+          <FormFeedback error={state.error} message={state.message} />
+        </div>
       )}
 
       {!cancelled && !state.message && (
@@ -77,21 +100,17 @@ export function ParentLessonCard({
           <input type="hidden" name="start_time" value={instance.start_time} />
 
           {insideCutoff && (
-            <p className="text-xs text-brand-ink/60">
-              This lesson is less than {cutoffHours} hours away. You can still cancel, but the
-              spot is too late to offer to anyone else.
-            </p>
+            <Callout tone="gold" icon="clock">
+              Less than {cutoffHours} hours away. You can still cancel, but the spot is too late
+              to offer to anyone else.
+            </Callout>
           )}
 
-          <button
-            type="submit"
-            disabled={pending}
-            className="min-h-11 rounded-xl border border-brand-ink/25 bg-white px-4 text-sm font-semibold disabled:opacity-60"
-          >
+          <Button type="submit" variant="secondary" block disabled={pending}>
             {pending ? "Cancelling…" : "Cancel this lesson"}
-          </button>
+          </Button>
         </form>
       )}
-    </article>
+    </Card>
   );
 }

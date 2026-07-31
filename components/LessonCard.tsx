@@ -1,3 +1,4 @@
+import { Card, Chip, ChipRow } from "@/components/ui/primitives";
 import type { LessonInstance, LessonRider } from "@/lib/types";
 import { formatTime } from "@/lib/dates";
 
@@ -21,52 +22,51 @@ export function LessonCard({
   const released = (riders ?? []).filter((r) => r.status === "cancelled");
 
   return (
-    <article
-      className={`rounded-2xl border p-4 ${
-        cancelled ? "border-brand-ink/10 bg-brand-ink/5" : "border-brand-ink/15 bg-white"
-      }`}
-    >
-      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+    <Card as="article" className={`p-4 ${cancelled ? "bg-sunk" : ""}`}>
+      {/*
+       * The time is the loudest thing on the card — a day view is read by
+       * scanning down the times, and everything else is qualifier.
+       */}
+      <div className="flex items-baseline gap-2">
         <span
-          className={`text-base font-semibold tabular-nums ${cancelled ? "line-through text-brand-ink/50" : ""}`}
+          className={`font-display text-title leading-none ${
+            cancelled ? "text-muted line-through" : "text-ink"
+          }`}
         >
           {formatTime(instance.start_time)}
         </span>
-        <span className="text-sm text-brand-ink/60">
+        <span className="text-caption text-muted">
           {instance.duration_min} min · {instance.type === "private" ? "Private" : "Group"}
         </span>
-        {cancelled && (
-          <span className="ml-auto rounded-full bg-brand-ink/10 px-2 py-0.5 text-[11px] font-semibold text-brand-ink/70">
-            Cancelled
-          </span>
-        )}
       </div>
 
-      {instructorName && (
-        <p className="mt-1 text-sm text-brand-ink/70">with {instructorName}</p>
+      {(instructorName || cancelled) && (
+        <div className="mt-1.5">
+          <ChipRow>
+            {cancelled && <Chip value="Cancelled" icon="alert" tone="danger" />}
+            {instructorName && <Chip label="With" value={instructorName} />}
+          </ChipRow>
+        </div>
       )}
 
       {riders && (
-        <p className="mt-1 text-sm text-brand-ink/70">
-          {booked.length === 0
-            ? "No riders booked"
-            : booked
-                .map((r) => riderNames?.get(r.rider_id) ?? "Rider")
-                .join(", ")}
+        <p className="mt-2 text-caption text-ink">
+          {booked.length === 0 ? (
+            <span className="text-muted">No riders booked</span>
+          ) : (
+            booked.map((r) => riderNames?.get(r.rider_id) ?? "Rider").join(", ")
+          )}
           {released.length > 0 && (
-            <span className="text-brand-ink/45">
-              {" "}
-              · {released.length} cancelled
-            </span>
+            <span className="text-muted"> · {released.length} cancelled</span>
           )}
         </p>
       )}
 
       {instance.notes && (
-        <p className="mt-1 whitespace-pre-line text-sm text-brand-ink/70">{instance.notes}</p>
+        <p className="mt-1 whitespace-pre-line text-caption text-muted">{instance.notes}</p>
       )}
 
       {children ? <div className="mt-3">{children}</div> : null}
-    </article>
+    </Card>
   );
 }

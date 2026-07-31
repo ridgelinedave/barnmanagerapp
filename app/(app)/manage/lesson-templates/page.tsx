@@ -1,6 +1,8 @@
-import Link from "next/link";
 import { TabPage } from "@/components/TabPage";
 import { LessonTemplateForm } from "@/components/LessonTemplateForm";
+import { Card, Chip, ChipRow, SectionHeader } from "@/components/ui/primitives";
+import { Button } from "@/components/ui/Button";
+import { SheetTrigger } from "@/components/ui/Sheet";
 import { requireTab } from "@/lib/guard";
 import { listLessonTemplates, listLevels } from "@/lib/lessons";
 import { listAssignableProfiles, nameMap } from "@/lib/tasks";
@@ -29,94 +31,82 @@ export default async function LessonTemplatesPage() {
   }));
 
   return (
-    <TabPage title="Weekly schedule">
-      <p className="text-sm text-brand-ink/70">
+    <TabPage title="Weekly schedule" back="/manage">
+      <p className="text-caption text-muted">
         Build the repeating week once. Generate the calendar from the Schedule tab, then edit
         only the days that differ.
       </p>
 
       {byDay.map((day) => (
         <section key={day.name} className="flex flex-col gap-2">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-brand-ink/55">
-            {day.name}
-          </h2>
+          <SectionHeader
+            title={day.name}
+            count={day.slots.length > 0 ? `${day.slots.length}` : undefined}
+          />
 
           {day.slots.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-brand-ink/20 p-3 text-sm text-brand-ink/55">
+            <p className="rounded-control border border-dashed border-line p-3 text-caption text-muted">
               Nothing scheduled
             </p>
           ) : (
             day.slots.map((template) => (
-              <div
-                key={template.id}
-                className={`rounded-2xl border p-4 ${
-                  template.active
-                    ? "border-brand-ink/15 bg-white"
-                    : "border-brand-ink/10 bg-brand-ink/5"
-                }`}
-              >
-                <div className="flex flex-wrap items-baseline gap-x-2">
-                  <span className="text-base font-semibold tabular-nums">
+              <Card key={template.id} className={`p-4 ${template.active ? "" : "bg-sunk"}`}>
+                <div className="flex items-baseline gap-2">
+                  <span className="font-display text-title leading-none text-ink">
                     {formatTime(template.start_time)}
                   </span>
-                  <span className="text-sm text-brand-ink/60">
+                  <span className="text-caption text-muted">
                     {template.duration_min} min ·{" "}
                     {template.type === "private"
                       ? "Private"
                       : `Group of ${template.max_riders}`}
                   </span>
-                  {!template.active && (
-                    <span className="ml-auto rounded-full bg-brand-ink/10 px-2 py-0.5 text-[11px] font-semibold text-brand-ink/70">
-                      Paused
-                    </span>
-                  )}
                 </div>
 
-                <p className="mt-1 text-sm text-brand-ink/70">
-                  {template.instructor_id
-                    ? instructorNames.get(template.instructor_id) ?? "Unknown instructor"
-                    : "No instructor set"}
-                  {template.level_id ? ` · ${levelNames.get(template.level_id) ?? "Level"}` : ""}
-                </p>
+                <div className="mt-1.5">
+                  <ChipRow>
+                    {!template.active && <Chip value="Paused" icon="clock" tone="neutral" />}
+                    <Chip
+                      label="With"
+                      value={
+                        template.instructor_id
+                          ? (instructorNames.get(template.instructor_id) ?? "Unknown")
+                          : "Nobody set"
+                      }
+                    />
+                    {template.level_id && (
+                      <Chip label="Level" value={levelNames.get(template.level_id) ?? "Level"} />
+                    )}
+                  </ChipRow>
+                </div>
 
                 <div className="mt-3 flex gap-2">
                   <form action={setTemplateActive} className="flex-1">
                     <input type="hidden" name="id" value={template.id} />
                     <input type="hidden" name="active" value={template.active ? "false" : "true"} />
-                    <button
-                      type="submit"
-                      className="min-h-11 w-full rounded-xl border border-brand-ink/20 bg-white text-sm font-semibold"
-                    >
+                    <Button type="submit" variant="secondary" block>
                       {template.active ? "Pause" : "Resume"}
-                    </button>
+                    </Button>
                   </form>
                   <form action={deleteLessonTemplate}>
                     <input type="hidden" name="id" value={template.id} />
-                    <button
-                      type="submit"
-                      className="min-h-11 rounded-xl border border-red-300 bg-white px-3 text-sm font-semibold text-red-700"
-                    >
+                    <Button type="submit" variant="danger">
                       Delete
-                    </button>
+                    </Button>
                   </form>
                 </div>
-              </div>
+              </Card>
             ))
           )}
         </section>
       ))}
 
-      <section className="flex flex-col gap-3 rounded-2xl border border-brand-ink/10 bg-white p-4">
-        <h2 className="text-base font-semibold">Add a weekly slot</h2>
+      <SheetTrigger label="Add a weekly slot" title="Weekly slot" variant="primary">
         <LessonTemplateForm
           instructors={people.map((p) => ({ id: p.id, name: p.full_name ?? "Unnamed" }))}
           levels={levels.map((l) => ({ id: l.id, name: l.name }))}
         />
-      </section>
-
-      <Link href="/schedule" className="py-2 text-center text-sm font-medium underline">
-        Back to Schedule
-      </Link>
+      </SheetTrigger>
     </TabPage>
   );
 }

@@ -1,6 +1,8 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { Button } from "@/components/ui/Button";
+import { FormFeedback } from "@/components/ui/Field";
 import {
   createLessonTemplate,
   type TemplateState,
@@ -31,14 +33,14 @@ export function LessonTemplateForm({
   return (
     <form action={formAction} className="flex flex-col gap-3">
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="tpl-weekday" className="text-sm font-medium">
+        <label htmlFor="tpl-weekday" className="text-label font-medium text-ink">
           Day
         </label>
         <select
           id="tpl-weekday"
           name="weekday"
           defaultValue="1"
-          className="min-h-12 rounded-xl border border-brand-ink/20 bg-white px-3 text-base"
+          className="min-h-12 w-full rounded-control border border-line bg-surface px-3 text-body text-ink"
         >
           {WEEKDAY_NAMES.map((name, index) => (
             <option key={name} value={index + 1}>
@@ -49,7 +51,7 @@ export function LessonTemplateForm({
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="tpl-start" className="text-sm font-medium">
+        <label htmlFor="tpl-start" className="text-label font-medium text-ink">
           Start time
         </label>
         <input
@@ -57,12 +59,12 @@ export function LessonTemplateForm({
           name="start_time"
           type="time"
           required
-          className="min-h-12 rounded-xl border border-brand-ink/20 bg-white px-3 text-base"
+          className="min-h-12 w-full rounded-control border border-line bg-surface px-3 text-body text-ink"
         />
       </div>
 
       <fieldset className="flex flex-col gap-2">
-        <legend className="text-sm font-medium">Lesson type</legend>
+        <legend className="text-label font-medium text-ink">Lesson type</legend>
         {(
           [
             ["private", "Private", `${barn.lessons.privateMin} minutes, one rider`],
@@ -71,7 +73,7 @@ export function LessonTemplateForm({
         ).map(([value, label, hint]) => (
           <label
             key={value}
-            className="flex min-h-12 items-start gap-3 rounded-xl border border-brand-ink/20 bg-white p-3"
+            className="flex min-h-12 items-start gap-3 rounded-control border border-line bg-surface p-3"
           >
             <input
               type="radio"
@@ -79,25 +81,25 @@ export function LessonTemplateForm({
               value={value}
               defaultChecked={value === "private"}
               onChange={() => setType(value)}
-              className="mt-1 size-5 accent-[var(--brand-gold)]"
+              className="mt-0.5 size-5 accent-[var(--brand-gold-deep)]"
             />
-            <span>
-              <span className="block text-sm font-semibold">{label}</span>
-              <span className="block text-xs text-brand-ink/60">{hint}</span>
+            <span className="min-w-0">
+              <span className="block text-body font-semibold text-ink">{label}</span>
+              <span className="block text-caption text-muted">{hint}</span>
             </span>
           </label>
         ))}
       </fieldset>
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="tpl-duration" className="text-sm font-medium">
+        <label htmlFor="tpl-duration" className="text-label font-medium text-ink">
           Length
         </label>
         <select
           id="tpl-duration"
           name="duration_min"
           defaultValue={String(barn.lessons.privateMin)}
-          className="min-h-12 rounded-xl border border-brand-ink/20 bg-white px-3 text-base"
+          className="min-h-12 w-full rounded-control border border-line bg-surface px-3 text-body text-ink"
         >
           <option value={barn.lessons.privateMin}>{barn.lessons.privateMin} minutes</option>
           <option value={barn.lessons.groupMin}>{barn.lessons.groupMin} minutes</option>
@@ -107,7 +109,7 @@ export function LessonTemplateForm({
       {/* Only meaningful for a group; a private is always one rider. */}
       {type === "group" && (
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="tpl-max" className="text-sm font-medium">
+          <label htmlFor="tpl-max" className="text-label font-medium text-ink">
             Maximum riders
           </label>
           <input
@@ -116,19 +118,19 @@ export function LessonTemplateForm({
             type="number"
             min={1}
             defaultValue={4}
-            className="min-h-12 rounded-xl border border-brand-ink/20 bg-white px-3 text-base"
+            className="min-h-12 w-full rounded-control border border-line bg-surface px-3 text-body text-ink"
           />
         </div>
       )}
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="tpl-instructor" className="text-sm font-medium">
+        <label htmlFor="tpl-instructor" className="text-label font-medium text-ink">
           Instructor
         </label>
         <select
           id="tpl-instructor"
           name="instructor_id"
-          className="min-h-12 rounded-xl border border-brand-ink/20 bg-white px-3 text-base"
+          className="min-h-12 w-full rounded-control border border-line bg-surface px-3 text-body text-ink"
         >
           <option value="">Unassigned</option>
           {instructors.map((person) => (
@@ -140,13 +142,13 @@ export function LessonTemplateForm({
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="tpl-level" className="text-sm font-medium">
-          Level <span className="font-normal text-brand-ink/50">(optional)</span>
+        <label htmlFor="tpl-level" className="text-label font-medium text-ink">
+          Level <span className="font-normal text-muted">(optional)</span>
         </label>
         <select
           id="tpl-level"
           name="level_id"
-          className="min-h-12 rounded-xl border border-brand-ink/20 bg-white px-3 text-base"
+          className="min-h-12 w-full rounded-control border border-line bg-surface px-3 text-body text-ink"
         >
           <option value="">Any level</option>
           {levels.map((level) => (
@@ -157,24 +159,11 @@ export function LessonTemplateForm({
         </select>
       </div>
 
-      {state.error && (
-        <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-800">
-          {state.error}
-        </p>
-      )}
-      {state.message && (
-        <p role="status" className="rounded-xl bg-green-50 p-3 text-sm text-green-900">
-          {state.message}
-        </p>
-      )}
+      <FormFeedback error={state.error} message={state.message} />
 
-      <button
-        type="submit"
-        disabled={pending}
-        className="min-h-12 rounded-xl bg-brand-gold px-4 text-base font-semibold text-brand-ink disabled:opacity-60"
-      >
+      <Button type="submit" variant="primary" block disabled={pending}>
         {pending ? "Saving…" : "Add to the weekly schedule"}
-      </button>
+      </Button>
     </form>
   );
 }

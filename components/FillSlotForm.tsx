@@ -1,6 +1,9 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { Chip, Sunk } from "@/components/ui/primitives";
+import { Button } from "@/components/ui/Button";
+import { FormFeedback } from "@/components/ui/Field";
 import {
   sendOffers,
   assignBackfill,
@@ -12,21 +15,7 @@ import type { BackfillOffer, EligibleRider } from "@/lib/types";
 const EMPTY: ScheduleState = { error: null, message: null };
 
 function Feedback({ state }: { state: ScheduleState }) {
-  if (state.error) {
-    return (
-      <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-800">
-        {state.error}
-      </p>
-    );
-  }
-  if (state.message) {
-    return (
-      <p role="status" className="rounded-xl bg-green-50 p-3 text-sm text-green-900">
-        {state.message}
-      </p>
-    );
-  }
-  return null;
+  return <FormFeedback error={state.error} message={state.message} />;
 }
 
 const OFFER_LABEL: Record<BackfillOffer["status"], string> = {
@@ -64,46 +53,55 @@ export function FillSlotForm({
 
   return (
     <div className="flex flex-col gap-2">
-      <button
+      <Button
         type="button"
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
-        className="min-h-11 w-full rounded-xl border border-brand-ink/20 bg-white text-sm font-semibold"
+        variant="secondary"
+        block
+        icon={open ? undefined : "alert"}
       >
         {open
           ? "Close"
           : `Fill this slot — ${openSeats} seat${openSeats === 1 ? "" : "s"} open${
               outstanding.length > 0 ? `, ${outstanding.length} offered` : ""
             }`}
-      </button>
+      </Button>
 
       {offers.length > 0 && (
-        <ul className="flex flex-col gap-1">
+        <ul className="flex flex-col gap-1.5">
           {offers.map((offer) => (
-            <li key={offer.id} className="flex items-center gap-2 text-sm">
-              <span className="flex-1 truncate">
+            <li key={offer.id} className="flex items-center gap-2">
+              <span className="min-w-0 flex-1 truncate text-caption text-ink">
                 {riderNames.get(offer.rider_id) ?? "Rider"}
               </span>
-              <span
-                className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+              <Chip
+                value={OFFER_LABEL[offer.status]}
+                icon={
                   offer.status === "accepted"
-                    ? "bg-green-100 text-green-900"
+                    ? "check"
                     : offer.status === "sent"
-                      ? "bg-brand-gold/30 text-brand-ink"
-                      : "bg-brand-ink/10 text-brand-ink/70"
-                }`}
-              >
-                {OFFER_LABEL[offer.status]}
-              </span>
+                      ? "clock"
+                      : "alert"
+                }
+                tone={
+                  offer.status === "accepted"
+                    ? "forest"
+                    : offer.status === "sent"
+                      ? "gold"
+                      : "neutral"
+                }
+              />
             </li>
           ))}
         </ul>
       )}
 
+      {/* Sunk, not a nested card: this opens inside the lesson's own card. */}
       {open && (
-        <div className="flex flex-col gap-3 rounded-xl border border-brand-ink/15 p-3">
+        <Sunk className="flex flex-col gap-3">
           {eligible.length === 0 ? (
-            <p className="text-sm text-brand-ink/70">
+            <p className="text-caption text-muted">
               No eligible riders — everyone at this level is already in the lesson.
             </p>
           ) : (
@@ -111,35 +109,33 @@ export function FillSlotForm({
               <form action={offerAction} className="flex flex-col gap-2">
                 <input type="hidden" name="instance_id" value={instanceId} />
                 <fieldset className="flex flex-col gap-1.5">
-                  <legend className="text-sm font-medium">Offer the spot to</legend>
+                  <legend className="mb-1 text-label font-medium text-ink">
+                    Offer the spot to
+                  </legend>
                   {eligible.map((rider) => (
                     <label
                       key={rider.id}
-                      className="flex min-h-11 items-center gap-3 rounded-xl border border-brand-ink/15 px-3"
+                      className="flex min-h-12 items-center gap-3 rounded-control border border-line bg-surface px-3"
                     >
                       <input
                         type="checkbox"
                         name="rider_ids"
                         value={rider.id}
-                        className="size-5 accent-[var(--brand-gold)]"
+                        className="size-5 accent-[var(--brand-gold-deep)]"
                       />
-                      <span className="text-sm">{rider.name}</span>
+                      <span className="text-body text-ink">{rider.name}</span>
                     </label>
                   ))}
                 </fieldset>
-                <button
-                  type="submit"
-                  disabled={offerPending}
-                  className="min-h-11 rounded-xl bg-brand-gold px-4 text-sm font-semibold text-brand-ink disabled:opacity-60"
-                >
+                <Button type="submit" variant="primary" block disabled={offerPending}>
                   {offerPending ? "Sending…" : "Send offers — first to accept wins"}
-                </button>
+                </Button>
                 <Feedback state={offerState} />
               </form>
 
-              <form action={assignAction} className="flex flex-col gap-2 border-t border-brand-ink/10 pt-3">
+              <form action={assignAction} className="flex flex-col gap-2 border-t border-line pt-3">
                 <input type="hidden" name="instance_id" value={instanceId} />
-                <label htmlFor={`assign-${instanceId}`} className="text-sm font-medium">
+                <label htmlFor={`assign-${instanceId}`} className="text-label font-medium text-ink">
                   Or place someone directly
                 </label>
                 <div className="flex gap-2">
@@ -148,7 +144,7 @@ export function FillSlotForm({
                     name="rider_id"
                     required
                     defaultValue=""
-                    className="min-h-11 flex-1 rounded-xl border border-brand-ink/20 bg-white px-3 text-sm"
+                    className="min-h-12 min-w-0 flex-1 rounded-control border border-line bg-surface px-3 text-body text-ink"
                   >
                     <option value="" disabled>
                       Pick a rider…
@@ -159,19 +155,15 @@ export function FillSlotForm({
                       </option>
                     ))}
                   </select>
-                  <button
-                    type="submit"
-                    disabled={assignPending}
-                    className="min-h-11 rounded-xl border border-brand-ink/20 bg-white px-3 text-sm font-semibold disabled:opacity-60"
-                  >
+                  <Button type="submit" variant="secondary" disabled={assignPending}>
                     {assignPending ? "…" : "Assign"}
-                  </button>
+                  </Button>
                 </div>
                 <Feedback state={assignState} />
               </form>
             </>
           )}
-        </div>
+        </Sunk>
       )}
     </div>
   );
@@ -184,13 +176,9 @@ export function SendRemindersButton({ date }: { date: string }) {
   return (
     <form action={formAction} className="flex flex-col gap-2">
       <input type="hidden" name="date" value={date} />
-      <button
-        type="submit"
-        disabled={pending}
-        className="min-h-12 rounded-xl border border-brand-ink/20 bg-white px-4 text-sm font-semibold disabled:opacity-60"
-      >
+      <Button type="submit" variant="secondary" block disabled={pending} icon="bell">
         {pending ? "Sending…" : "Send reminders for this day"}
-      </button>
+      </Button>
       <Feedback state={state} />
     </form>
   );

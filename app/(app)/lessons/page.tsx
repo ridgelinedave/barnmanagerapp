@@ -2,6 +2,7 @@ import { TabPage } from "@/components/TabPage";
 import { StubScreen } from "@/components/StubScreen";
 import { ParentLessonCard } from "@/components/ParentLessonCard";
 import { BackfillOfferCard } from "@/components/BackfillOfferCard";
+import { EmptyState, SectionHeader } from "@/components/ui/primitives";
 import { requireTab } from "@/lib/guard";
 import {
   listUpcomingInstances,
@@ -86,12 +87,17 @@ export default async function LessonsPage() {
         />
       ))}
 
-      <h2 className="text-base font-semibold">Next 4 weeks</h2>
+      <SectionHeader
+        title="Next 4 weeks"
+        count={upcoming.length > 0 ? `${upcoming.length} booked` : undefined}
+      />
 
       {upcoming.length === 0 ? (
-        <p className="rounded-2xl border border-brand-ink/10 bg-white p-4 text-sm text-brand-ink/70">
-          No lessons booked right now.
-        </p>
+        <EmptyState
+          title="Nothing booked right now"
+          body="When Belle puts your rider in a lesson it appears here, and you can cancel a spot from this screen if plans change."
+          emoji="🐴"
+        />
       ) : (
         upcoming.map(({ booking, instance }) => (
           <ParentLessonCard
@@ -110,7 +116,7 @@ export default async function LessonsPage() {
 
       {cancelled.length > 0 && (
         <>
-          <h2 className="mt-2 text-sm font-semibold text-brand-ink/60">Cancelled</h2>
+          <SectionHeader title="Cancelled" count={`${cancelled.length}`} />
           {cancelled.map(({ booking, instance }) => (
             <ParentLessonCard
               key={booking.id}

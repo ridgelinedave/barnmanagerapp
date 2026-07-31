@@ -1,6 +1,8 @@
 "use client";
 
 import { useActionState } from "react";
+import { Button } from "@/components/ui/Button";
+import { FormFeedback } from "@/components/ui/Field";
 import {
   generateInstances,
   bookRider,
@@ -13,21 +15,7 @@ const EMPTY: ScheduleState = { error: null, message: null };
 type Option = { id: string; name: string };
 
 function Feedback({ state }: { state: ScheduleState }) {
-  if (state.error) {
-    return (
-      <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-800">
-        {state.error}
-      </p>
-    );
-  }
-  if (state.message) {
-    return (
-      <p role="status" className="rounded-xl bg-green-50 p-3 text-sm text-green-900">
-        {state.message}
-      </p>
-    );
-  }
-  return null;
+  return <FormFeedback error={state.error} message={state.message} />;
 }
 
 /**
@@ -42,13 +30,9 @@ export function GenerateInstancesButton() {
 
   return (
     <form action={formAction} className="flex flex-col gap-2">
-      <button
-        type="submit"
-        disabled={pending}
-        className="min-h-12 rounded-xl bg-brand-gold px-4 text-base font-semibold text-brand-ink disabled:opacity-60"
-      >
+      <Button type="submit" variant="primary" block disabled={pending} icon="calendar">
         {pending ? "Generating…" : "Generate the next 4 weeks"}
-      </button>
+      </Button>
       <Feedback state={state} />
     </form>
   );
@@ -75,7 +59,7 @@ export function BookRiderForm({
           name="rider_id"
           required
           defaultValue=""
-          className="min-h-11 flex-1 rounded-xl border border-brand-ink/20 bg-white px-3 text-sm"
+          className="min-h-12 min-w-0 flex-1 rounded-control border border-line bg-surface px-3 text-body text-ink"
         >
           <option value="" disabled>
             Add a rider…
@@ -86,13 +70,9 @@ export function BookRiderForm({
             </option>
           ))}
         </select>
-        <button
-          type="submit"
-          disabled={pending}
-          className="min-h-11 rounded-xl border border-brand-ink/20 bg-white px-3 text-sm font-semibold disabled:opacity-60"
-        >
+        <Button type="submit" variant="secondary" disabled={pending}>
           {pending ? "…" : "Book"}
-        </button>
+        </Button>
       </div>
       <Feedback state={state} />
     </form>
@@ -116,7 +96,7 @@ export function OneOffLessonForm({
       <input type="hidden" name="date" value={date} />
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="oneoff-time" className="text-sm font-medium">
+        <label htmlFor="oneoff-time" className="text-label font-medium text-ink">
           Start time
         </label>
         <input
@@ -124,34 +104,34 @@ export function OneOffLessonForm({
           name="start_time"
           type="time"
           required
-          className="min-h-12 rounded-xl border border-brand-ink/20 bg-white px-3 text-base"
+          className="min-h-12 w-full rounded-control border border-line bg-surface px-3 text-body text-ink"
         />
       </div>
 
       <div className="flex gap-2">
         <div className="flex flex-1 flex-col gap-1.5">
-          <label htmlFor="oneoff-type" className="text-sm font-medium">
+          <label htmlFor="oneoff-type" className="text-label font-medium text-ink">
             Type
           </label>
           <select
             id="oneoff-type"
             name="type"
             defaultValue="private"
-            className="min-h-12 rounded-xl border border-brand-ink/20 bg-white px-3 text-base"
+            className="min-h-12 w-full rounded-control border border-line bg-surface px-3 text-body text-ink"
           >
             <option value="private">Private</option>
             <option value="group">Group</option>
           </select>
         </div>
         <div className="flex flex-1 flex-col gap-1.5">
-          <label htmlFor="oneoff-duration" className="text-sm font-medium">
+          <label htmlFor="oneoff-duration" className="text-label font-medium text-ink">
             Length
           </label>
           <select
             id="oneoff-duration"
             name="duration_min"
             defaultValue="45"
-            className="min-h-12 rounded-xl border border-brand-ink/20 bg-white px-3 text-base"
+            className="min-h-12 w-full rounded-control border border-line bg-surface px-3 text-body text-ink"
           >
             <option value="45">45 min</option>
             <option value="60">60 min</option>
@@ -160,13 +140,13 @@ export function OneOffLessonForm({
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="oneoff-instructor" className="text-sm font-medium">
+        <label htmlFor="oneoff-instructor" className="text-label font-medium text-ink">
           Instructor
         </label>
         <select
           id="oneoff-instructor"
           name="instructor_id"
-          className="min-h-12 rounded-xl border border-brand-ink/20 bg-white px-3 text-base"
+          className="min-h-12 w-full rounded-control border border-line bg-surface px-3 text-body text-ink"
         >
           <option value="">Unassigned</option>
           {instructors.map((person) => (
@@ -178,13 +158,13 @@ export function OneOffLessonForm({
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="oneoff-level" className="text-sm font-medium">
-          Level <span className="font-normal text-brand-ink/50">(optional)</span>
+        <label htmlFor="oneoff-level" className="text-label font-medium text-ink">
+          Level <span className="font-normal text-muted">(optional)</span>
         </label>
         <select
           id="oneoff-level"
           name="level_id"
-          className="min-h-12 rounded-xl border border-brand-ink/20 bg-white px-3 text-base"
+          className="min-h-12 w-full rounded-control border border-line bg-surface px-3 text-body text-ink"
         >
           <option value="">Any level</option>
           {levels.map((level) => (
@@ -193,13 +173,13 @@ export function OneOffLessonForm({
             </option>
           ))}
         </select>
-        <p className="text-xs text-brand-ink/55">
+        <p className="text-caption text-muted">
           Limits who can be offered the spot if it opens up. Leave as Any to allow everyone.
         </p>
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="oneoff-max" className="text-sm font-medium">
+        <label htmlFor="oneoff-max" className="text-label font-medium text-ink">
           Maximum riders
         </label>
         <input
@@ -208,20 +188,16 @@ export function OneOffLessonForm({
           type="number"
           min={1}
           defaultValue={1}
-          className="min-h-12 rounded-xl border border-brand-ink/20 bg-white px-3 text-base"
+          className="min-h-12 w-full rounded-control border border-line bg-surface px-3 text-body text-ink"
         />
-        <p className="text-xs text-brand-ink/55">Ignored for a private lesson, which is always one.</p>
+        <p className="text-caption text-muted">Ignored for a private lesson, which is always one.</p>
       </div>
 
       <Feedback state={state} />
 
-      <button
-        type="submit"
-        disabled={pending}
-        className="min-h-12 rounded-xl bg-brand-gold px-4 text-base font-semibold text-brand-ink disabled:opacity-60"
-      >
+      <Button type="submit" variant="primary" block disabled={pending}>
         {pending ? "Adding…" : "Add a one-off lesson"}
-      </button>
+      </Button>
     </form>
   );
 }

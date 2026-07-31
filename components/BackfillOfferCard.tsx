@@ -1,6 +1,10 @@
 "use client";
 
 import { useActionState } from "react";
+import { Callout, Card, Chip, ChipRow } from "@/components/ui/primitives";
+import { Button } from "@/components/ui/Button";
+import { FormFeedback } from "@/components/ui/Field";
+import { Icon } from "@/components/ui/Icon";
 import { respondToOffer, type OfferState } from "@/app/(app)/lessons/actions";
 import { formatBarnDayLabel, formatTime } from "@/lib/dates";
 import type { BackfillOfferStatus, LessonInstance } from "@/lib/types";
@@ -61,75 +65,79 @@ export function BackfillOfferCard({
   const resolved = status !== "sent";
   const outcome = resolved ? OUTCOME[status] : null;
 
+  /*
+   * An outstanding offer is the one thing on Home that is racing someone else,
+   * so it gets the loudest treatment in the system: a gold border. Once it is
+   * resolved it drops back to an ordinary card — the urgency is gone and it
+   * should stop shouting.
+   */
   return (
-    <article
-      className={`rounded-2xl border-2 p-4 ${
-        resolved ? "border-brand-ink/15 bg-white" : "border-brand-gold bg-white"
-      }`}
-    >
-      <p
-        className={`text-[11px] font-semibold uppercase tracking-wide ${
-          resolved ? "text-brand-ink/50" : "text-brand-gold-deep"
-        }`}
-      >
-        {resolved ? "Backfill spot" : "A spot opened up"}
-      </p>
-
-      <h3 className="mt-1 text-base font-semibold">{riderName}</h3>
-
-      {instance ? (
-        <>
-          <p className="mt-0.5 text-sm text-brand-ink/75">
-            {formatBarnDayLabel(instance.date)} · {formatTime(instance.start_time)} ·{" "}
-            {instance.duration_min} min {instance.type === "private" ? "private" : "group"}
-          </p>
-          {instructorName && <p className="text-sm text-brand-ink/60">with {instructorName}</p>}
-        </>
-      ) : null}
-
-      {resolved ? (
-        <div
-          role="status"
-          className={`mt-3 rounded-xl p-3 text-sm ${
-            status === "accepted" ? "bg-green-50 text-green-900" : "bg-brand-ink/5 text-brand-ink/80"
+    <Card as="article" className={`p-4 ${resolved ? "" : "border-2 border-gold"}`}>
+      <div className="flex items-start gap-3">
+        <span
+          aria-hidden="true"
+          className={`flex size-10 shrink-0 items-center justify-center rounded-control ${
+            resolved ? "bg-sunk text-muted" : "bg-gold text-ink"
           }`}
         >
-          <span className="block font-semibold">{state.message ?? outcome?.title}</span>
-          {!state.message && outcome && <span className="block">{outcome.body}</span>}
+          <Icon name={resolved ? "check" : "alert"} className="size-5" strokeWidth={2} />
+        </span>
+
+        <div className="min-w-0 flex-1">
+          <p className="font-display text-eyebrow uppercase text-gold-deep">
+            {resolved ? "Backfill spot" : "A spot opened up"}
+          </p>
+          <h3 className="mt-0.5 font-display text-heading text-ink">{riderName}</h3>
+
+          {instance && (
+            <>
+              <p className="mt-0.5 text-caption text-muted">
+                {formatBarnDayLabel(instance.date)} · {formatTime(instance.start_time)}
+                {instructorName ? ` · with ${instructorName}` : ""}
+              </p>
+              <div className="mt-1.5">
+                <ChipRow>
+                  <Chip value={instance.type === "private" ? "Private" : "Group"} />
+                  <Chip value={`${instance.duration_min} min`} icon="clock" />
+                </ChipRow>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      {resolved ? (
+        <div className="mt-3">
+          <Callout tone={status === "accepted" ? "forest" : "gold"} icon={status === "accepted" ? "check" : "clock"}>
+            <span className="block font-semibold">{state.message ?? outcome?.title}</span>
+            {!state.message && outcome && <span className="block">{outcome.body}</span>}
+          </Callout>
         </div>
       ) : (
         <>
           {state.error && (
-            <p role="alert" className="mt-3 rounded-xl bg-red-50 p-3 text-sm text-red-800">
-              {state.error}
-            </p>
+            <div className="mt-3">
+              <FormFeedback error={state.error} />
+            </div>
           )}
           <div className="mt-3 flex gap-2">
             <form action={formAction} className="flex-1">
               <input type="hidden" name="offer_id" value={offerId} />
               <input type="hidden" name="accept" value="true" />
-              <button
-                type="submit"
-                disabled={pending}
-                className="min-h-12 w-full rounded-xl bg-brand-gold px-4 text-base font-semibold text-brand-ink disabled:opacity-60"
-              >
+              <Button type="submit" variant="primary" block disabled={pending}>
                 {pending ? "…" : "Accept"}
-              </button>
+              </Button>
             </form>
             <form action={formAction} className="flex-1">
               <input type="hidden" name="offer_id" value={offerId} />
               <input type="hidden" name="accept" value="false" />
-              <button
-                type="submit"
-                disabled={pending}
-                className="min-h-12 w-full rounded-xl border border-brand-ink/25 bg-white px-4 text-base font-semibold disabled:opacity-60"
-              >
+              <Button type="submit" variant="secondary" block disabled={pending}>
                 {pending ? "…" : "Decline"}
-              </button>
+              </Button>
             </form>
           </div>
         </>
       )}
-    </article>
+    </Card>
   );
 }
