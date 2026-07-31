@@ -1,7 +1,7 @@
-import Link from "next/link";
 import { TabPage } from "@/components/TabPage";
 import { StubScreen } from "@/components/StubScreen";
 import { HorseBasicsCard, HorseCard } from "@/components/HorseCard";
+import { EmptyState, SectionHeader } from "@/components/ui/primitives";
 import { currentRole } from "@/lib/guard";
 import { basicsForFamily, familyNames, listHorses } from "@/lib/horses";
 import { featureEnabled } from "@/config/barn";
@@ -45,36 +45,38 @@ export default async function HorseDirectoryPage() {
     const [owned, ridden] = await Promise.all([listHorses(), basicsForFamily()]);
 
     return (
-      <TabPage title="Horses">
-        <section className="flex flex-col gap-3">
-          <h2 className="text-base font-semibold">Your horses</h2>
-          {owned.length === 0 ? (
-            <p className="rounded-2xl border border-brand-ink/10 bg-white p-4 text-sm text-brand-ink/70">
-              You don&apos;t have a horse at the barn.
-            </p>
-          ) : (
-            owned.map((horse) => (
+      <TabPage title="Horses" back="/more">
+        {/* Only rendered when the family actually owns one — a section with
+            nothing in it does not render. */}
+        {owned.length > 0 && (
+          <section className="flex flex-col gap-3">
+            <SectionHeader title="Your horses" />
+            {owned.map((horse) => (
               <HorseCard key={horse.id} horse={horse} href={`/more/horses/${horse.id}`} />
-            ))
-          )}
-        </section>
+            ))}
+          </section>
+        )}
 
         {ridden.length > 0 && (
           <section className="flex flex-col gap-3">
-            <h2 className="text-base font-semibold">Horses your rider rides</h2>
+            <SectionHeader title="Horses your rider rides" />
             {ridden.map((horse) => (
               <HorseBasicsCard key={horse.id} horse={horse} />
             ))}
-            <p className="text-sm text-brand-ink/60">
+            <p className="text-caption text-muted">
               These belong to the barn or to another family, so their records stay with their
               owners.
             </p>
           </section>
         )}
 
-        <Link href="/more" className="py-2 text-center text-sm font-medium underline">
-          Back to More
-        </Link>
+        {owned.length === 0 && ridden.length === 0 && (
+          <EmptyState
+            title="No horses yet"
+            body="When your rider is matched with a horse it appears here. If your family owns one, its record and feed chart show up too."
+            emoji="🐴"
+          />
+        )}
       </TabPage>
     );
   }
@@ -86,17 +88,16 @@ export default async function HorseDirectoryPage() {
     role === "admin" ? `/manage/horses/${id}` : `/more/horses/${id}`;
 
   return (
-    <TabPage title="Horses">
+    <TabPage title="Horses" back="/more">
       <section className="flex flex-col gap-3">
-        <div className="flex items-baseline gap-2">
-          <h2 className="text-base font-semibold">In work</h2>
-          <p className="text-sm text-brand-ink/60">{inWork.length}</p>
-        </div>
+        <SectionHeader title="In work" count={`${inWork.length}`} />
 
         {inWork.length === 0 ? (
-          <p className="rounded-2xl border border-brand-ink/10 bg-white p-4 text-sm text-brand-ink/70">
-            No horses on the books yet.
-          </p>
+          <EmptyState
+            title="No horses on the books"
+            body="Belle adds horses from Manage. Once they are on, their feed charts show up on the feed board."
+            emoji="🐴"
+          />
         ) : (
           inWork.map((horse) => (
             <HorseCard
@@ -115,16 +116,12 @@ export default async function HorseDirectoryPage() {
 
       {retired.length > 0 && (
         <section className="flex flex-col gap-3">
-          <h2 className="text-sm font-semibold text-brand-ink/60">Retired ({retired.length})</h2>
+          <SectionHeader title="Retired" count={`${retired.length}`} />
           {retired.map((horse) => (
             <HorseCard key={horse.id} horse={horse} href={detailHref(horse.id)} />
           ))}
         </section>
       )}
-
-      <Link href="/more" className="py-2 text-center text-sm font-medium underline">
-        Back to More
-      </Link>
     </TabPage>
   );
 }

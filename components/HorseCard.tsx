@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { Chip } from "@/components/ui/primitives";
+import { Avatar } from "@/components/ui/ListRow";
+import { Icon } from "@/components/ui/Icon";
 import type { Horse, HorseBasics } from "@/lib/types";
 
 /**
@@ -22,28 +25,17 @@ function Frame({
   children: React.ReactNode;
 }) {
   const className =
-    "flex min-h-16 w-full items-center gap-3 rounded-2xl border border-brand-ink/15 bg-white p-4 text-left";
+    "flex min-h-16 w-full items-center gap-3 rounded-card border border-line bg-surface p-4 text-left";
 
   if (!href) return <div className={className}>{children}</div>;
   return (
-    <Link href={href} className={className}>
-      {children}
-      <span aria-hidden="true" className="shrink-0 text-brand-ink/40">
-        ›
-      </span>
-    </Link>
-  );
-}
-
-/** The horse's initial in a gold disc. Stands in for a photo we may not have. */
-function Avatar({ name }: { name: string }) {
-  return (
-    <span
-      aria-hidden="true"
-      className="flex size-11 shrink-0 items-center justify-center rounded-full bg-brand-gold text-lg font-semibold text-brand-ink"
+    <Link
+      href={href}
+      className={`${className} transition-transform duration-150 ease-out active:scale-[0.99]`}
     >
-      {name.trim().charAt(0).toUpperCase()}
-    </span>
+      {children}
+      <Icon name="chevron" className="size-5 shrink-0 text-muted" />
+    </Link>
   );
 }
 
@@ -72,13 +64,13 @@ export function HorseCard({
 
   return (
     <Frame href={href}>
-      <Avatar name={horse.name} />
+      <Avatar name={horse.name} src={horse.photo_url} />
       <span className="min-w-0 flex-1">
-        <span className="block text-base font-semibold leading-snug">{horse.name}</span>
-        {detail && <span className="mt-0.5 block text-sm text-brand-ink/70">{detail}</span>}
+        <span className="block font-display text-heading leading-snug text-ink">{horse.name}</span>
+        {detail && <span className="mt-0.5 block text-caption text-muted">{detail}</span>}
         {!horse.active && (
-          <span className="mt-1 inline-block rounded-full bg-brand-ink/10 px-2 py-0.5 text-[11px] font-semibold text-brand-ink/70">
-            Retired
+          <span className="mt-1.5 block">
+            <Chip value="Retired" icon="clock" tone="neutral" />
           </span>
         )}
       </span>
@@ -93,11 +85,13 @@ export function HorseCard({
 export function HorseBasicsCard({ horse }: { horse: HorseBasics }) {
   return (
     <Frame>
-      <Avatar name={horse.name} />
+      <Avatar name={horse.name} src={horse.photo_url} />
       <span className="min-w-0 flex-1">
-        <span className="block text-base font-semibold leading-snug">{horse.name}</span>
+        <span className="block font-display text-heading leading-snug text-ink">{horse.name}</span>
         {horse.barn_name && horse.barn_name !== horse.name && (
-          <span className="mt-0.5 block text-sm text-brand-ink/70">&ldquo;{horse.barn_name}&rdquo;</span>
+          <span className="mt-0.5 block text-caption text-muted">
+            &ldquo;{horse.barn_name}&rdquo;
+          </span>
         )}
       </span>
     </Frame>

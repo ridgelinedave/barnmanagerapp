@@ -1,3 +1,6 @@
+import { Card } from "@/components/ui/primitives";
+import { Button } from "@/components/ui/Button";
+import { Icon } from "@/components/ui/Icon";
 import { deleteHorseDocument } from "@/app/(app)/manage/horses/documents-actions";
 import { formatBytes, type StoredDocument } from "@/lib/documents";
 
@@ -23,7 +26,7 @@ export function DocumentList({
 }) {
   if (documents.length === 0) {
     return (
-      <p className="rounded-2xl border border-brand-ink/10 bg-white p-4 text-sm text-brand-ink/70">
+      <p className="rounded-card border border-line bg-surface p-4 text-caption text-muted">
         {emptyMessage}
       </p>
     );
@@ -32,27 +35,32 @@ export function DocumentList({
   return (
     <ul className="flex flex-col gap-3">
       {documents.map((doc) => (
-        <li
+        <Card
+          as="li"
           key={doc.path}
-          className="flex min-h-16 items-center gap-3 rounded-2xl border border-brand-ink/15 bg-white p-4"
+          className="flex min-h-16 items-center gap-3 p-4"
         >
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-control bg-sunk text-gold-deep">
+            <Icon name="document" className="size-5" />
+          </span>
+
           <span className="min-w-0 flex-1">
             {doc.url ? (
               <a
                 href={doc.url}
                 target="_blank"
                 rel="noreferrer"
-                className="block break-words text-base font-semibold leading-snug underline"
+                className="block break-words font-display text-heading leading-snug text-ink underline underline-offset-4"
               >
                 {doc.name}
               </a>
             ) : (
-              <span className="block break-words text-base font-semibold leading-snug">
+              <span className="block break-words font-display text-heading leading-snug text-ink">
                 {doc.name}
               </span>
             )}
             {formatBytes(doc.sizeBytes) && (
-              <span className="mt-0.5 block text-sm text-brand-ink/60">
+              <span className="mt-0.5 block text-caption text-muted">
                 {formatBytes(doc.sizeBytes)}
               </span>
             )}
@@ -62,15 +70,12 @@ export function DocumentList({
             <form action={deleteHorseDocument} className="shrink-0">
               <input type="hidden" name="horse_id" value={horseId} />
               <input type="hidden" name="path" value={doc.path} />
-              <button
-                type="submit"
-                className="min-h-11 rounded-xl border border-red-300 bg-white px-3 text-sm font-semibold text-red-700"
-              >
+              <Button type="submit" variant="danger">
                 Remove
-              </button>
+              </Button>
             </form>
           )}
-        </li>
+        </Card>
       ))}
     </ul>
   );

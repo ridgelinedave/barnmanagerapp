@@ -1,8 +1,9 @@
-import Link from "next/link";
 import { TabPage } from "@/components/TabPage";
 import { StubScreen } from "@/components/StubScreen";
 import { HorseCard } from "@/components/HorseCard";
 import { HorseForm } from "@/components/HorseAdmin";
+import { EmptyState, SectionHeader } from "@/components/ui/primitives";
+import { SheetTrigger } from "@/components/ui/Sheet";
 import { requireTab } from "@/lib/guard";
 import { familyNames, listHorses } from "@/lib/horses";
 import { featureEnabled } from "@/config/barn";
@@ -33,19 +34,19 @@ export default async function ManageHorsesPage() {
     familyId ? (families.get(familyId) ?? "Owned") : "Barn horse";
 
   return (
-    <TabPage title="Horses">
+    <TabPage title="Horses" back="/manage">
       <section className="flex flex-col gap-3">
-        <div className="flex items-baseline gap-2">
-          <h2 className="text-base font-semibold">In work</h2>
-          <p className="text-sm text-brand-ink/60">
-            {inWork.length === 0 ? "None yet" : `${inWork.length}`}
-          </p>
-        </div>
+        <SectionHeader
+          title="In work"
+          count={inWork.length === 0 ? "None yet" : `${inWork.length}`}
+        />
 
         {inWork.length === 0 ? (
-          <p className="rounded-2xl border border-brand-ink/10 bg-white p-4 text-sm text-brand-ink/70">
-            No horses yet. Add the first one below.
-          </p>
+          <EmptyState
+            title="No horses yet"
+            body="Add the first one below — name, owner, and whether it belongs to the barn. Feed charts and care history hang off each horse from there."
+            emoji="🐴"
+          />
         ) : (
           inWork.map((horse) => (
             <HorseCard
@@ -60,7 +61,7 @@ export default async function ManageHorsesPage() {
 
       {retired.length > 0 && (
         <section className="flex flex-col gap-3">
-          <h2 className="text-sm font-semibold text-brand-ink/60">Retired ({retired.length})</h2>
+          <SectionHeader title="Retired" count={`${retired.length}`} />
           {retired.map((horse) => (
             <HorseCard
               key={horse.id}
@@ -72,14 +73,9 @@ export default async function ManageHorsesPage() {
         </section>
       )}
 
-      <section className="flex flex-col gap-3 rounded-2xl border border-brand-ink/10 bg-white p-4">
-        <h2 className="text-base font-semibold">Add a horse</h2>
+      <SheetTrigger label="Add a horse" title="New horse" variant="primary">
         <HorseForm families={[...families].map(([id, name]) => ({ id, name }))} />
-      </section>
-
-      <Link href="/manage" className="py-2 text-center text-sm font-medium underline">
-        Back to Manage
-      </Link>
+      </SheetTrigger>
     </TabPage>
   );
 }

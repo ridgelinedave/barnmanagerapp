@@ -8,30 +8,16 @@ import {
   updateHorse,
   type HorseAdminState,
 } from "@/app/(app)/manage/horses/actions";
+import { Button } from "@/components/ui/Button";
+import { FormFeedback } from "@/components/ui/Field";
 import { MEALS, MEAL_LABELS, type FeedPlan, type Horse } from "@/lib/types";
 
 const EMPTY: HorseAdminState = { error: null, message: null };
 
-const FIELD = "min-h-12 rounded-xl border border-brand-ink/20 bg-white px-3 text-base";
-const SUBMIT =
-  "min-h-12 rounded-xl bg-brand-gold px-4 text-base font-semibold text-brand-ink disabled:opacity-60";
+const FIELD = "min-h-12 w-full rounded-control border border-line bg-surface px-3 text-body text-ink";
 
 function Feedback({ state }: { state: HorseAdminState }) {
-  if (state.error) {
-    return (
-      <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-800">
-        {state.error}
-      </p>
-    );
-  }
-  if (state.message) {
-    return (
-      <p role="status" className="rounded-xl bg-green-50 p-3 text-sm text-green-900">
-        {state.message}
-      </p>
-    );
-  }
-  return null;
+  return <FormFeedback error={state.error} message={state.message} />;
 }
 
 type Family = { id: string; name: string };
@@ -61,7 +47,7 @@ export function HorseForm({
       {horse && <input type="hidden" name="id" value={horse.id} />}
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="horse-name" className="text-sm font-medium">
+        <label htmlFor="horse-name" className="text-label font-medium text-ink">
           Registered name
         </label>
         <input
@@ -74,8 +60,8 @@ export function HorseForm({
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="horse-barn-name" className="text-sm font-medium">
-          Barn name <span className="font-normal text-brand-ink/50">(optional)</span>
+        <label htmlFor="horse-barn-name" className="text-label font-medium text-ink">
+          Barn name <span className="font-normal text-muted">(optional)</span>
         </label>
         <input
           id="horse-barn-name"
@@ -86,7 +72,7 @@ export function HorseForm({
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="horse-owner" className="text-sm font-medium">
+        <label htmlFor="horse-owner" className="text-label font-medium text-ink">
           Owner
         </label>
         <select
@@ -102,22 +88,22 @@ export function HorseForm({
             </option>
           ))}
         </select>
-        <p className="text-xs text-brand-ink/55">
+        <p className="text-caption text-muted">
           The owning family can read this horse&apos;s full record and feed chart. Everyone else
           sees only the name and photo, and only if their rider rides it.
         </p>
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="horse-breed" className="text-sm font-medium">
-          Breed <span className="font-normal text-brand-ink/50">(optional)</span>
+        <label htmlFor="horse-breed" className="text-label font-medium text-ink">
+          Breed <span className="font-normal text-muted">(optional)</span>
         </label>
         <input id="horse-breed" name="breed" defaultValue={horse?.breed ?? ""} className={FIELD} />
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="horse-dob" className="text-sm font-medium">
-          Date of birth <span className="font-normal text-brand-ink/50">(optional)</span>
+        <label htmlFor="horse-dob" className="text-label font-medium text-ink">
+          Date of birth <span className="font-normal text-muted">(optional)</span>
         </label>
         <input
           id="horse-dob"
@@ -129,20 +115,20 @@ export function HorseForm({
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="horse-notes" className="text-sm font-medium">
-          Notes <span className="font-normal text-brand-ink/50">(optional)</span>
+        <label htmlFor="horse-notes" className="text-label font-medium text-ink">
+          Notes <span className="font-normal text-muted">(optional)</span>
         </label>
         <textarea
           id="horse-notes"
           name="notes"
           rows={3}
           defaultValue={horse?.notes ?? ""}
-          className="rounded-xl border border-brand-ink/20 bg-white p-3 text-base"
+          className="w-full rounded-control border border-line bg-surface p-3 text-body text-ink"
         />
       </div>
 
       {horse && (
-        <label className="flex min-h-12 items-center gap-3 rounded-xl border border-brand-ink/20 bg-white px-3">
+        <label className="flex min-h-12 items-center gap-3 rounded-control border border-line bg-surface px-3">
           <input
             type="checkbox"
             name="active"
@@ -155,9 +141,9 @@ export function HorseForm({
 
       <Feedback state={state} />
 
-      <button type="submit" disabled={pending} className={SUBMIT}>
+      <Button type="submit" variant="primary" block disabled={pending}>
         {pending ? "Saving…" : horse ? "Save changes" : "Add horse"}
-      </button>
+      </Button>
     </form>
   );
 }
@@ -175,7 +161,7 @@ export function AssignRiderForm({
 
   if (riders.length === 0) {
     return (
-      <p className="text-sm text-brand-ink/70">
+      <p className="text-caption text-muted">
         Every rider is already assigned to this horse.
       </p>
     );
@@ -186,7 +172,7 @@ export function AssignRiderForm({
       <input type="hidden" name="horse_id" value={horseId} />
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="assign-rider" className="text-sm font-medium">
+        <label htmlFor="assign-rider" className="text-label font-medium text-ink">
           Add a rider
         </label>
         <select id="assign-rider" name="rider_id" required className={FIELD}>
@@ -196,7 +182,7 @@ export function AssignRiderForm({
             </option>
           ))}
         </select>
-        <p className="text-xs text-brand-ink/55">
+        <p className="text-caption text-muted">
           Their family will see this horse&apos;s name and photo — never the breed, notes or feed
           chart.
         </p>
@@ -204,9 +190,9 @@ export function AssignRiderForm({
 
       <Feedback state={state} />
 
-      <button type="submit" disabled={pending} className={SUBMIT}>
+      <Button type="submit" variant="primary" block disabled={pending}>
         {pending ? "Assigning…" : "Assign rider"}
-      </button>
+      </Button>
     </form>
   );
 }
@@ -233,7 +219,7 @@ export function FeedPlanForm({
       <input type="hidden" name="horse_id" value={horseId} />
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="plan-meal" className="text-sm font-medium">
+        <label htmlFor="plan-meal" className="text-label font-medium text-ink">
           Meal
         </label>
         <select id="plan-meal" name="meal" defaultValue={first?.meal ?? "am"} className={FIELD}>
@@ -246,7 +232,7 @@ export function FeedPlanForm({
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="plan-description" className="text-sm font-medium">
+        <label htmlFor="plan-description" className="text-label font-medium text-ink">
           Feed
         </label>
         <input
@@ -259,33 +245,33 @@ export function FeedPlanForm({
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="plan-supplements" className="text-sm font-medium">
-          Supplements <span className="font-normal text-brand-ink/50">(optional)</span>
+        <label htmlFor="plan-supplements" className="text-label font-medium text-ink">
+          Supplements <span className="font-normal text-muted">(optional)</span>
         </label>
         <input id="plan-supplements" name="supplements" className={FIELD} />
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="plan-instructions" className="text-sm font-medium">
-          Special instructions <span className="font-normal text-brand-ink/50">(optional)</span>
+        <label htmlFor="plan-instructions" className="text-label font-medium text-ink">
+          Special instructions <span className="font-normal text-muted">(optional)</span>
         </label>
         <textarea
           id="plan-instructions"
           name="special_instructions"
           rows={2}
           placeholder="Soak 10 minutes. Feed alone."
-          className="rounded-xl border border-brand-ink/20 bg-white p-3 text-base"
+          className="w-full rounded-control border border-line bg-surface p-3 text-body text-ink"
         />
-        <p className="text-xs text-brand-ink/55">
+        <p className="text-caption text-muted">
           This is the line that gets highlighted on the feed board.
         </p>
       </div>
 
       <Feedback state={state} />
 
-      <button type="submit" disabled={pending} className={SUBMIT}>
+      <Button type="submit" variant="primary" block disabled={pending}>
         {pending ? "Saving…" : "Save feed chart"}
-      </button>
+      </Button>
     </form>
   );
 }

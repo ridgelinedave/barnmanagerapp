@@ -1,3 +1,4 @@
+import { Card, Chip } from "@/components/ui/primitives";
 import { formatBarnDayLabel } from "@/lib/dates";
 import { CARE_TYPE_LABELS, type CareEvent } from "@/lib/types";
 
@@ -13,13 +14,11 @@ function DueChip({ dueNext, today }: { dueNext: string; today: string }) {
   const overdue = dueNext < today;
 
   return (
-    <span
-      className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-        overdue ? "bg-red-100 text-red-900" : "bg-brand-gold/30 text-brand-ink"
-      }`}
-    >
-      {overdue ? "Overdue" : "Due"} {formatBarnDayLabel(dueNext)}
-    </span>
+    <Chip
+      value={`${overdue ? "Overdue" : "Due"} ${formatBarnDayLabel(dueNext)}`}
+      icon={overdue ? "alert" : "clock"}
+      tone={overdue ? "danger" : "gold"}
+    />
   );
 }
 
@@ -37,7 +36,7 @@ export function CareTimeline({
 }) {
   if (events.length === 0) {
     return (
-      <p className="rounded-2xl border border-brand-ink/10 bg-white p-4 text-sm text-brand-ink/70">
+      <p className="rounded-card border border-line bg-surface p-4 text-caption text-muted">
         {emptyMessage}
       </p>
     );
@@ -46,29 +45,31 @@ export function CareTimeline({
   return (
     <ul className="flex flex-col gap-3">
       {events.map((event) => (
-        <li key={event.id} className="rounded-2xl border border-brand-ink/15 bg-white p-4">
-          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-            <h3 className="text-base font-semibold leading-snug">
+        <Card as="li" key={event.id} className="p-4">
+          <div className="flex items-baseline gap-2">
+            <h3 className="min-w-0 flex-1 font-display text-heading leading-snug text-ink">
               {CARE_TYPE_LABELS[event.type]}
             </h3>
-            <span className="text-sm text-brand-ink/60">
+            <span className="shrink-0 text-caption text-muted">
               {formatBarnDayLabel(event.performed_at)}
             </span>
           </div>
 
           {event.description && (
-            <p className="mt-1 text-sm text-brand-ink/85">{event.description}</p>
+            <p className="mt-1 text-caption text-ink">{event.description}</p>
           )}
 
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            {event.due_next && <DueChip dueNext={event.due_next} today={today} />}
-            {loggerNames && event.logged_by && (
-              <span className="text-xs text-brand-ink/55">
-                Logged by {loggerNames.get(event.logged_by) ?? "the barn"}
-              </span>
-            )}
-          </div>
-        </li>
+          {(event.due_next || (loggerNames && event.logged_by)) && (
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              {event.due_next && <DueChip dueNext={event.due_next} today={today} />}
+              {loggerNames && event.logged_by && (
+                <span className="text-caption text-muted">
+                  Logged by {loggerNames.get(event.logged_by) ?? "the barn"}
+                </span>
+              )}
+            </div>
+          )}
+        </Card>
       ))}
     </ul>
   );

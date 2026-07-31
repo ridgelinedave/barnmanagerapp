@@ -1,31 +1,15 @@
 "use client";
 
 import { useActionState } from "react";
+import { Button } from "@/components/ui/Button";
+import { Field, FormFeedback, Input, Select, Textarea } from "@/components/ui/Field";
 import { logCareEvent, sendCareDigest, type CareState } from "@/app/(app)/manage/care/actions";
 import { CARE_TYPES, CARE_TYPE_LABELS } from "@/lib/types";
 
 const EMPTY: CareState = { error: null, message: null };
 
-const FIELD = "min-h-12 rounded-xl border border-brand-ink/20 bg-white px-3 text-base";
-const SUBMIT =
-  "min-h-12 rounded-xl bg-brand-gold px-4 text-base font-semibold text-brand-ink disabled:opacity-60";
-
 function Feedback({ state }: { state: CareState }) {
-  if (state.error) {
-    return (
-      <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-800">
-        {state.error}
-      </p>
-    );
-  }
-  if (state.message) {
-    return (
-      <p role="status" className="rounded-xl bg-green-50 p-3 text-sm text-green-900">
-        {state.message}
-      </p>
-    );
-  }
-  return null;
+  return <FormFeedback error={state.error} message={state.message} />;
 }
 
 /**
@@ -46,62 +30,43 @@ export function CareLogForm({ horseId, today }: { horseId: string; today: string
     <form action={formAction} className="flex flex-col gap-3">
       <input type="hidden" name="horse_id" value={horseId} />
 
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="care-type" className="text-sm font-medium">
-          What was done
-        </label>
-        <select id="care-type" name="type" defaultValue="farrier" className={FIELD}>
+      <Field label="What was done" htmlFor="care-type">
+        <Select id="care-type" name="type" defaultValue="farrier">
           {CARE_TYPES.map((type) => (
             <option key={type} value={type}>
               {CARE_TYPE_LABELS[type]}
             </option>
           ))}
-        </select>
-      </div>
+        </Select>
+      </Field>
 
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="care-description" className="text-sm font-medium">
-          Details <span className="font-normal text-brand-ink/50">(optional)</span>
-        </label>
-        <textarea
+      <Field label="Details" htmlFor="care-description" optional>
+        <Textarea
           id="care-description"
           name="description"
           rows={2}
           placeholder="Reset front shoes. Slight bruise on the near fore."
-          className="rounded-xl border border-brand-ink/20 bg-white p-3 text-base"
         />
-      </div>
+      </Field>
 
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="care-performed" className="text-sm font-medium">
-          When
-        </label>
-        <input
-          id="care-performed"
-          name="performed_at"
-          type="date"
-          required
-          defaultValue={today}
-          className={FIELD}
-        />
-      </div>
+      <Field label="When" htmlFor="care-performed">
+        <Input id="care-performed" name="performed_at" type="date" required defaultValue={today} />
+      </Field>
 
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="care-due" className="text-sm font-medium">
-          Next due <span className="font-normal text-brand-ink/50">(optional)</span>
-        </label>
-        <input id="care-due" name="due_next" type="date" className={FIELD} />
-        <p className="text-xs text-brand-ink/55">
-          Leave empty for a one-off. Anything due in the next 30 days shows on the barn&apos;s
-          due-soon list.
-        </p>
-      </div>
+      <Field
+        label="Next due"
+        htmlFor="care-due"
+        optional
+        hint="Leave empty for a one-off. Anything due in the next 30 days shows on the barn's due-soon list."
+      >
+        <Input id="care-due" name="due_next" type="date" />
+      </Field>
 
       <Feedback state={state} />
 
-      <button type="submit" disabled={pending} className={SUBMIT}>
+      <Button type="submit" variant="primary" block disabled={pending}>
         {pending ? "Saving…" : "Log care"}
-      </button>
+      </Button>
     </form>
   );
 }
@@ -118,9 +83,9 @@ export function SendCareDigestButton() {
 
   return (
     <form action={formAction} className="flex flex-col gap-2">
-      <button type="submit" disabled={pending} className={SUBMIT}>
+      <Button type="submit" variant="primary" block disabled={pending} icon="bell">
         {pending ? "Sending…" : "Send due-soon reminders"}
-      </button>
+      </Button>
       <Feedback state={state} />
     </form>
   );
