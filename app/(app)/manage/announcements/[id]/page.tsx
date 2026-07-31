@@ -19,7 +19,7 @@ export default async function EditAnnouncementPage({
   if (!announcement) notFound();
 
   return (
-    <TabPage title="Edit announcement">
+    <TabPage title="Edit announcement" back="/manage/announcements">
       <AnnouncementForm
         action={updateAnnouncement}
         announcement={announcement}

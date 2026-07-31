@@ -1,6 +1,7 @@
-import Link from "next/link";
 import { TabPage } from "@/components/TabPage";
 import { AnnouncementCard } from "@/components/AnnouncementCard";
+import { EmptyState } from "@/components/ui/primitives";
+import { Button, ButtonLink } from "@/components/ui/Button";
 import { requireTab } from "@/lib/guard";
 import { listAnnouncements } from "@/lib/announcements";
 import { deleteAnnouncement } from "./actions";
@@ -12,46 +13,39 @@ export default async function ManageAnnouncementsPage() {
   const announcements = await listAnnouncements(50);
 
   return (
-    <TabPage title="Announcements">
-      <Link
-        href="/manage/announcements/new"
-        className="flex min-h-12 items-center justify-center rounded-xl bg-brand-gold px-4 text-base font-semibold text-brand-ink"
-      >
+    <TabPage title="Announcements" back="/manage">
+      <ButtonLink href="/manage/announcements/new" variant="primary" block icon="plus">
         New announcement
-      </Link>
+      </ButtonLink>
 
       {announcements.length === 0 ? (
-        <p className="rounded-2xl border border-brand-ink/10 bg-white p-4 text-sm text-brand-ink/70">
-          Nothing posted yet.
-        </p>
+        <EmptyState
+          title="Nothing posted yet"
+          body="Schedule changes, weather calls, show reminders — whatever the barn needs everyone to know. Families see it the moment you post."
+          emoji="📣"
+        />
       ) : (
         announcements.map((announcement) => (
           <div key={announcement.id} className="flex flex-col gap-2">
             <AnnouncementCard announcement={announcement} showAudience />
             <div className="flex gap-2">
-              <Link
+              <ButtonLink
                 href={`/manage/announcements/${announcement.id}`}
-                className="flex min-h-11 flex-1 items-center justify-center rounded-xl border border-brand-ink/20 bg-white text-sm font-semibold"
+                variant="secondary"
+                className="flex-1"
               >
                 Edit
-              </Link>
+              </ButtonLink>
               <form action={deleteAnnouncement}>
                 <input type="hidden" name="id" value={announcement.id} />
-                <button
-                  type="submit"
-                  className="min-h-11 rounded-xl border border-red-300 bg-white px-4 text-sm font-semibold text-red-700"
-                >
+                <Button type="submit" variant="danger">
                   Delete
-                </button>
+                </Button>
               </form>
             </div>
           </div>
         ))
       )}
-
-      <Link href="/manage" className="py-2 text-center text-sm font-medium underline">
-        Back to Manage
-      </Link>
     </TabPage>
   );
 }

@@ -9,7 +9,7 @@ export default async function NewAnnouncementPage() {
   await requireTab("/manage");
 
   return (
-    <TabPage title="New announcement">
+    <TabPage title="New announcement" back="/manage/announcements">
       <AnnouncementForm action={createAnnouncement} submitLabel="Post" />
     </TabPage>
   );
