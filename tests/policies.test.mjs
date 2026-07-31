@@ -4559,6 +4559,107 @@ async function main() {
   }
 
   // ===========================================================================
+  // STANDING GUARD — a parent row can never carry a permission flag (0018)
+  //
+  // public.has_permission() short-circuits to true for admin and otherwise
+  // reads the flag column WITHOUT checking the role is staff, so a parent
+  // carrying manage_horses would genuinely hold barn-wide write access. That
+  // was verified live before the constraint existed: with the flag off the
+  // parent's insert into `horses` was refused, with it on the insert LANDED.
+  // Migration 0018 makes the combination impossible in the data.
+  //
+  // POSITIVE CONTROL FIRST: a STAFF profile must still be able to hold the
+  // flag. A constraint that refused every flag would pass the deny case below
+  // and look correct while breaking the feature the flags exist for.
+  //
+  // Every change is reverted before the section ends.
+  // ===========================================================================
+  console.log("\n\n═══ STANDING GUARD — a parent row carries no permission flag ═══\n");
+  {
+    const staffProfileId = users.staff.profileId;
+    const parentProfileId = users.parent.profileId;
+
+    const flagsOf = async (id) => {
+      const { data } = await admin
+        .from("profiles")
+        .select("role, manage_shows, manage_schedule, manage_horses")
+        .eq("id", id)
+        .single();
+      return data;
+    };
+
+    // --- CONTROL: staff MAY hold a flag -------------------------------------
+    const { error: staffGrant } = await admin
+      .from("profiles")
+      .update({ manage_horses: true })
+      .eq("id", staffProfileId);
+    check(
+      "control: a STAFF profile CAN be given manage_horses — the flags still work",
+      !staffGrant,
+      staffGrant?.message,
+    );
+    check("control: and it really stored", (await flagsOf(staffProfileId))?.manage_horses === true);
+
+    // --- DENY: a parent may NOT ---------------------------------------------
+    const { error: parentGrant } = await admin
+      .from("profiles")
+      .update({ manage_horses: true })
+      .eq("id", parentProfileId);
+    check(
+      "an admin CANNOT give a PARENT manage_horses — has_permission() would honour it",
+      Boolean(parentGrant),
+      parentGrant ? "" : "the update was accepted — a parent now holds barn-wide write access",
+    );
+    check(
+      "the refusal is the 23514 check violation, not an incidental failure",
+      parentGrant?.code === "23514",
+      `got ${parentGrant?.code}: ${parentGrant?.message}`,
+    );
+    check(
+      "and the parent's flag is still false",
+      (await flagsOf(parentProfileId))?.manage_horses === false,
+    );
+
+    // --- DENY: nor by demoting a flagged staff member into a parent ---------
+    // The lingering-flag path. Changing the role alone leaves the flags behind
+    // on a row where they now grant real access, so the database refuses it.
+    const { error: demote } = await admin
+      .from("profiles")
+      .update({ role: "parent" })
+      .eq("id", staffProfileId);
+    check(
+      "demoting a FLAGGED staff member to parent is REFUSED — the flags cannot linger",
+      Boolean(demote),
+      demote ? "" : "accepted — the flags survived onto a parent row",
+    );
+
+    // --- CONTROL: clearing the flags in the same statement IS allowed --------
+    // This is exactly what updatePersonRole() does, and the reason it has to.
+    const { error: demoteClean } = await admin
+      .from("profiles")
+      .update({ role: "parent", manage_horses: false, family_id: null })
+      .eq("id", staffProfileId);
+    check(
+      "control: demoting WITH the flags cleared in the same statement succeeds — the hand-over path is open",
+      !demoteClean,
+      demoteClean?.message,
+    );
+
+    // --- Restore --------------------------------------------------------------
+    await admin.from("profiles").update({ role: "staff" }).eq("id", staffProfileId);
+    const restored = await flagsOf(staffProfileId);
+    const parentRestored = await flagsOf(parentProfileId);
+    check(
+      "the fixtures are restored — staff is staff with no flags, parent is clean",
+      restored?.role === "staff" &&
+        restored?.manage_horses === false &&
+        parentRestored?.role === "parent" &&
+        parentRestored?.manage_horses === false,
+      `staff=${restored?.role}/${restored?.manage_horses}, parent=${parentRestored?.role}/${parentRestored?.manage_horses}`,
+    );
+  }
+
+  // ===========================================================================
   // STANDING GUARD — the barn always has at least one admin (migration 0016)
   //
   // The Team panel's server action already refuses to demote the last admin,

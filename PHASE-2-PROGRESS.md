@@ -13,14 +13,15 @@
 `events` are on. The `design-pass` branch is **merged in** (fast-forward, no
 conflicts), and the **Team panel** is built on top of it.
 
-**Suite: 559 passed, 0 failed, 0 skipped**, run twice with no re-seed. Advisor
+**Suite: 567 passed, 0 failed, 0 skipped**, run twice with no re-seed. Advisor
 **clean across 8 lints**. Plus `test:pdf` (12), `test:ical` (30) and
 `test:invites` (27).
 
-Migration 0017 was audited, applied on 2026-07-31, and `features.invites` is
-**on**. The invites RLS section switched itself on as designed (gated on the
-table existing, not on the flag), taking the suite from 533-with-a-skip to
-**559 with none**.
+Migrations 0017 (invites) and 0018 (parents hold no flags) were both audited
+and applied on 2026-07-31, and `features.invites` is **on**. The invites RLS
+section switched itself on as designed — gated on the table existing rather
+than on the flag — taking the suite from 533-with-a-skip to 559 with none;
+0018's eight assertions bring it to **567**.
 
 The green gate is now one command, and it includes the Advisor:
 
@@ -40,6 +41,7 @@ npm run db:gate    # seed → test:policies → test:policies (no re-seed) → d
 | — Team panel (admin UI) | **none needed** | — | Live |
 | — at-least-one-admin rule | 0016 | — | Live |
 | — invites / provisioning | 0017 | `invites` **on** | Live |
+| — parents hold no flags | 0018 | — | Live |
 
 ---
 
@@ -254,6 +256,59 @@ list that anything added to it is reachable by the internet with no session.
 
 ---
 
+## Migration 0018 — a parent row can never carry a permission flag
+
+The `profiles`-table mirror of `invites_flags_only_for_staff`, and the
+structural close on the `has_permission()` quirk written up above.
+
+`has_permission()` short-circuits to true for admin and otherwise reads the
+flag column **without checking that the role is staff**, so a parent carrying
+`manage_horses` genuinely holds barn-wide write access. 0017 closed the one
+path that creates a profile from stored values; **0018 closes the data**. The
+unsafe combination can no longer exist, so the quirk has nothing to act on —
+which is better than a rule the app has to keep remembering.
+
+```sql
+alter table public.profiles
+  add constraint profiles_flags_only_for_staff check (
+    role <> 'parent'
+    or (manage_shows = false and manage_schedule = false and manage_horses = false)
+  );
+```
+
+**Admin is deliberately unconstrained.** It holds every permission implicitly,
+so whatever its flag columns say is never read. Constraining them would forbid
+a harmless state and break the ordinary staff → admin promotion, which does not
+clear them. Only the one genuinely unsafe combination is forbidden.
+
+**Checked before applying, not after.** A pre-flight query looked for existing
+parent rows carrying a flag — there were none, across all four fixture profiles
+— so the `ADD` could not fail opaquely.
+
+**It changed an app path, which is the point.** Demoting a flagged staff member
+to parent would previously have left the flags behind on a row where they now
+grant real access. The constraint refuses that, so `updatePersonRole()` now
+clears the flags **in the same statement** as the role change — exactly as it
+already clears `family_id` on the way up, and for exactly the same reason: a
+second UPDATE would arrive after the row was already a parent carrying flags.
+A rejection surfaces as *"Parents hold no permissions. Untick what this person
+manages before making them a parent."*
+
+**Eight assertions, positive control first:**
+
+| | |
+|---|---|
+| **control** | **a STAFF profile CAN be given `manage_horses`** — proves the constraint is not a blanket refusal of every flag |
+| control | and it really stored |
+| deny | an admin CANNOT give a PARENT `manage_horses` |
+| deny | …with errcode **23514** |
+| deny | and the parent's flag is still false |
+| deny | demoting a FLAGGED staff member to parent is refused — the flags cannot linger |
+| **control** | **demoting WITH the flags cleared in the same statement succeeds** — the hand-over path stays open |
+| restore | fixtures back to staff-with-no-flags and a clean parent |
+
+---
+
 ## Migration 0016 — "at least one admin" is now a database rule
 
 `20260731000100_at_least_one_admin.sql`. An AFTER UPDATE OR DELETE trigger on
@@ -376,21 +431,6 @@ shows phase was not started.
 ---
 
 ## WHAT NEEDS DAVID
-
-**A. A separate small migration, not folded into the invites slice.**
-`has_permission()` honours a `manage_*` flag on a **parent** row — verified, see
-above. `profiles` has no CHECK stopping that combination the way `invites` now
-does. The fix mirrors 0017:
-
-```sql
-alter table public.profiles add constraint profiles_flags_only_for_staff
-  check (role <> 'parent'
-         or (manage_shows = false and manage_schedule = false and manage_horses = false));
-```
-
-Nothing sets it today, so this is a latch on a door nobody is currently opening
-— but it is the kind of thing that hides. Your call whether it rides with 0017
-or goes on its own.
 
 1. **Confirm the rider age brackets** (Team panel, section B). `config/barn.ts`
    → `riderAgeGroups` currently reads **10 & under / 11–13 / 14–17 / Adult**.
@@ -827,7 +867,7 @@ npm run db:apply -- <f>  # apply a migration
 npm run db:seed          # test fixtures
 npm run db:gate          # THE GREEN GATE: seed → policies → policies → advisor
 npm run db:advisor       # Supabase security lints (splinter), DB-level only
-npm run test:policies    # the 559-assertion RLS suite
+npm run test:policies    # the 567-assertion RLS suite
 npm run test:pdf         # PDF structure (12)
 npm run test:ical        # feed format, DST conversion, feed scoping (30)
 npm run test:invites     # invite status, expiry, flag rules, the one bad-token message (27)

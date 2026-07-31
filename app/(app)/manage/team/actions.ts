@@ -63,6 +63,9 @@ function readable(message: string): string {
   if (message.includes("profiles_family_only_for_parents")) {
     return "Only parents belong to a family. Clear the family before making this person staff or an admin.";
   }
+  if (message.includes("profiles_flags_only_for_staff")) {
+    return "Parents hold no permissions. Untick what this person manages before making them a parent.";
+  }
   if (message.includes("levels_name_key")) {
     return "There is already a level with that name.";
   }
@@ -108,14 +111,19 @@ export async function updatePersonDetails(
 /**
  * Change someone's role.
  *
- * TWO THINGS THIS HAS TO GET RIGHT, both of which the database will otherwise
+ * THREE THINGS THIS HAS TO GET RIGHT, each of which the database will otherwise
  * refuse or allow wrongly:
  *
  *  1. `profiles_family_only_for_parents` requires family_id to be null unless
  *     role is 'parent'. Promoting a parent to staff therefore has to clear the
  *     family IN THE SAME UPDATE — two statements would leave a moment where the
  *     row violates its own constraint, and the first one would simply fail.
- *  2. The barn must not end up with no admin at all. Nothing in the schema
+ *  2. `profiles_flags_only_for_staff` (migration 0018) is the mirror image:
+ *     demoting a flagged staff member to parent has to clear the permission
+ *     flags in that same update, for exactly the same reason. Without it the
+ *     flags would linger on a row where has_permission() now honours them —
+ *     which is precisely the hole 0018 exists to close.
+ *  3. The barn must not end up with no admin at all. Nothing in the schema
  *     prevents the last admin demoting themselves, and the resulting state is
  *     unrecoverable from inside the app: no one left can promote anyone.
  */
@@ -162,6 +170,15 @@ export async function updatePersonRole(
       role: role as Role,
       // Staff and admin never belong to a family; parents may or may not yet.
       family_id: role === "parent" ? familyId : null,
+      // A parent holds no permission flags. Cleared in the SAME statement as
+      // the role change — a second UPDATE would arrive after the row was
+      // already a parent carrying flags, which the constraint refuses. Admin is
+      // left alone: it holds everything implicitly, so its stored flags are
+      // never read and clearing them would lose a staff member's grants on the
+      // way up.
+      ...(role === "parent"
+        ? { manage_shows: false, manage_schedule: false, manage_horses: false }
+        : {}),
     })
     .eq("id", id);
 
