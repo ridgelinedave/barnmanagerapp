@@ -2,6 +2,7 @@ import { TabPage } from "@/components/TabPage";
 import { StubScreen } from "@/components/StubScreen";
 import { ClockButton } from "@/components/ClockButton";
 import { PunchList } from "@/components/PunchList";
+import { Card, SectionHeader } from "@/components/ui/primitives";
 import { requireTab } from "@/lib/guard";
 import { listPunchesBetween } from "@/lib/punches";
 import { addBarnDays, barnToday, formatBarnDayLabel } from "@/lib/dates";
@@ -41,19 +42,20 @@ export default async function ClockPage() {
     <TabPage title="Clock">
       <ClockButton clockedIn={Boolean(openPunch)} />
 
-      <section className="rounded-2xl border border-brand-ink/10 bg-white p-4">
-        <div className="flex items-baseline justify-between">
-          <h2 className="text-base font-semibold">This week</h2>
-          <p className="text-lg font-semibold tabular-nums">{formatMinutes(week)}</p>
+      <Card className="flex items-baseline gap-3 p-4">
+        <div className="min-w-0 flex-1">
+          <h2 className="font-display text-heading text-ink">This week</h2>
+          <p className="mt-0.5 text-caption text-muted">Since {formatBarnDayLabel(weekStart)}</p>
         </div>
-        <p className="mt-0.5 text-sm text-brand-ink/60">
-          Since {formatBarnDayLabel(weekStart)}
-        </p>
-      </section>
+        <p className="font-display text-display leading-none text-ink">{formatMinutes(week)}</p>
+      </Card>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-base font-semibold">Today</h2>
-        <PunchList punches={todaysPunches} emptyLabel="No punches yet today." />
+        <SectionHeader title="Today" />
+        <PunchList
+          punches={todaysPunches}
+          emptyLabel="Nothing yet today — tap the button above when you start."
+        />
       </section>
     </TabPage>
   );

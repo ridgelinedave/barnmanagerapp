@@ -1,4 +1,5 @@
 import { TabPage } from "@/components/TabPage";
+import { Card, Chip, EmptyState } from "@/components/ui/primitives";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseConfigured } from "@/lib/env";
 import { currentRole } from "@/lib/guard";
@@ -28,21 +29,29 @@ export default async function NotificationsPage() {
   return (
     <TabPage title="Notifications">
       {items.length === 0 ? (
-        <p className="rounded-2xl border border-brand-ink/10 bg-white p-5 text-sm text-brand-ink/70">
-          No notifications yet.
-        </p>
+        <EmptyState
+          title="Nothing waiting"
+          body="Lesson reminders, offered spots and barn news land here. We'll badge the bell when something arrives."
+          emoji="🔔"
+        />
       ) : (
         <ul className="flex flex-col gap-3">
           {items.map((item) => (
-            <li
+            <Card
+              as="li"
               key={item.id}
-              className={`rounded-2xl border bg-white p-4 ${
-                item.read_at ? "border-brand-ink/10" : "border-brand-gold/60"
-              }`}
+              className={`p-4 ${item.read_at ? "" : "border-gold/60"}`}
             >
-              <h2 className="text-sm font-semibold">{item.title}</h2>
-              {item.body && <p className="mt-1 text-sm text-brand-ink/70">{item.body}</p>}
-            </li>
+              <div className="flex items-start gap-2">
+                <h2 className="min-w-0 flex-1 font-display text-heading leading-snug text-ink">
+                  {item.title}
+                </h2>
+                {/* Unread gets a chip as well as the border — the border alone
+                    is a colour-only signal. */}
+                {!item.read_at && <Chip value="New" icon="bell" tone="gold" />}
+              </div>
+              {item.body && <p className="mt-1 text-caption text-muted">{item.body}</p>}
+            </Card>
           ))}
         </ul>
       )}

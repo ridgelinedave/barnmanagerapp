@@ -1,6 +1,9 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { Card, Chip, ChipRow, Sunk } from "@/components/ui/primitives";
+import { Button } from "@/components/ui/Button";
+import { FormFeedback } from "@/components/ui/Field";
 import {
   addCorrection,
   approveTimesheet,
@@ -12,21 +15,7 @@ import { formatMinutes } from "@/lib/timeclock";
 const EMPTY: TimesheetState = { error: null, message: null };
 
 function Feedback({ state }: { state: TimesheetState }) {
-  if (state.error) {
-    return (
-      <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-800">
-        {state.error}
-      </p>
-    );
-  }
-  if (state.message) {
-    return (
-      <p role="status" className="rounded-xl bg-green-50 p-3 text-sm text-green-900">
-        {state.message}
-      </p>
-    );
-  }
-  return null;
+  return <FormFeedback error={state.error} message={state.message} />;
 }
 
 export function NewPayPeriodForm({ start, end }: { start: string; end: string }) {
@@ -36,7 +25,7 @@ export function NewPayPeriodForm({ start, end }: { start: string; end: string })
     <form action={formAction} className="flex flex-col gap-3">
       <div className="flex gap-2">
         <div className="flex flex-1 flex-col gap-1.5">
-          <label htmlFor="pp-start" className="text-sm font-medium">
+          <label htmlFor="pp-start" className="text-label font-medium text-ink">
             From
           </label>
           <input
@@ -44,11 +33,11 @@ export function NewPayPeriodForm({ start, end }: { start: string; end: string })
             name="start_date"
             type="date"
             defaultValue={start}
-            className="min-h-12 rounded-xl border border-brand-ink/20 bg-white px-3 text-base"
+            className="min-h-12 w-full rounded-control border border-line bg-surface px-3 text-body text-ink"
           />
         </div>
         <div className="flex flex-1 flex-col gap-1.5">
-          <label htmlFor="pp-end" className="text-sm font-medium">
+          <label htmlFor="pp-end" className="text-label font-medium text-ink">
             To
           </label>
           <input
@@ -56,18 +45,14 @@ export function NewPayPeriodForm({ start, end }: { start: string; end: string })
             name="end_date"
             type="date"
             defaultValue={end}
-            className="min-h-12 rounded-xl border border-brand-ink/20 bg-white px-3 text-base"
+            className="min-h-12 w-full rounded-control border border-line bg-surface px-3 text-body text-ink"
           />
         </div>
       </div>
       <Feedback state={state} />
-      <button
-        type="submit"
-        disabled={pending}
-        className="min-h-12 rounded-xl bg-brand-gold px-4 text-base font-semibold text-brand-ink disabled:opacity-60"
-      >
+      <Button type="submit" variant="primary" block disabled={pending}>
         {pending ? "Opening…" : "Open a pay period"}
-      </button>
+      </Button>
     </form>
   );
 }
@@ -102,73 +87,72 @@ export function EmployeeTimesheetCard({
   const [correcting, setCorrecting] = useState(false);
 
   return (
-    <article className="flex flex-col gap-3 rounded-2xl border border-brand-ink/15 bg-white p-4">
-      <div className="flex items-baseline gap-2">
-        <h3 className="flex-1 text-base font-semibold">{name}</h3>
-        <span className="text-lg font-semibold tabular-nums">{formatMinutes(minutes)}</span>
+    <Card as="article" className="flex flex-col gap-3 p-4">
+      <div className="flex items-baseline gap-3">
+        <h3 className="min-w-0 flex-1 font-display text-heading text-ink">{name}</h3>
+        <span className="font-display text-title leading-none text-ink">
+          {formatMinutes(minutes)}
+        </span>
       </div>
 
-      <div className="flex flex-wrap gap-1">
-        {flaggedCount > 0 && (
-          <span className="rounded-full bg-brand-ink/10 px-2 py-0.5 text-[11px] font-semibold text-brand-ink/75">
-            {flaggedCount} to check
-          </span>
-        )}
-        {approvedMinutes !== null && (
-          <span className="rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-semibold text-green-900">
-            Approved at {formatMinutes(approvedMinutes)}
-          </span>
-        )}
-      </div>
+      {(flaggedCount > 0 || approvedMinutes !== null) && (
+        <ChipRow>
+          {flaggedCount > 0 && (
+            <Chip value={`${flaggedCount} to check`} icon="alert" tone="gold" />
+          )}
+          {approvedMinutes !== null && (
+            <Chip value={`Approved at ${formatMinutes(approvedMinutes)}`} icon="check" tone="forest" />
+          )}
+        </ChipRow>
+      )}
 
       {periodId && (
         <form action={approveAction}>
           <input type="hidden" name="period_id" value={periodId} />
           <input type="hidden" name="profile_id" value={profileId} />
           <input type="hidden" name="total_minutes" value={minutes} />
-          <button
-            type="submit"
-            disabled={approvePending}
-            className="min-h-11 w-full rounded-xl bg-brand-gold px-4 text-sm font-semibold text-brand-ink disabled:opacity-60"
-          >
+          <Button type="submit" variant="primary" block disabled={approvePending}>
             {approvePending
               ? "Approving…"
               : approvedMinutes !== null
                 ? "Re-approve at this total"
                 : "Approve these hours"}
-          </button>
+          </Button>
         </form>
       )}
       <Feedback state={approveState} />
 
       {correctable.length > 0 && (
         <>
-          <button
+          <Button
             type="button"
             onClick={() => setCorrecting((v) => !v)}
             aria-expanded={correcting}
-            className="min-h-11 w-full rounded-xl border border-brand-ink/20 bg-white text-sm font-semibold"
+            variant="secondary"
+            block
           >
             {correcting ? "Close" : "Add a correction"}
-          </button>
+          </Button>
 
+          {/* Sunk, not a bordered box: this opens inside the employee's card. */}
           {correcting && (
-            <form action={correctAction} className="flex flex-col gap-3 rounded-xl border border-brand-ink/15 p-3">
+            <Sunk>
+              <form action={correctAction} className="flex flex-col gap-3">
               <input type="hidden" name="profile_id" value={profileId} />
 
-              <p className="text-xs text-brand-ink/60">
+              <p className="text-caption text-muted">
                 This adds a correcting entry. The original punch stays in the record.
               </p>
 
               <div className="flex flex-col gap-1.5">
-                <label htmlFor={`adj-${profileId}`} className="text-sm font-medium">
+                <label htmlFor={`adj-${profileId}`} className="text-label font-medium text-ink">
                   Punch being corrected
                 </label>
                 <select
                   id={`adj-${profileId}`}
                   name="adjusts_punch_id"
                   required
-                  className="min-h-11 rounded-xl border border-brand-ink/20 bg-white px-3 text-sm"
+                  className="min-h-12 w-full rounded-control border border-line bg-surface px-3 text-body text-ink"
                 >
                   {correctable.map((punch) => (
                     <option key={punch.id} value={punch.id}>
@@ -180,20 +164,20 @@ export function EmployeeTimesheetCard({
 
               <div className="flex gap-2">
                 <div className="flex flex-1 flex-col gap-1.5">
-                  <label htmlFor={`dir-${profileId}`} className="text-sm font-medium">
+                  <label htmlFor={`dir-${profileId}`} className="text-label font-medium text-ink">
                     Should be
                   </label>
                   <select
                     id={`dir-${profileId}`}
                     name="direction"
-                    className="min-h-11 rounded-xl border border-brand-ink/20 bg-white px-3 text-sm"
+                    className="min-h-12 w-full rounded-control border border-line bg-surface px-3 text-body text-ink"
                   >
                     <option value="in">In</option>
                     <option value="out">Out</option>
                   </select>
                 </div>
                 <div className="flex flex-1 flex-col gap-1.5">
-                  <label htmlFor={`at-${profileId}`} className="text-sm font-medium">
+                  <label htmlFor={`at-${profileId}`} className="text-label font-medium text-ink">
                     At
                   </label>
                   <input
@@ -201,13 +185,13 @@ export function EmployeeTimesheetCard({
                     name="punched_at"
                     type="datetime-local"
                     required
-                    className="min-h-11 rounded-xl border border-brand-ink/20 bg-white px-2 text-sm"
+                    className="min-h-12 w-full rounded-control border border-line bg-surface px-2 text-body text-ink"
                   />
                 </div>
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label htmlFor={`note-${profileId}`} className="text-sm font-medium">
+                <label htmlFor={`note-${profileId}`} className="text-label font-medium text-ink">
                   Why
                 </label>
                 <input
@@ -215,23 +199,20 @@ export function EmployeeTimesheetCard({
                   name="note"
                   required
                   placeholder="Forgot to clock out"
-                  className="min-h-11 rounded-xl border border-brand-ink/20 bg-white px-3 text-sm"
+                  className="min-h-12 w-full rounded-control border border-line bg-surface px-3 text-body text-ink"
                 />
               </div>
 
               <Feedback state={correctState} />
 
-              <button
-                type="submit"
-                disabled={correctPending}
-                className="min-h-11 rounded-xl bg-brand-gold px-4 text-sm font-semibold text-brand-ink disabled:opacity-60"
-              >
+              <Button type="submit" variant="primary" block disabled={correctPending}>
                 {correctPending ? "Saving…" : "Add correction"}
-              </button>
-            </form>
+              </Button>
+              </form>
+            </Sunk>
           )}
         </>
       )}
-    </article>
+    </Card>
   );
 }

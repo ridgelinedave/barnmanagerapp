@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { TabPage } from "@/components/TabPage";
 import { PunchList } from "@/components/PunchList";
+import { Card, EmptyState, SectionHeader } from "@/components/ui/primitives";
 import { currentRole } from "@/lib/guard";
 import { redirect } from "next/navigation";
 import { listPunchesBetween, listApprovals, listPayPeriods } from "@/lib/punches";
@@ -38,59 +38,47 @@ export default async function TimesheetPage() {
   const days = [...byDay.entries()].sort((a, b) => b[0].localeCompare(a[0]));
 
   return (
-    <TabPage title="My timesheet">
+    <TabPage title="My timesheet" back="/more">
       {approvals.length > 0 && (
         <section className="flex flex-col gap-2">
-          <h2 className="text-base font-semibold">Approved</h2>
+          <SectionHeader title="Approved" />
           {approvals.map((approval) => {
             const period = periodById.get(approval.period_id);
             return (
-              <div
-                key={approval.id}
-                className="flex items-baseline gap-2 rounded-2xl border border-brand-ink/10 bg-white p-4"
-              >
-                <span className="flex-1 text-sm">
+              <Card key={approval.id} className="flex items-baseline gap-3 p-4">
+                <span className="min-w-0 flex-1 text-caption text-ink">
                   {period
                     ? `${formatBarnDayLabel(period.start_date)} – ${formatBarnDayLabel(period.end_date)}`
                     : "Pay period"}
                 </span>
-                <span className="text-base font-semibold tabular-nums">
+                <span className="font-display text-heading text-ink">
                   {formatMinutes(approval.total_minutes)}
                 </span>
-              </div>
+              </Card>
             );
           })}
         </section>
       )}
 
-      <h2 className="text-base font-semibold">Last 4 weeks</h2>
+      <SectionHeader title="Last 4 weeks" />
 
       {days.length === 0 ? (
-        <p className="rounded-2xl border border-brand-ink/10 bg-white p-4 text-sm text-brand-ink/70">
-          No punches recorded yet.
-        </p>
+        <EmptyState
+          title="No hours yet"
+          body="Every time you clock in and out it lands here, day by day, so you can check your week before it is approved."
+          emoji="⏱️"
+        />
       ) : (
         days.map(([day, dayPunches]) => {
           const minutes = totalMinutes(pairPunches(dayPunches));
           return (
             <section key={day} className="flex flex-col gap-2">
-              <div className="flex items-baseline justify-between">
-                <h3 className="text-sm font-semibold text-brand-ink/70">
-                  {formatBarnDayLabel(day)}
-                </h3>
-                <span className="text-sm font-semibold tabular-nums">
-                  {formatMinutes(minutes)}
-                </span>
-              </div>
+              <SectionHeader title={formatBarnDayLabel(day)} count={formatMinutes(minutes)} />
               <PunchList punches={dayPunches} />
             </section>
           );
         })
       )}
-
-      <Link href="/more" className="py-2 text-center text-sm font-medium underline">
-        Back to More
-      </Link>
     </TabPage>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Icon } from "@/components/ui/Icon";
 import { createClient } from "@/lib/supabase/client";
 import { supabaseConfigured } from "@/lib/env";
 
@@ -45,27 +46,20 @@ export function NotificationBell() {
 
   const label = unread > 0 ? `Notifications, ${unread} unread` : "Notifications";
 
+  /*
+   * The bell sits in the charcoal header, so it is white-on-dark; the badge is
+   * gold carrying ink rather than a red dot, because unread mail is not an
+   * error — red in this system means something is wrong.
+   */
   return (
     <a
       href="/notifications"
       aria-label={label}
-      className="relative inline-flex size-11 items-center justify-center rounded-full text-brand-ink"
+      className="relative -mr-1.5 inline-flex size-11 shrink-0 items-center justify-center rounded-chip text-white/85"
     >
-      <svg
-        aria-hidden="true"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="size-6"
-      >
-        <path d="M18 8a6 6 0 1 0-12 0c0 6-2 7-2 7h16s-2-1-2-7Z" />
-        <path d="M10.5 20a2 2 0 0 0 3 0" />
-      </svg>
+      <Icon name="bell" className="size-6" />
       {unread > 0 && (
-        <span className="absolute right-1.5 top-1.5 min-w-5 rounded-full bg-red-600 px-1 text-center text-xs font-semibold leading-5 text-white">
+        <span className="absolute right-0.5 top-1 min-w-5 rounded-chip bg-gold px-1 text-center font-display text-caption font-bold leading-5 text-ink">
           {unread > 99 ? "99+" : unread}
         </span>
       )}

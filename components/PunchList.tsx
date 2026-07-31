@@ -1,3 +1,4 @@
+import { Card, Chip, ChipRow } from "@/components/ui/primitives";
 import type { Punch } from "@/lib/types";
 import { flagsForPunch, FLAG_LABEL } from "@/lib/timeclock";
 import { barn } from "@/config/barn";
@@ -26,7 +27,7 @@ export function PunchList({
 }) {
   if (punches.length === 0) {
     return (
-      <p className="rounded-2xl border border-brand-ink/10 bg-white p-4 text-sm text-brand-ink/70">
+      <p className="rounded-card border border-line bg-surface p-4 text-caption text-muted">
         {emptyLabel}
       </p>
     );
@@ -39,43 +40,37 @@ export function PunchList({
         const correction = punch.source === "admin_adjustment";
 
         return (
-          <li
+          <Card
+            as="li"
             key={punch.id}
-            className={`rounded-2xl border p-3 ${
-              correction ? "border-brand-gold/50 bg-brand-gold/5" : "border-brand-ink/10 bg-white"
-            }`}
+            className={`p-3 ${correction ? "border-gold/50 bg-gold-soft" : ""}`}
           >
-            <div className="flex flex-wrap items-baseline gap-x-2">
-              <span className="text-base font-semibold">
+            <div className="flex items-baseline gap-2">
+              {/* Direction as a word, not just a colour — this is a pay record. */}
+              <span className="font-display text-heading text-ink">
                 {punch.direction === "in" ? "In" : "Out"}
               </span>
-              <span className="tabular-nums text-brand-ink/80">
+              <span className="text-body text-ink">
                 {timeFormatter.format(new Date(punch.punched_at))}
               </span>
-              {correction && (
-                <span className="ml-auto rounded-full bg-brand-gold/40 px-2 py-0.5 text-[11px] font-semibold text-brand-ink">
-                  Correction
-                </span>
-              )}
             </div>
 
-            {flags.length > 0 && !correction && (
-              <p className="mt-1 flex flex-wrap gap-1">
-                {flags.map((flag) => (
-                  <span
-                    key={flag}
-                    className="rounded-full bg-brand-ink/10 px-2 py-0.5 text-[11px] font-semibold text-brand-ink/70"
-                  >
-                    {FLAG_LABEL[flag]}
-                  </span>
-                ))}
-              </p>
+            {(correction || (flags.length > 0 && !correction)) && (
+              <div className="mt-1.5">
+                <ChipRow>
+                  {correction && <Chip value="Correction" icon="alert" tone="gold" />}
+                  {!correction &&
+                    flags.map((flag) => (
+                      <Chip key={flag} value={FLAG_LABEL[flag]} icon="alert" tone="neutral" />
+                    ))}
+                </ChipRow>
+              </div>
             )}
 
             {showNotes && punch.note && (
-              <p className="mt-1 text-sm text-brand-ink/70">{punch.note}</p>
+              <p className="mt-1.5 text-caption text-muted">{punch.note}</p>
             )}
-          </li>
+          </Card>
         );
       })}
     </ul>

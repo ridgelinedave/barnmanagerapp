@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useRef, useState } from "react";
+import { FormFeedback } from "@/components/ui/Field";
 import { recordPunch, type PunchState } from "@/app/(app)/clock/actions";
 
 /**
@@ -70,32 +71,33 @@ export function ClockButton({ clockedIn }: { clockedIn: boolean }) {
       <input type="hidden" name="lat" defaultValue="" />
       <input type="hidden" name="lng" defaultValue="" />
 
+      {/*
+       * The biggest target in the app, deliberately: this is pressed in the
+       * dark, in gloves, usually while carrying something. Gold when you are
+       * off the clock (the inviting state), a bordered surface with a forest
+       * dot when you are on it — so a glance from across the aisle answers
+       * "am I clocked in" without reading a word.
+       */}
       <button
         type="button"
         onClick={onClick}
         disabled={busy}
-        className={`flex min-h-32 w-full flex-col items-center justify-center gap-1 rounded-3xl text-2xl font-semibold disabled:opacity-60 ${
-          clockedIn
-            ? "border-2 border-brand-ink/25 bg-white text-brand-ink"
-            : "bg-brand-gold text-brand-ink"
+        className={`flex min-h-32 w-full flex-col items-center justify-center gap-1.5 rounded-sheet transition-transform duration-150 ease-out active:scale-[0.99] disabled:opacity-60 ${
+          clockedIn ? "border-2 border-line bg-surface" : "bg-gold"
         }`}
       >
-        <span>{busy ? "…" : clockedIn ? "Clock out" : "Clock in"}</span>
-        <span className="text-sm font-medium text-brand-ink/60">
+        <span className="flex items-center gap-2 font-display text-[1.75rem] font-bold leading-none text-ink">
+          {clockedIn && (
+            <span aria-hidden="true" className="size-2.5 rounded-full bg-forest" />
+          )}
+          {busy ? "…" : clockedIn ? "Clock out" : "Clock in"}
+        </span>
+        <span className="text-label text-muted">
           {locating ? "Getting your location…" : clockedIn ? "You're on the clock" : "Tap to start"}
         </span>
       </button>
 
-      {state.message && (
-        <p role="status" className="rounded-xl bg-green-50 p-3 text-sm text-green-900">
-          {state.message}
-        </p>
-      )}
-      {state.error && (
-        <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-800">
-          {state.error}
-        </p>
-      )}
+      <FormFeedback error={state.error} message={state.message} />
     </form>
   );
 }

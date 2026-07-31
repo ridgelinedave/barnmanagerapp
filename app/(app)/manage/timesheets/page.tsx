@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { TabPage } from "@/components/TabPage";
 import { EmployeeTimesheetCard, NewPayPeriodForm } from "@/components/TimesheetAdmin";
+import { Card, Chip, EmptyState } from "@/components/ui/primitives";
+import { Button } from "@/components/ui/Button";
+import { SheetTrigger } from "@/components/ui/Sheet";
 import { requireTab } from "@/lib/guard";
 import { listPunchesBetween, listPayPeriods, listApprovals } from "@/lib/punches";
 import { listAssignableProfiles, nameMap } from "@/lib/tasks";
@@ -56,7 +59,7 @@ export default async function ManageTimesheetsPage({
   const employees = people.filter((p) => p.role === "staff" || byProfile.has(p.id));
 
   return (
-    <TabPage title="Timesheets">
+    <TabPage title="Timesheets" back="/manage">
       {periods.length > 0 && (
         <nav aria-label="Pay period" className="flex flex-wrap gap-2">
           {periods.slice(0, 6).map((p) => (
@@ -64,10 +67,8 @@ export default async function ManageTimesheetsPage({
               key={p.id}
               href={`/manage/timesheets?period=${p.id}`}
               aria-current={p.id === period?.id ? "page" : undefined}
-              className={`flex min-h-11 items-center rounded-xl px-3 text-sm font-semibold ${
-                p.id === period?.id
-                  ? "bg-brand-gold text-brand-ink"
-                  : "border border-brand-ink/20 bg-white"
+              className={`flex min-h-11 items-center rounded-chip px-3 text-label font-semibold ${
+                p.id === period?.id ? "bg-gold text-ink" : "border border-line bg-surface text-ink"
               }`}
             >
               {formatBarnDayLabel(p.start_date)}
@@ -77,21 +78,29 @@ export default async function ManageTimesheetsPage({
       )}
 
       {!period ? (
-        <p className="rounded-2xl border border-brand-ink/10 bg-white p-4 text-sm text-brand-ink/70">
-          No pay periods yet. Open one below to start reviewing hours.
-        </p>
+        <EmptyState
+          title="No pay periods yet"
+          body="Open one below and the week's punches get grouped under it, ready to check and approve."
+          emoji="🗓️"
+        />
       ) : (
         <>
-          <section className="rounded-2xl border border-brand-ink/10 bg-white p-4">
-            <h2 className="text-base font-semibold">
+          <Card className="p-4">
+            <h2 className="font-display text-heading text-ink">
               {formatBarnDayLabel(period.start_date)} – {formatBarnDayLabel(period.end_date)}
             </h2>
-            <p className="mt-0.5 text-sm capitalize text-brand-ink/60">{period.status}</p>
+            <div className="mt-1.5">
+              <Chip
+                value={period.status}
+                icon={period.status === "open" ? "clock" : "check"}
+                tone={period.status === "open" ? "gold" : "forest"}
+              />
+            </div>
 
             <div className="mt-3 flex flex-wrap gap-2">
               <a
                 href={`/manage/timesheets/export?period=${period.id}`}
-                className="flex min-h-11 flex-1 items-center justify-center rounded-xl border border-brand-ink/20 px-3 text-sm font-semibold"
+                className="inline-flex min-h-12 flex-1 items-center justify-center rounded-control border border-line bg-surface px-4 text-label font-semibold text-ink"
               >
                 Export CSV
               </a>
@@ -102,25 +111,24 @@ export default async function ManageTimesheetsPage({
                   name="status"
                   value={period.status === "open" ? "approved" : "open"}
                 />
-                <button
-                  type="submit"
-                  className="min-h-11 rounded-xl border border-brand-ink/20 bg-white px-3 text-sm font-semibold"
-                >
+                <Button type="submit" variant="secondary">
                   {period.status === "open" ? "Close period" : "Reopen"}
-                </button>
+                </Button>
               </form>
             </div>
 
-            <p className="mt-2 text-xs text-brand-ink/55">
+            <p className="mt-2 text-caption text-muted">
               CSV export stands in for QuickBooks while the API sync is deferred. Confirm the
               column layout against the barn&apos;s QuickBooks before relying on a straight import.
             </p>
-          </section>
+          </Card>
 
           {employees.length === 0 ? (
-            <p className="rounded-2xl border border-brand-ink/10 bg-white p-4 text-sm text-brand-ink/70">
-              No staff punches in this period.
-            </p>
+            <EmptyState
+              title="No punches in this period"
+              body="Once staff start clocking in against these dates, each person gets a card here with their total and anything worth checking."
+              emoji="⏱️"
+            />
           ) : (
             employees.map((person) => {
               const theirs = byProfile.get(person.id) ?? [];
@@ -155,14 +163,9 @@ export default async function ManageTimesheetsPage({
         </>
       )}
 
-      <section className="flex flex-col gap-3 rounded-2xl border border-brand-ink/10 bg-white p-4">
-        <h2 className="text-base font-semibold">Open a pay period</h2>
+      <SheetTrigger label="Open a pay period" title="New pay period">
         <NewPayPeriodForm start={suggestion.start} end={suggestion.end} />
-      </section>
-
-      <Link href="/manage" className="py-2 text-center text-sm font-medium underline">
-        Back to Manage
-      </Link>
+      </SheetTrigger>
     </TabPage>
   );
 }
