@@ -20,15 +20,18 @@ export function LaunchScreen() {
     >
       <Image
         src={barn.brand.logoSrc}
-        alt={barn.name}
+        alt=""
         width={160}
         height={160}
         priority
         className="size-40"
       />
+      {/* The wordmark, so the launch field and the sign-in door read as the
+          same door. Display face, because this is the app announcing itself. */}
+      <p className="font-display text-display text-white">{barn.name}</p>
       <span
         aria-hidden="true"
-        className="h-1 w-24 animate-pulse rounded-full"
+        className="h-1 w-24 animate-pulse rounded-chip"
         style={{ backgroundColor: barn.brand.gold, opacity: 0.7 }}
       />
       <span className="sr-only">Loading {barn.name}</span>

@@ -3,6 +3,7 @@ import Image from "next/image";
 import { getViewer } from "@/lib/session";
 import { devRoleSwitcherEnabled, DEV_ROLE_NONE } from "@/lib/dev-role";
 import { DevRoleSwitcher } from "@/components/DevRoleSwitcher";
+import { Button } from "@/components/ui/Button";
 import { barn } from "@/config/barn";
 
 export const metadata = { title: "Account not set up" };
@@ -34,7 +35,7 @@ export default async function AccountPendingPage() {
       <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center gap-6 px-5 py-10 text-center">
         <Image
           src={barn.brand.logoSrc}
-          alt={barn.name}
+          alt=""
           width={64}
           height={64}
           priority
@@ -42,21 +43,20 @@ export default async function AccountPendingPage() {
         />
 
         <div className="flex flex-col gap-2">
-          <h1 className="text-xl font-semibold">Your account isn&apos;t set up yet</h1>
-          <p className="text-sm text-brand-ink/70">
+          <h1 className="font-display text-display text-ink">
+            Your account isn&apos;t set up yet
+          </h1>
+          <p className="text-caption text-muted">
             You&apos;re signed in{state.email ? ` as ${state.email}` : ""}, but this account
-            hasn&apos;t been linked to a barn profile. Please contact the barn and we&apos;ll get
-            you set up.
+            hasn&apos;t been linked to a barn profile. Contact {barn.owner} and we&apos;ll get you
+            set up.
           </p>
         </div>
 
         <form action="/auth/sign-out" method="post">
-          <button
-            type="submit"
-            className="min-h-12 w-full rounded-xl border border-brand-ink/20 bg-white px-4 text-sm font-semibold"
-          >
+          <Button type="submit" variant="secondary" block>
             Sign out
-          </button>
+          </Button>
         </form>
       </div>
     </main>
