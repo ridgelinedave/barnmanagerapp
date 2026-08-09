@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { Icon } from "@/components/ui/Icon";
@@ -88,21 +89,31 @@ export function SignInForm() {
   return (
     <div className="flex min-h-dvh flex-col bg-black px-7 text-white">
       <div className="flex flex-1 flex-col justify-center py-10">
-        {/* --- wordmark: "Crouse skin", swaps per barn --------------------- */}
-        <div className="mb-11 text-center">
-          <div className="mx-auto mb-4 flex size-[3.25rem] items-center justify-center rounded-full border-[1.5px] border-gold">
-            <span className="font-display text-[1.5rem] font-bold tracking-[0.06em] text-gold">
-              {barn.shortName.charAt(0)}
-            </span>
-          </div>
-          <p className="font-display text-[1.875rem] font-semibold uppercase leading-none tracking-[0.16em]">
-            {barn.name.split(" ")[0]}
-            <br />
-            <span className="font-medium text-white/85">{barn.name.split(" ").slice(1).join(" ")}</span>
-          </p>
-          <p className="mt-2.5 text-[0.6875rem] uppercase tracking-[0.22em] text-white/55">
-            Barn Management
-          </p>
+        {/*
+         * --- the crest: "Crouse skin", swaps per barn ---------------------
+         *
+         * Belle's real crest. The mockup drew a monogram-in-a-circle plus a
+         * typeset CROUSE / EQUESTRIAN because whoever built it did not have
+         * this file — it was standing in for exactly this.
+         *
+         * The crest is a complete lockup: it already reads CROUSE, EQUESTRIAN,
+         * WNC, USA, EST. 2021. So it stands alone. Setting "CROUSE /
+         * EQUESTRIAN" underneath a crest that already says it, or captioning
+         * it "Barn Management", is the doubling that makes a real logo look
+         * like a stock one.
+         *
+         * `alt` carries the barn name rather than being empty, because with no
+         * text on the screen this image IS the name for anyone who cannot see it.
+         */}
+        <div className="mb-10 text-center">
+          <Image
+            src={barn.brand.logoSrc}
+            alt={barn.name}
+            width={340}
+            height={340}
+            priority
+            className="mx-auto size-[10.5rem]"
+          />
         </div>
 
         <form onSubmit={onSubmit} noValidate>
@@ -190,13 +201,20 @@ export function SignInForm() {
       </div>
 
       <div className="pb-9 text-center">
+        {/* The mockup also carried a faint barn name along the bottom edge.
+            With the crest standing alone above, that was the name a third
+            time. Gone. */}
+        {/* The label is 17px of text; the target is 44px. Padding plus an
+            inline-flex box gives the finger something real to hit without the
+            link looking like a button. */}
         <a
           href="/sign-in/reset"
-          className="border-b border-transparent pb-px text-caption text-white/60 transition-colors hover:border-gold hover:text-gold"
+          className="inline-flex min-h-11 items-center px-4 text-caption text-white/60 transition-colors hover:text-gold"
         >
-          Forgot my password
+          <span className="border-b border-transparent pb-px transition-colors hover:border-gold">
+            Forgot my password
+          </span>
         </a>
-        <p className="mt-6 text-[0.625rem] uppercase tracking-[0.2em] text-white/25">{barn.name}</p>
       </div>
     </div>
   );

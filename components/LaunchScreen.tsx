@@ -20,18 +20,20 @@ export function LaunchScreen() {
       className="flex min-h-dvh flex-col items-center justify-center gap-5"
       style={{ backgroundColor: barn.pwa.launchBackground }}
     >
-      <div className="animate-brand-in flex flex-col items-center gap-5">
+      {/*
+       * The crest alone. It is a full lockup — it already reads CROUSE and
+       * EQUESTRIAN — so the typeset name that used to sit under it was the
+       * barn's name printed twice, once well and once badly.
+       */}
+      <div className="animate-brand-in">
         <Image
           src={barn.brand.logoSrc}
           alt=""
-          width={160}
-          height={160}
+          width={340}
+          height={340}
           priority
-          className="size-36"
+          className="size-44"
         />
-        <p className="font-display text-[1.75rem] font-semibold uppercase tracking-[0.16em] text-white">
-          {barn.name}
-        </p>
       </div>
       <span className="sr-only">Loading {barn.name}</span>
     </div>
