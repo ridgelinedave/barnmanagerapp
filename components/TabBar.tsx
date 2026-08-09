@@ -9,7 +9,7 @@ import type { Role } from "@/lib/types";
  * The bottom tab bar.
  *
  * Charcoal, matching the header, so the app is framed top and bottom by the
- * barn's own colour and the cream content sits between them like paper on a
+ * barn's own colour and the paper-white content sits between them like a page on a
  * board.
  *
  * The active tab gets a gold pill behind the icon AND a gold label AND a

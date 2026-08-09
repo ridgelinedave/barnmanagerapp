@@ -46,7 +46,6 @@ export default async function ManageFormsPage() {
           <EmptyState
             title="Everyone is up to date"
             body="Every family with paperwork on their checklist has signed it. Nothing to chase."
-            emoji="✅"
           />
         ) : (
           incomplete.map((family) => (
@@ -94,8 +93,7 @@ export default async function ManageFormsPage() {
         {templates.length === 0 ? (
           <EmptyState
             title="No templates yet"
-            body="Waivers and forms are seeded straight into the database for now — there is no authoring screen. Ask David to add one."
-            emoji="📝"
+            body="No authoring screen yet — templates are seeded directly."
           />
         ) : (
           templates.map((template) => (

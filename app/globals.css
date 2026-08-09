@@ -22,25 +22,29 @@
 
 :root {
   --brand-gold: #dabc51;
+  --brand-gold-press: #c9aa3f;
   --brand-gold-deep: #776628;
-  --brand-cream: #f6f1e7;
-  --brand-ink: #2b2b2b;
+  --brand-paper: #ffffff;
+  --brand-soft: #fafaf9;
+  --brand-ink: #1c1b18;
   --brand-charcoal: #1c1b18;
+  --brand-black: #0f0e0c;
   --brand-forest: #2f4a34;
   --brand-danger: #9b2c1f;
-  --brand-muted: #5b564c;
-  --brand-line: #e4dccb;
-  --brand-gold-soft: #f6edd4;
-  --brand-forest-soft: #e7ede5;
-  --brand-danger-soft: #f6e5e2;
-  --brand-sunk: #f1ece0;
+  --brand-muted: #6b665d;
+  --brand-line: #e7e6e2;
+  --brand-gold-soft: #f8f2dc;
+  --brand-forest-soft: #e9efe9;
+  --brand-danger-soft: #f7e7e4;
 }
 
 @theme inline {
   /* --- Brand ------------------------------------------------------------ */
-  /* Surface gold — backgrounds and badges. Always pair with ink text. */
+  /* Surface gold — buttons, keylines, the active tab. Always carries ink. */
   --color-gold: var(--brand-gold);
-  /* Text gold — links, active labels. AA on cream and on white. */
+  /* The pressed surface under a gold button. NEVER text: 2.26:1 on white. */
+  --color-gold-press: var(--brand-gold-press);
+  /* Text gold — links, chip labels. 5.65:1 on white. */
   --color-gold-deep: var(--brand-gold-deep);
   --color-gold-soft: var(--brand-gold-soft);
   --color-forest: var(--brand-forest);
@@ -49,14 +53,20 @@
   --color-danger-soft: var(--brand-danger-soft);
 
   /* --- Semantic surfaces ------------------------------------------------ */
-  /* The page itself. */
-  --color-ground: var(--brand-cream);
-  /* A card sitting on the ground. */
-  --color-surface: #ffffff;
-  /* A tile sunk INTO a card — stat tiles, read-only rows. */
-  --color-sunk: var(--brand-sunk);
-  /* Header, tab bar, launch field. */
+  /*
+   * The page and a panel on it are the SAME white. Separation is a hairline,
+   * not a box — editorial rows over boxed cards. `ground` and `surface` are
+   * kept as distinct names so a future dark theme can pull them apart without
+   * touching a single component.
+   */
+  --color-ground: var(--brand-paper);
+  --color-surface: var(--brand-paper);
+  /* A tile sunk into a panel — read-only rows, quiet blocks. */
+  --color-sunk: var(--brand-soft);
+  /* Header, tab bar. */
   --color-chrome: var(--brand-charcoal);
+  /* Splash and sign-in. A shade below the chrome. */
+  --color-black: var(--brand-black);
 
   /* --- Semantic text ---------------------------------------------------- */
   --color-ink: var(--brand-ink);
@@ -114,19 +124,29 @@
   --text-eyebrow--font-weight: 700;
 
   /* --- Radius ----------------------------------------------------------- */
+  /*
+   * Squared, not rounded. A full pill on every button is the single most
+   * recognisable generated-UI tell; 5px reads as a made object instead.
+   * `chip` keeps a pill because a status pill genuinely is one.
+   */
   --radius-chip: 999px;
-  --radius-control: 0.75rem;
-  --radius-card: 1rem;
-  --radius-sheet: 1.5rem;
+  --radius-control: 0.3125rem;
+  --radius-card: 0.375rem;
+  --radius-sheet: 1rem;
+  /* Avatars and photo tiles — the mockup's 12px. */
+  --radius-avatar: 0.75rem;
 
   /* --- Elevation -------------------------------------------------------- */
   /*
-   * Cards on cream get a hairline, not a shadow — a shadow on a warm ground
-   * turns muddy. Elevation is reserved for things that genuinely float.
+   * Panels get a hairline, not a shadow. Elevation is reserved for things that
+   * genuinely float, and for the tactile press under a gold button.
    */
   --shadow-raised: 0 1px 2px rgb(28 27 24 / 0.05), 0 6px 16px rgb(28 27 24 / 0.05);
   --shadow-sheet: 0 -10px 40px rgb(28 27 24 / 0.22);
   --shadow-chrome: 0 1px 0 rgb(28 27 24 / 0.08);
+  /* The lip that makes a button feel pressable rather than printed on. */
+  --shadow-press: inset 0 -2px 0 rgb(0 0 0 / 0.12);
+  --shadow-press-active: inset 0 -1px 0 rgb(0 0 0 / 0.12);
 }
 
 html {
@@ -135,7 +155,7 @@ html {
 }
 
 body {
-  background: var(--brand-cream);
+  background: var(--brand-paper);
   color: var(--brand-ink);
   -webkit-text-size-adjust: 100%;
   /* Barlow's default figures are proportional; tabular keeps columns of times
@@ -152,7 +172,7 @@ body {
 }
 
 /*
- * Focus: visible, on-brand, and never removed. Gold reads on both the cream
+ * Focus: visible, on-brand, and never removed. Gold reads on both the paper
  * ground and the charcoal chrome, so one ring works everywhere.
  */
 :focus-visible {
@@ -176,6 +196,54 @@ h3 {
 }
 p {
   text-wrap: pretty;
+}
+
+/*
+ * The launch mark arriving. Ease-out-quart: fast at the start, settling at the
+ * end, which is how a real object comes to rest. No bounce.
+ */
+@keyframes brand-in {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.animate-brand-in {
+  animation: brand-in 520ms cubic-bezier(0.25, 1, 0.5, 1) both;
+}
+
+/*
+ * SKELETONS.
+ *
+ * A sweep across a soft block, not a pulsing grey rectangle and not a spinner.
+ * The point is that the page's SHAPE is already there — the row heights and
+ * column widths match the real content — so when data lands nothing moves.
+ * That is what stops the pop-in; the shimmer is only there to say "still
+ * coming" rather than "broken".
+ */
+@keyframes skeleton-sweep {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+.skeleton {
+  background-color: var(--brand-soft);
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgb(28 27 24 / 0.045) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-sweep 1.4s ease-in-out infinite;
+  border-radius: 0.25rem;
 }
 
 @media (prefers-reduced-motion: reduce) {

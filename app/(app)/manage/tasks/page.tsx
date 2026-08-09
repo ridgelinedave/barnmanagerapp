@@ -40,8 +40,7 @@ export default async function ManageTasksPage() {
         {tasks.length === 0 ? (
           <EmptyState
             title="Nothing scheduled today"
-            body="Generate the day from your recurring templates, or add a one-off below if something has come up."
-            emoji="📋"
+            body="Generate the day, or add a one-off."
           />
         ) : (
           tasks.map((task) => (
@@ -97,8 +96,7 @@ export default async function ManageTasksPage() {
         {templates.length === 0 ? (
           <EmptyState
             title="No templates yet"
-            body="Set up the jobs that happen every day or every week — stalls, turnout, water — and the day generates itself from them."
-            emoji="🔁"
+            body="Recurring jobs the day builds itself from."
           />
         ) : (
           templates.map((template) => (

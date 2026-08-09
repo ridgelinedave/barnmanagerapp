@@ -30,7 +30,6 @@ export default async function FormsPage() {
         <EmptyState
           title="Not your paperwork"
           body="Family forms are between the family and the barn owner, so there is nothing here for staff."
-          emoji="📄"
         />
       </TabPage>
     );
@@ -45,8 +44,7 @@ export default async function FormsPage() {
       {submissions.length === 0 ? (
         <EmptyState
           title="Nothing to fill in"
-          body="When the barn needs a waiver or a form from you it appears here, and you can sign it on your phone."
-          emoji="📄"
+          body="Anything the barn needs signed appears here."
         />
       ) : (
         <>

@@ -152,7 +152,7 @@ export default async function ManageTeamPage() {
           {openInvites.length === 0 ? (
             <EmptyState
               title="No invites out"
-              body="Inviting someone creates a link you send them yourself. They pick their own password, and the role you choose here is the one they get."
+              body="Invite someone and you get a link to send."
             />
           ) : (
             <Card className="flex flex-col gap-3 p-4">
@@ -182,7 +182,7 @@ export default async function ManageTeamPage() {
         {familiesWithRiders.length === 0 ? (
           <EmptyState
             title="No families yet"
-            body="A family is the household an account belongs to. Add one here, then add its riders — neither needs a login, so you can set them up before anyone signs in."
+            body="Add a family, then its riders. Neither needs a login."
           />
         ) : (
           familiesWithRiders.map((family) => (
@@ -283,7 +283,7 @@ export default async function ManageTeamPage() {
         {levels.length === 0 ? (
           <EmptyState
             title="No levels yet"
-            body="Levels are how a rider is matched to a lesson — when a seat opens up, only riders at the right level are offered it. Intro, Training, First, and so on."
+            body="Intro, Training, First. Levels decide who gets offered a seat."
           />
         ) : (
           <ul className="flex flex-col gap-2">

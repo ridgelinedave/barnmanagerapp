@@ -52,8 +52,7 @@ export default async function ManageEventsPage() {
         {upcoming.length === 0 ? (
           <EmptyState
             title="Nothing on the calendar"
-            body="Shows, clinics, farrier and vet days, closures. Anything marked visible to everyone lands on subscribed family calendars too."
-            emoji="📅"
+            body="Shows, clinics, farrier and vet days, closures."
           />
         ) : (
           upcoming.map((event) => (

@@ -101,7 +101,6 @@ export default async function ManageHorsePage({
           <EmptyState
             title="No feed chart yet"
             body="Set the morning and evening feeds below and this horse joins the feed board staff read at 6am."
-            emoji="🪣"
           />
         )}
 
@@ -165,7 +164,6 @@ export default async function ManageHorsePage({
             <EmptyState
               title="Nothing logged yet"
               body="Vaccines, worming, farrier and vet visits go here. The first one you log starts the history."
-              emoji="🩺"
             />
           ) : (
             <CareTimeline events={care} today={barnToday()} loggerNames={loggers} />
@@ -183,8 +181,7 @@ export default async function ManageHorsePage({
           {documents.length === 0 ? (
             <EmptyState
               title="No papers on file"
-              body="Coggins, registration papers and vet reports live here. The owning family can read them; nobody else can."
-              emoji="📄"
+              body="Coggins, papers and vet reports. Owner-only."
             />
           ) : (
             <DocumentList documents={documents} horseId={horse.id} canDelete />

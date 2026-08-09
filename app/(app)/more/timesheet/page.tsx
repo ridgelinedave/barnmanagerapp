@@ -65,8 +65,7 @@ export default async function TimesheetPage() {
       {days.length === 0 ? (
         <EmptyState
           title="No hours yet"
-          body="Every time you clock in and out it lands here, day by day, so you can check your week before it is approved."
-          emoji="⏱️"
+          body="Your hours, day by day."
         />
       ) : (
         days.map(([day, dayPunches]) => {

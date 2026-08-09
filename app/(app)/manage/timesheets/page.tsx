@@ -81,7 +81,6 @@ export default async function ManageTimesheetsPage({
         <EmptyState
           title="No pay periods yet"
           body="Open one below and the week's punches get grouped under it, ready to check and approve."
-          emoji="🗓️"
         />
       ) : (
         <>
@@ -126,8 +125,7 @@ export default async function ManageTimesheetsPage({
           {employees.length === 0 ? (
             <EmptyState
               title="No punches in this period"
-              body="Once staff start clocking in against these dates, each person gets a card here with their total and anything worth checking."
-              emoji="⏱️"
+              body="Each person’s hours appear once they clock in."
             />
           ) : (
             employees.map((person) => {

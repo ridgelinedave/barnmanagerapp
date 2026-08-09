@@ -69,52 +69,46 @@ export async function listFeedPlans(horseId: string): Promise<FeedPlan[]> {
   return (data ?? []) as FeedPlan[];
 }
 
-/** A feed-board row: the plan, plus the horse it belongs to. */
-export type FeedBoardEntry = { plan: FeedPlan; horse: Horse };
+/** One horse and every active meal it has a chart for. */
+export type HorseFeed = { horse: Horse; plans: FeedPlan[] };
 
 /**
- * Every active feed plan, grouped by meal — the morning surface.
+ * The feed board, BY HORSE.
  *
- * Two queries rather than a PostgREST embed, because the embed would silently
- * return a null horse for any row whose horse the caller cannot read. Staff and
- * admin can read every horse, so that cannot happen today; doing the join here
- * means it still cannot happen if this is ever shown to somebody narrower.
- * A plan whose horse is unreadable is dropped rather than rendered nameless.
+ * The old shape was meal-major — three lists, one per meal, a horse appearing
+ * in each. That is how a spreadsheet thinks about feeding. A person walking the
+ * aisle thinks horse-major: stand in front of Winston, read Winston. So the
+ * board is now a list of horses, and the chart lives on the horse.
+ *
+ * Horses with no chart at all are included deliberately, so "nobody has set
+ * Sable's feed" is visible on the board rather than being a silent absence.
  */
-export async function feedBoard(): Promise<Record<Meal, FeedBoardEntry[]>> {
-  const empty: Record<Meal, FeedBoardEntry[]> = { am: [], lunch: [], pm: [] };
-  if (!supabaseConfigured()) return empty;
+export async function feedBoardByHorse(): Promise<HorseFeed[]> {
+  if (!supabaseConfigured()) return [];
 
   const supabase = await createClient();
-  const { data: plans, error } = await supabase
-    .from("feed_plans")
-    .select("*")
-    .eq("active", true);
+  const [{ data: horses }, { data: plans }] = await Promise.all([
+    supabase.from("horses").select("*").eq("active", true).order("name"),
+    supabase.from("feed_plans").select("*").eq("active", true),
+  ]);
 
-  if (error || !plans?.length) return empty;
-
-  const horseIds = [...new Set(plans.map((p) => p.horse_id as string))];
-  const { data: horses } = await supabase
-    .from("horses")
-    .select("*")
-    .in("id", horseIds)
-    .eq("active", true);
-
-  const byId = new Map((horses ?? []).map((h) => [h.id as string, h as Horse]));
-
-  const board: Record<Meal, FeedBoardEntry[]> = { am: [], lunch: [], pm: [] };
-  for (const plan of plans as FeedPlan[]) {
-    const horse = byId.get(plan.horse_id);
-    if (!horse) continue;
-    board[plan.meal].push({ plan, horse });
+  const byHorse = new Map<string, FeedPlan[]>();
+  for (const plan of (plans ?? []) as FeedPlan[]) {
+    const list = byHorse.get(plan.horse_id);
+    if (list) list.push(plan);
+    else byHorse.set(plan.horse_id, [plan]);
   }
 
-  for (const meal of Object.keys(board) as Meal[]) {
-    board[meal].sort((a, b) => a.horse.name.localeCompare(b.horse.name));
-  }
-
-  return board;
+  return ((horses ?? []) as Horse[]).map((horse) => ({
+    horse,
+    plans: (byHorse.get(horse.id) ?? []).sort(
+      (a, b) => MEAL_ORDER.indexOf(a.meal) - MEAL_ORDER.indexOf(b.meal),
+    ),
+  }));
 }
+
+const MEAL_ORDER: Meal[] = ["am", "lunch", "pm"];
+
 
 /** Riders assigned to a horse. Admin/staff read all; a parent sees their own. */
 export async function listHorseRiders(horseId: string): Promise<Rider[]> {

@@ -31,8 +31,7 @@ export default async function NotificationsPage() {
       {items.length === 0 ? (
         <EmptyState
           title="Nothing waiting"
-          body="Lesson reminders, offered spots and barn news land here. We'll badge the bell when something arrives."
-          emoji="🔔"
+          body="Reminders, offers and barn news land here."
         />
       ) : (
         <ul className="flex flex-col gap-3">

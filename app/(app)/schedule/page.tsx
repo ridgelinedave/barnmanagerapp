@@ -161,7 +161,6 @@ export default async function SchedulePage({
               ? "Generate the day from the weekly schedule below, or add a one-off if something has come up."
               : "No lessons are scheduled. Check another day with the arrows above."
           }
-          emoji="🌾"
         />
       ) : (
         instances.map((instance) => (

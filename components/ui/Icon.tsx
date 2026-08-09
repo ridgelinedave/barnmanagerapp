@@ -7,13 +7,15 @@ import type { SVGProps } from "react";
  * pulling icons from three libraries is the fastest way to make an interface
  * look assembled rather than designed.
  *
- * Emoji are NOT icons here. They appear in a couple of places as a warm
- * decorative mark next to a greeting or a board label, always `aria-hidden`,
- * never as the only carrier of meaning and never in navigation — an emoji
- * renders differently on every phone and cannot be themed.
+ * THERE ARE NO EMOJI IN THIS APP. Not as icons, not as decoration, not beside
+ * a greeting. An emoji renders differently on every phone, cannot be themed,
+ * cannot take a stroke weight, and is the fastest way to make a tool look like
+ * a toy. `EmptyState` and `Board` no longer accept an emoji prop at all, so it
+ * cannot creep back in one screen at a time.
  */
 export type IconName =
   | "chevron"
+  | "arrow"
   | "back"
   | "plus"
   | "calendar"
@@ -27,12 +29,18 @@ export type IconName =
   | "grid"
   | "list"
   | "pin"
-  | "bucket";
+  | "bucket"
+  | "eye"
+  | "eyeOff";
 
 const PATHS: Record<IconName, string> = {
   chevron: "m9 6 6 6-6 6",
+  /** The trailing mark on a primary button. */
+  arrow: "M4 12h15m0 0-5.5-5.5M19 12l-5.5 5.5",
   back: "M19 12H5m0 0 6-6m-6 6 6 6",
   plus: "M12 5v14M5 12h14",
+  eye: "M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Zm10 3a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z",
+  eyeOff: "M3 3l18 18M10.6 10.6a3 3 0 0 0 4.2 4.2M9.4 5.3A9.9 9.9 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4M6.2 6.6A17 17 0 0 0 2 12s3.5 7 10 7a9.6 9.6 0 0 0 3.6-.7",
   calendar:
     "M7 3v3m10-3v3M3.5 9.5h17M5 6h14a1.5 1.5 0 0 1 1.5 1.5v12A1.5 1.5 0 0 1 19 21H5a1.5 1.5 0 0 1-1.5-1.5v-12A1.5 1.5 0 0 1 5 6Z",
   check: "m5 12.5 4.5 4.5L19 7",

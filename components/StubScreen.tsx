@@ -27,7 +27,6 @@ export function StubScreen({
     <EmptyState
       title={heading}
       body={detail ? `${detail} Being built in ${phase}.` : `Being built in ${phase}.`}
-      emoji="🚧"
     />
   );
 }

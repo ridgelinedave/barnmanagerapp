@@ -76,7 +76,23 @@ async function removeDemoData() {
   await del("tasks", "title");
   await del("task_templates", "title");
   await del("announcements", "title");
+  // care_events and feed_plans cascade from horses; submissions from templates.
+  await del("form_templates", "name");
+  await del("horses", "name");
   await del("families", "name"); // riders cascade
+
+  // Demo staff have auth users of their own, so they need removing on both
+  // sides — a profile deleted without its login leaves an account that can
+  // sign in and reach nothing.
+  const { data: demoStaff } = await supabase
+    .from("profiles")
+    .select("id, user_id")
+    .like("full_name", `${DEMO_TAG}%`);
+  for (const person of demoStaff ?? []) {
+    await supabase.from("profiles").delete().eq("id", person.id);
+    await supabase.auth.admin.deleteUser(person.user_id).catch(() => {});
+  }
+  removed.profiles = demoStaff?.length ?? 0;
 
   for (const [table, count] of Object.entries(removed)) {
     console.log(`  ${table.padEnd(18)} ${count} removed`);
@@ -113,13 +129,22 @@ async function main() {
 
   // --- demo families and riders ---------------------------------------------
   const FAMILIES = [
-    { name: `${DEMO_TAG} Whitfield`, riders: [["Ava Whitfield", "Training"]] },
-    { name: `${DEMO_TAG} Marchetti`, riders: [["Luca Marchetti", "First"]] },
-    { name: `${DEMO_TAG} Okonkwo`, riders: [["Ada Okonkwo", "Training"]] },
-    { name: `${DEMO_TAG} Sørensen`, riders: [["Freya Sørensen", "Intro"]] },
+    {
+      name: `${DEMO_TAG} Whitfield`,
+      riders: [
+        ["Ava Whitfield", "Training", "2011-04-18"],
+        ["Beau Whitfield", "Intro", "2015-09-02"],
+      ],
+    },
+    { name: `${DEMO_TAG} Marchetti`, riders: [["Luca Marchetti", "First", "2009-06-30"]] },
+    { name: `${DEMO_TAG} Okonkwo`, riders: [["Ada Okonkwo", "Training", "2012-01-22"]] },
+    { name: `${DEMO_TAG} Sørensen`, riders: [["Freya Sørensen", "Intro", "2014-11-07"]] },
+    { name: `${DEMO_TAG} Harper`, riders: [["Rowan Harper", "Second", "2007-03-14"]] },
+    { name: `${DEMO_TAG} Delgado`, riders: [["Mateo Delgado", "First", "2010-08-25"]] },
   ];
 
   const demoRiders = [];
+  const familyIdByName = new Map();
   for (const family of FAMILIES) {
     const { data: existing } = await supabase
       .from("families")
@@ -138,7 +163,9 @@ async function main() {
       familyId = data.id;
     }
 
-    for (const [riderName, levelName] of family.riders) {
+    familyIdByName.set(family.name, familyId);
+
+    for (const [riderName, levelName, dob] of family.riders) {
       const { data: rider } = await supabase
         .from("riders")
         .select("id")
@@ -156,6 +183,10 @@ async function main() {
           family_id: familyId,
           name: riderName,
           level_id: levelByName.get(levelName) ?? null,
+          // Real dates of birth so the age groups on the Team panel render —
+          // age is derived, never stored, so a fixed date is the only way to
+          // make that column show anything.
+          dob,
           active: true,
         })
         .select()
@@ -165,6 +196,286 @@ async function main() {
     }
   }
   console.log(`  families      ${FAMILIES.length} with ${demoRiders.length} riders`);
+
+  // --- horses, with their feed charts ----------------------------------------
+  //
+  // The sub-line the feed board wants is "Bay gelding · 16.2h". `horses` has no
+  // colour, sex or height column today, so the descriptive half lives in
+  // `breed` for now and the height is carried in `notes` — both readable, both
+  // wrong shapes. Migration 0019 (PRINTED FOR AUDIT, NOT APPLIED) adds real
+  // columns; this seed moves onto them the moment it lands.
+  const HORSES = [
+    {
+      name: "Winston",
+      breed: "Bay gelding · Thoroughbred",
+      height: "16.2h",
+      family: `${DEMO_TAG} Harper`,
+      am: { description: "2 flakes timothy", supplements: "SmartVite · MSM", note: "Soak grain 10 min." },
+      pm: { description: "2 flakes timothy", supplements: "SmartVite", note: "Muzzle on turnout after evening feed." },
+    },
+    {
+      name: "Dakota",
+      breed: "Chestnut mare · Quarter Horse",
+      height: "15.3h",
+      family: `${DEMO_TAG} Whitfield`,
+      am: { description: "2 flakes orchard", supplements: "Vitamin E", note: "" },
+      pm: { description: "2 flakes orchard", supplements: "", note: "Slow feeder net." },
+    },
+    {
+      name: "Miller",
+      breed: "Grey gelding · Connemara",
+      height: "16.1h",
+      family: null,
+      am: { description: "3 flakes timothy", supplements: "Joint supplement", note: "Morning feed only." },
+      pm: null,
+    },
+    {
+      name: "Juno",
+      breed: "Bay mare · Warmblood",
+      height: "15.2h",
+      family: `${DEMO_TAG} Marchetti`,
+      am: { description: "2 flakes alfalfa mix", supplements: "SmartVite", note: "" },
+      pm: { description: "2 flakes alfalfa mix", supplements: "SmartVite · Biotin", note: "" },
+    },
+    {
+      name: "Remy",
+      breed: "Palomino gelding · Welsh Cob",
+      height: "14.3h",
+      family: `${DEMO_TAG} Sørensen`,
+      am: { description: "1 flake timothy", supplements: "", note: "Small feeds — easy keeper." },
+      pm: { description: "1 flake timothy", supplements: "Magnesium", note: "" },
+    },
+    {
+      name: "Sable",
+      breed: "Black mare · Friesian cross",
+      height: "16.0h",
+      family: null,
+      am: { description: "2 flakes orchard", supplements: "Omega oil", note: "" },
+      pm: { description: "2 flakes orchard", supplements: "Omega oil", note: "Feed alone — bolts." },
+    },
+  ];
+
+  const horseIds = [];
+  for (const horse of HORSES) {
+    const tagged = `${DEMO_TAG} ${horse.name}`;
+    let { data: existing } = await supabase
+      .from("horses")
+      .select("id")
+      .eq("name", tagged)
+      .maybeSingle();
+
+    if (!existing) {
+      const { data, error } = await supabase
+        .from("horses")
+        .insert({
+          name: tagged,
+          barn_name: horse.name,
+          breed: horse.breed,
+          owner_family_id: horse.family ? (familyIdByName.get(horse.family) ?? null) : null,
+          notes: `${horse.height} · demo horse, safe to delete.`,
+          active: true,
+        })
+        .select()
+        .single();
+      if (error) fail(`Could not create horse ${horse.name}`, error);
+      existing = data;
+    }
+    horseIds.push({ id: existing.id, spec: horse });
+
+    for (const meal of ["am", "pm"]) {
+      const plan = horse[meal];
+      if (!plan) continue;
+      const { data: already } = await supabase
+        .from("feed_plans")
+        .select("id")
+        .eq("horse_id", existing.id)
+        .eq("meal", meal)
+        .eq("active", true)
+        .maybeSingle();
+      if (already) continue;
+
+      const { error } = await supabase.from("feed_plans").insert({
+        horse_id: existing.id,
+        meal,
+        description: plan.description,
+        supplements: plan.supplements,
+        special_instructions: plan.note,
+        active: true,
+      });
+      if (error) fail(`Could not create the ${meal} feed plan for ${horse.name}`, error);
+    }
+  }
+  console.log(`  horses        ${horseIds.length} with feed charts`);
+
+  // --- who rides what --------------------------------------------------------
+  let assigned = 0;
+  for (const [index, rider] of demoRiders.entries()) {
+    const horse = horseIds[index % horseIds.length];
+    const { data: already } = await supabase
+      .from("horse_riders")
+      .select("id")
+      .eq("horse_id", horse.id)
+      .eq("rider_id", rider)
+      .maybeSingle();
+    if (already) continue;
+    const { error } = await supabase
+      .from("horse_riders")
+      .insert({ horse_id: horse.id, rider_id: rider });
+    if (!error) assigned++;
+  }
+  console.log(`  horse_riders  ${assigned} assignments`);
+
+  // --- care events, some overdue so the due-soon screen has teeth ------------
+  const CARE = [
+    { type: "vaccine", description: "Spring 5-way", performed: -120, due: 245 },
+    { type: "coggins", description: "Annual Coggins", performed: -200, due: 165 },
+    { type: "farrier", description: "Reset, front shoes", performed: -38, due: -4 },
+    { type: "deworm", description: "Ivermectin", performed: -95, due: -12 },
+    { type: "dental", description: "Float", performed: -300, due: 65 },
+    { type: "vet", description: "Lameness recheck — sound", performed: -21, due: null },
+  ];
+
+  let careCount = 0;
+  for (const [index, horse] of horseIds.entries()) {
+    const care = CARE[index % CARE.length];
+    const performed = isoDate(care.performed);
+    const { data: already } = await supabase
+      .from("care_events")
+      .select("id")
+      .eq("horse_id", horse.id)
+      .eq("performed_at", performed)
+      .maybeSingle();
+    if (already) continue;
+
+    const { error } = await supabase.from("care_events").insert({
+      horse_id: horse.id,
+      type: care.type,
+      description: care.description,
+      performed_at: performed,
+      due_next: care.due === null ? null : isoDate(care.due),
+    });
+    if (!error) careCount++;
+  }
+  console.log(`  care_events   ${careCount} (2 overdue)`);
+
+  // --- onboarding forms ------------------------------------------------------
+  const FORM_TEMPLATES = [
+    {
+      name: `${DEMO_TAG} Liability waiver`,
+      description: "Required before a rider's first lesson.",
+      applies_to: "rider",
+      required: true,
+      schema: [
+        { key: "guardian", label: "Parent or guardian name", type: "text", required: true },
+        { key: "understood", label: "I have read and accept the risks", type: "checkbox", required: true },
+      ],
+    },
+    {
+      name: `${DEMO_TAG} Emergency contact`,
+      description: "Who we call, and who can make decisions.",
+      applies_to: "family",
+      required: true,
+      schema: [
+        { key: "contact", label: "Emergency contact name", type: "text", required: true },
+        { key: "phone", label: "Phone", type: "text", required: true },
+        { key: "vet", label: "Preferred vet", type: "text" },
+      ],
+    },
+    {
+      name: `${DEMO_TAG} Photo permission`,
+      description: "Whether we can post your rider's photo.",
+      applies_to: "family",
+      required: false,
+      schema: [{ key: "allow", label: "Photos may be shared", type: "checkbox" }],
+    },
+  ];
+
+  const templateIds = [];
+  for (const template of FORM_TEMPLATES) {
+    let { data: existing } = await supabase
+      .from("form_templates")
+      .select("id")
+      .eq("name", template.name)
+      .maybeSingle();
+    if (!existing) {
+      const { data, error } = await supabase
+        .from("form_templates")
+        .insert({ ...template, active: true })
+        .select()
+        .single();
+      if (error) fail(`Could not create form template ${template.name}`, error);
+      existing = data;
+    }
+    templateIds.push({ id: existing.id, appliesTo: template.applies_to });
+  }
+
+  // A realistic mix: some signed, some still owed, so both sides of the
+  // dashboard have something in them.
+  let submissions = 0;
+  const demoFamilyIds = [...familyIdByName.values()];
+  for (const [index, familyId] of demoFamilyIds.entries()) {
+    for (const template of templateIds) {
+      const { data: already } = await supabase
+        .from("form_submissions")
+        .select("id")
+        .eq("template_id", template.id)
+        .eq("family_id", familyId)
+        .is("rider_id", null)
+        .maybeSingle();
+      if (already) continue;
+
+      // Roughly two thirds signed.
+      const signed = (index + template.id.charCodeAt(0)) % 3 !== 0;
+      const { error } = await supabase.from("form_submissions").insert({
+        template_id: template.id,
+        family_id: familyId,
+        rider_id: null,
+        data: signed ? { guardian: "Demo Parent", contact: "Demo Parent", phone: "555-0142" } : {},
+        signed_name: signed ? "Demo Parent" : null,
+        signed_at: signed ? new Date().toISOString() : null,
+        status: signed ? "complete" : "pending",
+      });
+      if (!error) submissions++;
+    }
+  }
+  console.log(`  forms         ${templateIds.length} templates, ${submissions} submissions`);
+
+  // --- demo staff -------------------------------------------------------------
+  // Real auth users, because a profile cannot exist without one. Removed on
+  // --clean from both sides.
+  const STAFF = [
+    { name: "Nora Whitlock", email: "demo.nora@example.com", flags: { manage_horses: true } },
+    { name: "Cal Rivers", email: "demo.cal@example.com", flags: { manage_schedule: true } },
+  ];
+
+  let staffCreated = 0;
+  for (const person of STAFF) {
+    const tagged = `${DEMO_TAG} ${person.name}`;
+    const { data: already } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("full_name", tagged)
+      .maybeSingle();
+    if (already) continue;
+
+    const { data: created, error: userError } = await supabase.auth.admin.createUser({
+      email: person.email,
+      password: `demo-${Math.random().toString(36).slice(2, 10)}`,
+      email_confirm: true,
+      user_metadata: { full_name: tagged },
+    });
+    if (userError) continue; // already exists from a previous run
+
+    const { error } = await supabase.from("profiles").insert({
+      user_id: created.user.id,
+      role: "staff",
+      full_name: tagged,
+      phone: "555-0175",
+      ...person.flags,
+    });
+    if (!error) staffCreated++;
+  }
+  console.log(`  staff         ${staffCreated} created`);
 
   // --- announcements ---------------------------------------------------------
   const ANNOUNCEMENTS = [

@@ -62,8 +62,7 @@ export default async function TasksPage() {
       {tasks.length === 0 ? (
         <EmptyState
           title="Nothing on your list"
-          body="Belle assigns the day's jobs from Manage. When something lands with your name on it, it shows up here."
-          emoji="✅"
+          body="Jobs with your name on them show up here."
         />
       ) : (
         <>
@@ -75,7 +74,6 @@ export default async function TasksPage() {
             <EmptyState
               title="That's the lot"
               body="Everything assigned to you today is ticked off. Nice work."
-              emoji="🎉"
             />
           )}
 

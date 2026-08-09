@@ -53,7 +53,7 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   // Matches the manifest and the splash images, so an installed app opens on
-  // the crest's dark field rather than flashing cream first.
+  // the crest's dark field rather than flashing white first.
   themeColor: barn.pwa.launchBackground,
   width: "device-width",
   initialScale: 1,
@@ -88,10 +88,13 @@ const APPLE_SPLASH = [
  */
 const brandVars = {
   "--brand-gold": barn.brand.gold,
+  "--brand-gold-press": barn.brand.goldPress,
   "--brand-gold-deep": barn.brand.goldDeep,
-  "--brand-cream": barn.brand.cream,
+  "--brand-paper": barn.brand.paper,
+  "--brand-soft": barn.brand.soft,
   "--brand-ink": barn.brand.ink,
   "--brand-charcoal": barn.brand.charcoal,
+  "--brand-black": barn.brand.black,
   "--brand-forest": barn.brand.forest,
   "--brand-danger": barn.brand.danger,
   "--brand-muted": barn.brand.muted,
@@ -99,7 +102,6 @@ const brandVars = {
   "--brand-gold-soft": barn.brand.goldSoft,
   "--brand-forest-soft": barn.brand.forestSoft,
   "--brand-danger-soft": barn.brand.dangerSoft,
-  "--brand-sunk": barn.brand.sunk,
 } as CSSProperties;
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

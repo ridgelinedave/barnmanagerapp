@@ -37,6 +37,26 @@ export const barn = {
   /** IANA timezone. All timestamptz values render in this zone. */
   timezone: "America/New_York",
 
+  /**
+   * BLACK · WHITE · GOLD. There is no cream in this app.
+   *
+   * Light content, dark chrome — paper-white screens so a phone stays readable
+   * in daylight, near-black header and tab bar, gold as the only accent. Every
+   * value below is measured against the surface it actually sits on, and the
+   * ratio is recorded beside it.
+   *
+   * TWO PLACES THIS DELIBERATELY DIVERGES FROM design/mockups, both because
+   * accessibility outranks the design system when they disagree:
+   *
+   *   the mockup's `--muted:#8A857C` measures 3.67:1 on white and fails AA for
+   *   body text, so secondary text here is one step darker;
+   *
+   *   the mockup's `--gold-deep:#C9AA3F` measures 2.26:1 on white. It is kept
+   *   EXACTLY as the mockup uses it — a pressed/hover SURFACE under the gold
+   *   button — and a separate, darker gold carries text.
+   *
+   * Do not "simplify" either back to a single value.
+   */
   brand: {
     /**
      * CONFIRMED — sampled from Belle's actual logo, not guessed.
@@ -45,64 +65,64 @@ export const barn = {
      * around 47° and saturation around 0.63, but value runs 0.26 → 0.90 across
      * 35 palette entries. `gold` is the single most-used gold pixel in the
      * image, i.e. the tone the eye reads as "the Crouse gold".
+     *
+     * A SURFACE colour: buttons, the chrome keyline, the active tab. Carries
+     * ink at 9.26:1. Never used as text on white (1.86:1).
      */
-    gold: "#dabc51",
+    gold: "#DABC51",
 
     /**
-     * The shadow end of that same gradient — also straight from the logo, not
-     * invented. It exists because `gold` is a light tone: it scores 1.86:1
-     * against white and 1.65:1 on cream, so it is unusable for text. Gold is
-     * therefore a SURFACE colour (button and badge backgrounds, carrying ink
-     * text at 7.61:1) and `goldDeep` is the TEXT colour (5.02:1 on cream,
-     * 5.65:1 on white — both clear of the 4.5:1 AA floor).
-     *
-     * Accessibility outranks the design system when they disagree, so do not
-     * "simplify" this back to one gold.
+     * The pressed state of that button, straight from the mockup. A SURFACE,
+     * never text: 2.26:1 on white.
+     */
+    goldPress: "#C9AA3F",
+
+    /**
+     * TEXT gold — links, chip labels, the active nav label on white.
+     * 5.65:1 on white, 5.46:1 on soft. Clears the AA floor with room.
      */
     goldDeep: "#776628",
 
-    // Chosen neutrals for the app surface. The crest itself is gold on
-    // charcoal/black; cream keeps long screens readable on a phone in daylight.
-    cream: "#F6F1E7",
-    ink: "#2B2B2B",
+    /** The page. Paper white, not a tinted near-white. */
+    paper: "#FFFFFF",
+
+    /** Sunk tiles and read-only rows. 16.49:1 carrying ink. */
+    soft: "#FAFAF9",
 
     /**
-     * CHROME — the charcoal the app's header, tab bar and launch field are cut
-     * from. Deliberately NOT the same value as `ink`: text ink and a chrome
-     * surface doing the same job at the same value makes the header read as
-     * "big text block" rather than a separate plane. This is a touch deeper and
-     * a touch warmer, so the gold sits on it the way it sits on the sign.
-     *
-     * Measured: white 17.22:1 · gold 9.26:1 · cream 15.30:1.
+     * Body text AND the chrome plane — one near-black doing both jobs now that
+     * the ground is plain white. 17.22:1 on paper, and the header reads as a
+     * separate plane because it is a filled surface, not because it is a
+     * different black.
      */
+    ink: "#1C1B18",
     charcoal: "#1C1B18",
 
+    /** The splash/login field. A shade below the chrome so the logo sits in it. */
+    black: "#0F0E0C",
+
     /**
-     * SECONDARY — the pasture green. One value doing two jobs, which is why
-     * this particular green: it clears AA as TEXT on cream (8.68:1) *and* as a
-     * SURFACE carrying white (9.77:1) or gold (5.25:1). Used for confirmations,
-     * "done" states, and the quiet labels on a board.
+     * SECONDARY — the pasture green. Clears AA as text on white (9.77:1) and as
+     * a surface carrying white. Confirmations and "done" states.
      */
     forest: "#2F4A34",
 
-    /** Cancellations, overdue care, destructive actions. 6.73:1 on cream. */
+    /** Cancellations, overdue care, destructive actions. 7.57:1 on white. */
     danger: "#9B2C1F",
 
     /**
-     * Secondary text. A measured 6.48:1 on cream rather than a percentage of
-     * ink — "muted grey at 60% opacity" is how body copy quietly fails AA.
+     * Secondary text. 5.70:1 on white — the mockup's #8A857C one step darker,
+     * because 3.67:1 is how body copy quietly fails AA.
      */
-    muted: "#5B564C",
+    muted: "#6B665D",
 
-    /** Hairline. Not a text colour, so no ratio applies; it must simply be seen. */
-    line: "#E4DCCB",
+    /** The hairline that does all the separating now that cards are retired. */
+    line: "#E7E6E2",
 
-    /** Tinted grounds for chips, callouts and tiles. All carry ink or their own deep tone. */
-    goldSoft: "#F6EDD4",
-    forestSoft: "#E7EDE5",
-    dangerSoft: "#F6E5E2",
-    /** Inset tiles inside a card — the stat-tile ground. */
-    sunk: "#F1ECE0",
+    /** Tinted grounds for chips and callouts. All carry their own deep tone. */
+    goldSoft: "#F8F2DC",
+    forestSoft: "#E9EFE9",
+    dangerSoft: "#F7E7E4",
 
     logoSrc: "/brand/crouse-logo.png",
   },
@@ -230,11 +250,15 @@ export const barn = {
     installTitle: "Add to your home screen",
     installBody: "Install the app for one-tap access from your phone.",
     /**
-     * The launch screen sits on the crest's own dark field rather than the
-     * app's cream, so the gold mark reads the way it does on the sign — and so
-     * the splash does not flash white before the first paint.
+     * BLACK, not grey. The old #2B2B2B put the logo on a grey card, which is
+     * the thing that read as unfinished. This is the same field the sign-in
+     * screen uses, so launch → sign-in is one continuous surface rather than
+     * two shades of almost-black.
+     *
+     * Baked into the generated splash PNGs — changing it means re-running
+     * `npm run brand:assets`, which this change did.
      */
-    launchBackground: "#2B2B2B",
+    launchBackground: "#0F0E0C",
   },
 } as const;
 

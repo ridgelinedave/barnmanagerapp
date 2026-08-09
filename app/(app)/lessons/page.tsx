@@ -95,8 +95,7 @@ export default async function LessonsPage() {
       {upcoming.length === 0 ? (
         <EmptyState
           title="Nothing booked right now"
-          body="When Belle puts your rider in a lesson it appears here, and you can cancel a spot from this screen if plans change."
-          emoji="🐴"
+          body="Booked lessons appear here."
         />
       ) : (
         upcoming.map(({ booking, instance }) => (

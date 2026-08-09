@@ -119,7 +119,7 @@ export default async function HorseDetailPage({
 
       {/* What is coming up. Only rendered when there IS something coming up. */}
       {careOn && due.length > 0 && (
-        <Board label="Coming up" emoji="📌">
+        <Board label="Coming up">
           {due.map((event) => {
             const overdue = (event.due_next ?? "") < today;
             return (
@@ -160,7 +160,6 @@ export default async function HorseDetailPage({
                 ? "Set the morning and evening feeds on this horse and they will appear on the feed board."
                 : "The barn has not set a feed chart for this horse yet."
             }
-            emoji="🪣"
           />
         ) : (
           <Card className="flex flex-col gap-3 p-4">
@@ -207,7 +206,6 @@ export default async function HorseDetailPage({
                   ? "Vaccines, worming, farrier and vet visits go here. The first one you log starts the history."
                   : "When the barn logs a vaccine, a farrier visit or a vet call, it will show up here."
               }
-              emoji="🩺"
             />
           ) : (
             <CareTimeline events={care} today={today} loggerNames={loggers} />
@@ -224,8 +222,7 @@ export default async function HorseDetailPage({
           {documents.length === 0 ? (
             <EmptyState
               title="No papers on file"
-              body="Coggins, registration papers and vet reports live here. The owning family can read them; nobody else can."
-              emoji="📄"
+              body="Coggins, papers and vet reports. Owner-only."
             />
           ) : (
             <DocumentList documents={documents} horseId={horse.id} canDelete={isBarn} />

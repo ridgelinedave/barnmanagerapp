@@ -44,8 +44,7 @@ export default async function ManageHorsesPage() {
         {inWork.length === 0 ? (
           <EmptyState
             title="No horses yet"
-            body="Add the first one below — name, owner, and whether it belongs to the barn. Feed charts and care history hang off each horse from there."
-            emoji="🐴"
+            body="Add the first one below."
           />
         ) : (
           inWork.map((horse) => (

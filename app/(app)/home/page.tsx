@@ -34,7 +34,7 @@ const HOME_BY_ROLE = {
  * The barn's clock, not the phone's — a parent checking in from a show three
  * states away should still be greeted by the morning the barn is having.
  */
-function greeting(): { text: string; emoji: string } {
+function greeting(): string {
   const hour = Number(
     new Intl.DateTimeFormat("en-GB", {
       timeZone: barn.timezone,
@@ -42,9 +42,9 @@ function greeting(): { text: string; emoji: string } {
       hour12: false,
     }).format(new Date()),
   );
-  if (hour < 12) return { text: "Good morning", emoji: "🌅" };
-  if (hour < 17) return { text: "Good afternoon", emoji: "☀️" };
-  return { text: "Good evening", emoji: "🌙" };
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  return "Good evening";
 }
 
 export default async function HomePage() {
@@ -78,16 +78,13 @@ export default async function HomePage() {
 
   // The soonest scheduled lesson. RLS already limits these to this family's.
   const nextLesson = instances.filter((i) => i.status === "scheduled")[0] ?? null;
-  const { text: hello, emoji } = greeting();
+  const hello = greeting();
 
   return (
     <TabPage title="Home">
       {role === "parent" ? (
         <>
           <h2 className="font-display text-title text-ink">
-            <span aria-hidden="true" className="mr-1.5">
-              {emoji}
-            </span>
             {firstName ? `${hello}, ${firstName}` : hello}
           </h2>
 
@@ -102,7 +99,7 @@ export default async function HomePage() {
           ))}
 
           {featureEnabled("lessons") && (
-            <Board label="Next in the diary" emoji="🐴" action={{ href: "/lessons", label: "All lessons" }}>
+            <Board label="Next in the diary" action={{ href: "/lessons", label: "All lessons" }}>
               {nextLesson ? (
                 <div className="flex items-start gap-3">
                   <span
@@ -135,7 +132,7 @@ export default async function HomePage() {
               ) : (
                 <EmptyState
                   title="Nothing booked just yet"
-                  body="When Belle puts your rider in a lesson it will show up here, and you can cancel from the Lessons tab if plans change."
+                  body="Your rider’s next lesson shows up here."
                 />
               )}
             </Board>
@@ -147,8 +144,7 @@ export default async function HomePage() {
               {announcements.length === 0 ? (
                 <EmptyState
                   title="All quiet"
-                  body="Belle posts news here — schedule changes, weather calls, show reminders. Nothing at the moment."
-                  emoji="📋"
+                  body="Barn news lands here."
                 />
               ) : (
                 announcements.map((announcement) => (

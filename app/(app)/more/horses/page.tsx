@@ -73,8 +73,7 @@ export default async function HorseDirectoryPage() {
         {owned.length === 0 && ridden.length === 0 && (
           <EmptyState
             title="No horses yet"
-            body="When your rider is matched with a horse it appears here. If your family owns one, its record and feed chart show up too."
-            emoji="🐴"
+            body="Your rider’s horses appear here."
           />
         )}
       </TabPage>
@@ -96,7 +95,6 @@ export default async function HorseDirectoryPage() {
           <EmptyState
             title="No horses on the books"
             body="Belle adds horses from Manage. Once they are on, their feed charts show up on the feed board."
-            emoji="🐴"
           />
         ) : (
           inWork.map((horse) => (

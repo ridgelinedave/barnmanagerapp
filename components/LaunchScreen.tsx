@@ -2,38 +2,37 @@ import Image from "next/image";
 import { barn } from "@/config/barn";
 
 /**
- * The branded launch screen, shown while the shell resolves who is looking.
+ * The launch screen, shown while the shell resolves who is looking.
  *
- * Used as the Suspense fallback for the app layout, so an installed PWA opens
- * on the crest rather than on a white flash followed by a jump. Everything is
- * config-driven: a clone changes /config/barn.ts and gets its own.
+ * BLACK, not grey. The old field was #2B2B2B, which put the crest on a grey
+ * card and read as an unfinished placeholder. It is now the same black as the
+ * sign-in screen and the generated splash PNGs, so launch → splash → sign-in
+ * is one continuous surface instead of three near-blacks.
  *
- * The indicator is a slow pulse rather than a spinner — this is a sub-second
- * wait most of the time, and a spinner makes a fast thing feel slow. Motion is
- * dropped entirely under prefers-reduced-motion (see globals.css).
+ * The mark fades and scales in rather than appearing: a sub-second wait that
+ * arrives calmly feels intentional, where an instant pop feels like a glitch
+ * and a spinner makes a fast thing feel slow. Motion is dropped entirely under
+ * prefers-reduced-motion (see globals.css).
  */
 export function LaunchScreen() {
   return (
     <div
-      className="flex min-h-dvh flex-col items-center justify-center gap-6"
+      className="flex min-h-dvh flex-col items-center justify-center gap-5"
       style={{ backgroundColor: barn.pwa.launchBackground }}
     >
-      <Image
-        src={barn.brand.logoSrc}
-        alt=""
-        width={160}
-        height={160}
-        priority
-        className="size-40"
-      />
-      {/* The wordmark, so the launch field and the sign-in door read as the
-          same door. Display face, because this is the app announcing itself. */}
-      <p className="font-display text-display text-white">{barn.name}</p>
-      <span
-        aria-hidden="true"
-        className="h-1 w-24 animate-pulse rounded-chip"
-        style={{ backgroundColor: barn.brand.gold, opacity: 0.7 }}
-      />
+      <div className="animate-brand-in flex flex-col items-center gap-5">
+        <Image
+          src={barn.brand.logoSrc}
+          alt=""
+          width={160}
+          height={160}
+          priority
+          className="size-36"
+        />
+        <p className="font-display text-[1.75rem] font-semibold uppercase tracking-[0.16em] text-white">
+          {barn.name}
+        </p>
+      </div>
       <span className="sr-only">Loading {barn.name}</span>
     </div>
   );

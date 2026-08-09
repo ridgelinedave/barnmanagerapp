@@ -26,7 +26,7 @@ export function GET() {
       orientation: "portrait",
       // The launch field, not the app surface: this is what fills the screen
       // before the first paint, so it must match the splash images or the
-      // launch flashes cream then jumps to charcoal.
+      // launch flashes white then jumps to the black field.
       background_color: barn.pwa.launchBackground,
       theme_color: barn.pwa.launchBackground,
       icons: [

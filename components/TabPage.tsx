@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { AppHeader } from "@/components/AppHeader";
 
 /**
- * The standard screen: charcoal header, cream body, room at the bottom for the
+ * The standard screen: charcoal header, paper-white body, room at the bottom for the
  * fixed tab bar.
  *
  * `gap-5` between blocks rather than a tighter uniform gap — sections need to

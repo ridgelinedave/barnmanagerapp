@@ -42,7 +42,6 @@ export default async function ManageCarePage() {
         <EmptyState
           title="Nothing due"
           body={`No vaccine, Coggins, worming or farrier date falls inside the next ${CARE_DUE_SOON_DAYS} days. Log care on a horse and set its next-due date to see it here.`}
-          emoji="🌿"
         />
       ) : (
         <>

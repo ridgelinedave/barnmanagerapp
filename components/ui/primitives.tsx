@@ -20,7 +20,7 @@ import { Icon, type IconName } from "@/components/ui/Icon";
 /* -------------------------------------------------------------------------- */
 
 /**
- * A card on the cream ground: white, one hairline, generous radius, and NO
+ * A panel on the paper ground: one hairline, tight radius, and NO
  * shadow. A drop shadow over a warm ground goes muddy; the hairline does the
  * separating and keeps the surface clean.
  */
@@ -45,24 +45,16 @@ export function Card({
  */
 export function Board({
   label,
-  emoji,
   action,
   children,
 }: {
   label: string;
-  /** Decorative only — always paired with the text label, never replacing it. */
-  emoji?: string;
   action?: { href: string; label: string };
   children: ReactNode;
 }) {
   return (
     <section className="overflow-hidden rounded-card border border-line bg-surface">
       <div className="flex items-center gap-2 bg-chrome px-4 py-2.5">
-        {emoji && (
-          <span aria-hidden="true" className="text-[0.9rem] leading-none">
-            {emoji}
-          </span>
-        )}
         <h2 className="font-display text-eyebrow uppercase text-white">{label}</h2>
         {action && (
           /* The hit area is 44px even though the label is 19px: padding plus a
@@ -204,22 +196,14 @@ export function ChipRow({ children }: { children: ReactNode }) {
 export function EmptyState({
   title,
   body,
-  emoji,
   action,
 }: {
   title: string;
   body: string;
-  /** Decorative. Never the only thing in the box. */
-  emoji?: string;
   action?: ReactNode;
 }) {
   return (
-    <div className="rounded-card border border-dashed border-line bg-surface/60 px-4 py-6 text-center">
-      {emoji && (
-        <p aria-hidden="true" className="mb-1 text-xl leading-none">
-          {emoji}
-        </p>
-      )}
+    <div className="rounded-card border border-dashed border-line bg-surface px-4 py-6 text-center">
       <p className="font-display text-heading text-ink">{title}</p>
       <p className="mx-auto mt-1 max-w-[38ch] text-caption text-muted">{body}</p>
       {action && <div className="mt-3 flex justify-center">{action}</div>}

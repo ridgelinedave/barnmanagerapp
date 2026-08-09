@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Crouse — Feed Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --gold:#DABC51;--gold-deep:#C9AA3F;
+    --ink:#1C1B18;--paper:#FFFFFF;--line:#E7E6E2;--muted:#8A857C;--soft:#FAFAF9;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Barlow',sans-serif;background:#E9E7E2;color:#2a2824;padding:40px 20px 64px;-webkit-font-smoothing:antialiased}
+  .head{max-width:900px;margin:0 auto 34px;text-align:center}
+  .head h1{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:26px;letter-spacing:.5px;text-transform:uppercase;color:#1c1b18}
+  .head p{margin-top:8px;color:#6b675e;font-size:15px}
+  .stage{display:flex;gap:48px;justify-content:center;flex-wrap:wrap;max-width:1000px;margin:0 auto}
+  .col{display:flex;flex-direction:column;align-items:center;gap:16px}
+  .caption{font-size:13px;color:#6b675e;text-align:center;max-width:300px}
+  .caption b{color:#1c1b18;font-weight:600}
+
+  .phone{width:320px;height:660px;border-radius:44px;background:var(--paper);
+    box-shadow:0 24px 60px rgba(0,0,0,.28),0 0 0 10px #17150f,0 0 0 11px #2a2620;
+    position:relative;overflow:hidden;display:flex;flex-direction:column}
+
+  /* dark chrome top bar */
+  .topbar{background:var(--ink);color:#fff;padding:52px 22px 16px;position:relative;flex-shrink:0}
+  .topbar::after{content:"";position:absolute;left:0;right:0;bottom:0;height:2px;background:var(--gold)}
+  .topbar .kicker{font-size:10px;letter-spacing:2.5px;text-transform:uppercase;color:var(--gold);margin-bottom:3px}
+  .topbar h2{font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:27px;letter-spacing:1px;text-transform:uppercase}
+  .back{position:absolute;top:52px;left:20px;color:#fff;font-size:22px;text-decoration:none;opacity:.9}
+
+  .body{flex:1;overflow:hidden;background:var(--paper)}
+  .scroll{padding:14px 16px 0}
+
+  /* horse row */
+  .horse{display:flex;align-items:center;gap:14px;padding:12px 8px;border-bottom:1px solid var(--line);cursor:pointer}
+  .horse:last-child{border-bottom:none}
+  .avatar{width:52px;height:52px;border-radius:12px;flex-shrink:0;display:flex;align-items:center;justify-content:center;
+    font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:22px;color:#fff;letter-spacing:1px}
+  .a1{background:linear-gradient(135deg,#6b5f4a,#3a3327)}
+  .a2{background:linear-gradient(135deg,#7a6a52,#463d2d)}
+  .a3{background:linear-gradient(135deg,#5c5344,#2c2820)}
+  .a4{background:linear-gradient(135deg,#847152,#4a3f2c)}
+  .a5{background:linear-gradient(135deg,#655a48,#332e24)}
+  .hinfo{flex:1;min-width:0}
+  .hname{font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:20px;color:var(--ink);letter-spacing:.4px;line-height:1.1}
+  .hsub{font-size:12.5px;color:var(--muted);margin-top:2px}
+  .htag{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--gold-deep);font-weight:600;background:rgba(218,188,81,.12);padding:4px 8px;border-radius:6px;white-space:nowrap}
+  .chev{color:#C9C5BC;font-size:20px}
+
+  /* detail */
+  .banner{background:var(--ink);padding:0 22px 20px;color:#fff;position:relative}
+  .bannerphoto{height:120px;margin:0 -22px 16px;background:linear-gradient(135deg,#6b5f4a,#33291b);display:flex;align-items:flex-end;padding:14px 22px}
+  .bannerphoto .pill{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;background:rgba(0,0,0,.35);color:#e8e2d4;padding:5px 9px;border-radius:6px}
+  .banner h2{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:30px;letter-spacing:.6px;text-transform:uppercase;line-height:1}
+  .banner .meta{font-size:13px;color:#b8b3a8;margin-top:5px}
+
+  .feedsec{padding:16px 16px 0}
+  .seclabel{display:flex;align-items:center;gap:8px;margin:6px 2px 10px}
+  .seclabel .t{font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:2px;text-transform:uppercase;color:var(--ink)}
+  .seclabel .rule{flex:1;height:1px;background:var(--line)}
+  .frow{display:flex;justify-content:space-between;padding:9px 2px;font-size:14px;border-bottom:1px solid var(--line)}
+  .frow:last-child{border-bottom:none}
+  .frow .k{color:var(--muted)}
+  .frow .v{color:var(--ink);font-weight:500;text-align:right}
+  .note{margin:12px 2px 0;font-size:13px;color:var(--muted);font-style:italic;line-height:1.4}
+
+  .btn{display:flex;align-items:center;justify-content:center;gap:8px;margin:20px 16px;height:50px;border:none;border-radius:5px;cursor:pointer;
+    background:var(--gold);color:var(--ink);font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;letter-spacing:2px;text-transform:uppercase;
+    box-shadow:inset 0 -2px 0 rgba(0,0,0,.12);transition:.12s}
+  .btn:hover{background:var(--gold-deep)}
+  .btn:active{transform:translateY(1px);box-shadow:inset 0 -1px 0 rgba(0,0,0,.12)}
+  .btn .arw{font-size:17px}
+
+  /* bottom nav */
+  .nav{background:var(--ink);display:flex;justify-content:space-around;padding:11px 0 20px;flex-shrink:0}
+  .nav a{display:flex;flex-direction:column;align-items:center;gap:4px;color:#7d7970;text-decoration:none;font-size:9.5px;letter-spacing:.5px;text-transform:uppercase}
+  .nav a.on{color:var(--gold)}
+  .nav svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.75}
+</style>
+</head>
+<body>
+  <div class="head">
+    <h1>Crouse — Feed Board (by horse)</h1>
+    <p>Light content, dark chrome, gold accents. Tap-through: horse list → that horse's chart.</p>
+  </div>
+
+  <div class="stage">
+
+    <!-- LIST -->
+    <div class="col">
+      <div class="phone">
+        <div class="topbar">
+          <div class="kicker">Crouse Equestrian</div>
+          <h2>Feed Board</h2>
+        </div>
+        <div class="body"><div class="scroll">
+          <div class="horse">
+            <div class="avatar a1">WI</div>
+            <div class="hinfo"><div class="hname">Winston</div><div class="hsub">Bay gelding · 16.2h</div></div>
+            <span class="htag">AM · PM</span>
+          </div>
+          <div class="horse">
+            <div class="avatar a2">DA</div>
+            <div class="hinfo"><div class="hname">Dakota</div><div class="hsub">Chestnut mare · 15.3h</div></div>
+            <span class="htag">AM · PM</span>
+          </div>
+          <div class="horse">
+            <div class="avatar a3">MI</div>
+            <div class="hinfo"><div class="hname">Miller</div><div class="hsub">Grey gelding · 16.1h</div></div>
+            <span class="htag">AM only</span>
+          </div>
+          <div class="horse">
+            <div class="avatar a4">JU</div>
+            <div class="hinfo"><div class="hname">Juno</div><div class="hsub">Bay mare · 15.2h</div></div>
+            <span class="htag">AM · PM</span>
+          </div>
+          <div class="horse">
+            <div class="avatar a5">RE</div>
+            <div class="hinfo"><div class="hname">Remy</div><div class="hsub">Palomino gelding · 14.3h</div></div>
+            <span class="htag">3× daily</span>
+          </div>
+        </div></div>
+        <div class="nav">
+          <a class="on"><svg viewBox="0 0 24 24"><path d="M4 10h16M6 10V6h5v4M13 10V4h5v6M4 10v10h16V10"/></svg>Feed</a>
+          <a><svg viewBox="0 0 24 24"><path d="M3 7h18M3 12h18M3 17h18"/></svg>Care</a>
+          <a><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4M16 3v4M4 10h16"/></svg>Calendar</a>
+          <a><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>Barn</a>
+        </div>
+      </div>
+      <div class="caption"><b>The list.</b> Each horse is a photo + name (photos slot into the avatars). Right chip previews their feed cadence at a glance.</div>
+    </div>
+
+    <!-- DETAIL -->
+    <div class="col">
+      <div class="phone">
+        <div class="banner">
+          <a class="back" href="#">‹</a>
+          <div style="height:36px"></div>
+          <div class="bannerphoto"><span class="pill">Winston · photo</span></div>
+          <h2>Winston</h2>
+          <div class="meta">Bay gelding · 16.2h · Owner: Harper family</div>
+        </div>
+        <div class="body" style="overflow:auto">
+          <div class="feedsec">
+            <div class="seclabel"><span class="t">Morning</span><span class="rule"></span></div>
+            <div class="frow"><span class="k">Hay</span><span class="v">2 flakes timothy</span></div>
+            <div class="frow"><span class="k">Grain</span><span class="v">1 scoop Ultium</span></div>
+            <div class="frow"><span class="k">Supplements</span><span class="v">SmartVite · MSM</span></div>
+          </div>
+          <div class="feedsec">
+            <div class="seclabel"><span class="t">Evening</span><span class="rule"></span></div>
+            <div class="frow"><span class="k">Hay</span><span class="v">2 flakes timothy</span></div>
+            <div class="frow"><span class="k">Grain</span><span class="v">1 scoop Ultium</span></div>
+            <div class="frow"><span class="k">Supplements</span><span class="v">SmartVite</span></div>
+            <div class="note">Soak grain 10 min. Muzzle on turnout after evening feed.</div>
+          </div>
+          <button class="btn">Log Feeding <span class="arw">→</span></button>
+        </div>
+        <div class="nav">
+          <a class="on"><svg viewBox="0 0 24 24"><path d="M4 10h16M6 10V6h5v4M13 10V4h5v6M4 10v10h16V10"/></svg>Feed</a>
+          <a><svg viewBox="0 0 24 24"><path d="M3 7h18M3 12h18M3 17h18"/></svg>Care</a>
+          <a><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4M16 3v4M4 10h16"/></svg>Calendar</a>
+          <a><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>Barn</a>
+        </div>
+      </div>
+      <div class="caption"><b>Tap a horse.</b> Its feed chart, morning and evening, with notes. The gold button is the refined, squared style (not the AI pill) — tactile press, small arrow.</div>
+    </div>
+
+  </div>
+</body>
+</html>

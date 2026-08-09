@@ -21,8 +21,7 @@ export default async function ManageAnnouncementsPage() {
       {announcements.length === 0 ? (
         <EmptyState
           title="Nothing posted yet"
-          body="Schedule changes, weather calls, show reminders — whatever the barn needs everyone to know. Families see it the moment you post."
-          emoji="📣"
+          body="Post something and families see it straight away."
         />
       ) : (
         announcements.map((announcement) => (
