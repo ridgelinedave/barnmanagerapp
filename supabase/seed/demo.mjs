@@ -199,56 +199,68 @@ async function main() {
 
   // --- horses, with their feed charts ----------------------------------------
   //
-  // The sub-line the feed board wants is "Bay gelding · 16.2h". `horses` has no
-  // colour, sex or height column today, so the descriptive half lives in
-  // `breed` for now and the height is carried in `notes` — both readable, both
-  // wrong shapes. Migration 0019 (PRINTED FOR AUDIT, NOT APPLIED) adds real
-  // columns; this seed moves onto them the moment it lands.
+  // Colour, sex and height are real columns as of migration 0019, so they are
+  // seeded as data rather than smuggled into `breed` and `notes` the way this
+  // block did before it landed. The feed board's "Bay gelding · 16.2h" is now
+  // composed from three fields that can be sorted and validated.
   const HORSES = [
     {
       name: "Winston",
-      breed: "Bay gelding · Thoroughbred",
-      height: "16.2h",
+      colour: "Bay",
+      sex: "gelding",
+      height: 16.2,
+      breed: "Thoroughbred",
       family: `${DEMO_TAG} Harper`,
       am: { description: "2 flakes timothy", supplements: "SmartVite · MSM", note: "Soak grain 10 min." },
       pm: { description: "2 flakes timothy", supplements: "SmartVite", note: "Muzzle on turnout after evening feed." },
     },
     {
       name: "Dakota",
-      breed: "Chestnut mare · Quarter Horse",
-      height: "15.3h",
+      colour: "Chestnut",
+      sex: "mare",
+      height: 15.3,
+      breed: "Quarter Horse",
       family: `${DEMO_TAG} Whitfield`,
       am: { description: "2 flakes orchard", supplements: "Vitamin E", note: "" },
       pm: { description: "2 flakes orchard", supplements: "", note: "Slow feeder net." },
     },
     {
       name: "Miller",
-      breed: "Grey gelding · Connemara",
-      height: "16.1h",
+      colour: "Grey",
+      sex: "gelding",
+      height: 16.1,
+      breed: "Connemara",
       family: null,
       am: { description: "3 flakes timothy", supplements: "Joint supplement", note: "Morning feed only." },
       pm: null,
     },
     {
       name: "Juno",
-      breed: "Bay mare · Warmblood",
-      height: "15.2h",
+      colour: "Bay",
+      sex: "mare",
+      height: 15.2,
+      breed: "Warmblood",
       family: `${DEMO_TAG} Marchetti`,
       am: { description: "2 flakes alfalfa mix", supplements: "SmartVite", note: "" },
       pm: { description: "2 flakes alfalfa mix", supplements: "SmartVite · Biotin", note: "" },
     },
     {
       name: "Remy",
-      breed: "Palomino gelding · Welsh Cob",
-      height: "14.3h",
+      colour: "Palomino",
+      sex: "gelding",
+      // A whole number, so the display drops the decimal: "14h", not "14.0h".
+      height: 14,
+      breed: "Welsh Cob",
       family: `${DEMO_TAG} Sørensen`,
       am: { description: "1 flake timothy", supplements: "", note: "Small feeds — easy keeper." },
       pm: { description: "1 flake timothy", supplements: "Magnesium", note: "" },
     },
     {
       name: "Sable",
-      breed: "Black mare · Friesian cross",
-      height: "16.0h",
+      colour: "Black",
+      sex: "mare",
+      height: 16,
+      breed: "Friesian cross",
       family: null,
       am: { description: "2 flakes orchard", supplements: "Omega oil", note: "" },
       pm: { description: "2 flakes orchard", supplements: "Omega oil", note: "Feed alone — bolts." },
@@ -270,9 +282,12 @@ async function main() {
         .insert({
           name: tagged,
           barn_name: horse.name,
+          colour: horse.colour,
+          sex: horse.sex,
+          height_hands: horse.height,
           breed: horse.breed,
           owner_family_id: horse.family ? (familyIdByName.get(horse.family) ?? null) : null,
-          notes: `${horse.height} · demo horse, safe to delete.`,
+          notes: "Demo horse, safe to delete.",
           active: true,
         })
         .select()

@@ -1,30 +1,41 @@
-import type { FeedPlan, Horse, Meal } from "@/lib/types";
+import { HORSE_SEX_LABELS, type FeedPlan, type Horse, type Meal } from "@/lib/types";
 
 /**
  * How a horse is described on a list row: "Bay gelding · 16.2h".
  *
- * ⚠ THIS IS A STOPGAP AND IT SHOWS. `horses` has no colour, sex or height
- * column, so the descriptive half is whatever is in `breed` and the height is
- * parsed out of the FRONT of `notes`. Parsing a free-text field for a
- * structured value is exactly the kind of thing that works until someone
- * writes a note that starts with a number.
+ * Reads the real columns from migration 0019. This used to compose the same
+ * string from `breed` plus a regex that mined the height out of the FRONT of
+ * `notes` — which worked, and would have broken the first time someone wrote a
+ * note starting with a number. Those columns exist now, so the parsing is gone.
  *
- * Migration 0019 is written and PRINTED FOR AUDIT, NOT APPLIED — it adds
- * `colour`, `sex` and `height_hands` as real columns. When it lands, this
- * function reads them and the parsing goes away. Until then the feed board
- * renders the mockup's sub-line without the schema pretending it is structured.
+ * `breed` is still shown, but LAST and only when there is room in the sentence:
+ * colour and sex identify the animal in front of you, breed is provenance.
  */
-const HEIGHT_AT_START = /^(\d{1,2}(?:\.\d)?)\s*h\b/i;
-
 export function horseSubtitle(horse: Horse): string | null {
-  const parts: string[] = [];
+  // "Bay gelding" reads as one phrase, so colour and sex join without a dot.
+  const build = [horse.colour, horse.sex ? HORSE_SEX_LABELS[horse.sex].toLowerCase() : null]
+    .filter(Boolean)
+    .join(" ");
 
-  if (horse.breed) parts.push(horse.breed);
-
-  const height = HEIGHT_AT_START.exec((horse.notes ?? "").trim());
-  if (height) parts.push(`${height[1]}h`);
+  const parts = [
+    build || null,
+    horse.height_hands === null ? null : `${formatHands(horse.height_hands)}h`,
+    horse.breed,
+  ].filter(Boolean) as string[];
 
   return parts.length > 0 ? parts.join(" · ") : null;
+}
+
+/**
+ * 16.2 → "16.2", 16 → "16".
+ *
+ * The decimal is INCHES, not a fraction, so it is never rounded or padded:
+ * "16.0h" is a horse that is exactly sixteen hands, and writing it as "16h" is
+ * how a person would say it. Number formatting would happily render 16.2 as
+ * 16.20, which is not a height anyone recognises.
+ */
+export function formatHands(hands: number): string {
+  return Number.isInteger(hands) ? String(hands) : hands.toFixed(1);
 }
 
 /**

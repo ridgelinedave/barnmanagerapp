@@ -233,6 +233,21 @@ export type TimesheetApproval = {
   external_ref: unknown;
 };
 
+export const HORSE_SEXES = ["mare", "gelding", "stallion", "filly", "colt"] as const;
+export type HorseSex = (typeof HORSE_SEXES)[number];
+
+export function isHorseSex(value: unknown): value is HorseSex {
+  return typeof value === "string" && (HORSE_SEXES as readonly string[]).includes(value);
+}
+
+export const HORSE_SEX_LABELS: Record<HorseSex, string> = {
+  mare: "Mare",
+  gelding: "Gelding",
+  stallion: "Stallion",
+  filly: "Filly",
+  colt: "Colt",
+};
+
 export type Horse = {
   id: string;
   created_at: string;
@@ -245,6 +260,15 @@ export type Horse = {
   dob: string | null;
   active: boolean;
   notes: string | null;
+  /** Coat colour as the barn says it — "Bay", "Chestnut", "Grey" (0019). */
+  colour: string | null;
+  sex: HorseSex | null;
+  /**
+   * Hands, with inches as the decimal: 16.2 is sixteen hands two inches, so
+   * the fractional part only ever runs 0–3. Numeric in the database; PostgREST
+   * hands numeric back as a JS number.
+   */
+  height_hands: number | null;
 };
 
 /**

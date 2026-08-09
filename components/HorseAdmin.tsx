@@ -10,7 +10,14 @@ import {
 } from "@/app/(app)/manage/horses/actions";
 import { Button } from "@/components/ui/Button";
 import { FormFeedback } from "@/components/ui/Field";
-import { MEALS, MEAL_LABELS, type FeedPlan, type Horse } from "@/lib/types";
+import {
+  HORSE_SEXES,
+  HORSE_SEX_LABELS,
+  MEALS,
+  MEAL_LABELS,
+  type FeedPlan,
+  type Horse,
+} from "@/lib/types";
 
 const EMPTY: HorseAdminState = { error: null, message: null };
 
@@ -94,11 +101,74 @@ export function HorseForm({
         </p>
       </div>
 
+      {/*
+       * Colour, sex and height — the three facts that identify a horse in an
+       * aisle, and the line the feed board reads. Colour and height sit on one
+       * row because they are short and they are read together ("bay, 16.2").
+       */}
+      <div className="flex gap-3">
+        <div className="flex flex-1 flex-col gap-1.5">
+          <label htmlFor="horse-colour" className="text-label font-medium text-ink">
+            Colour <span className="font-normal text-muted">(optional)</span>
+          </label>
+          <input
+            id="horse-colour"
+            name="colour"
+            placeholder="Bay"
+            defaultValue={horse?.colour ?? ""}
+            className={FIELD}
+          />
+        </div>
+
+        <div className="flex w-28 shrink-0 flex-col gap-1.5">
+          <label htmlFor="horse-height" className="text-label font-medium text-ink">
+            Height
+          </label>
+          <input
+            id="horse-height"
+            name="height_hands"
+            type="number"
+            inputMode="decimal"
+            step="0.1"
+            min="0"
+            max="29.3"
+            placeholder="16.2"
+            defaultValue={horse?.height_hands ?? ""}
+            className={FIELD}
+          />
+        </div>
+      </div>
+      {/* Said once, here, because "16.2 hands" surprises people who expect
+          decimals to be fractions. The database enforces it either way. */}
+      <p className="-mt-1.5 text-caption text-muted">
+        Height in hands — the decimal is inches, so 16.2 is sixteen hands two inches.
+      </p>
+
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="horse-sex" className="text-label font-medium text-ink">
+          Sex <span className="font-normal text-muted">(optional)</span>
+        </label>
+        <select id="horse-sex" name="sex" defaultValue={horse?.sex ?? ""} className={FIELD}>
+          <option value="">Not set</option>
+          {HORSE_SEXES.map((sex) => (
+            <option key={sex} value={sex}>
+              {HORSE_SEX_LABELS[sex]}
+            </option>
+          ))}
+        </select>
+      </div>
+
       <div className="flex flex-col gap-1.5">
         <label htmlFor="horse-breed" className="text-label font-medium text-ink">
           Breed <span className="font-normal text-muted">(optional)</span>
         </label>
-        <input id="horse-breed" name="breed" defaultValue={horse?.breed ?? ""} className={FIELD} />
+        <input
+          id="horse-breed"
+          name="breed"
+          placeholder="Thoroughbred"
+          defaultValue={horse?.breed ?? ""}
+          className={FIELD}
+        />
       </div>
 
       <div className="flex flex-col gap-1.5">

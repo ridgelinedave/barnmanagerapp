@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getViewer } from "@/lib/session";
-import { isMeal } from "@/lib/types";
+import { isHorseSex, isMeal, type HorseSex } from "@/lib/types";
 
 /**
  * Horse, rider-assignment and feed-plan management.
@@ -47,6 +47,39 @@ function optional(formData: FormData, key: string): string | null {
   return value.length > 0 ? value : null;
 }
 
+/** The sex column is a CHECK; anything not in the list stores as absent. */
+function sexOf(formData: FormData): HorseSex | null {
+  const value = optional(formData, "sex");
+  return isHorseSex(value) ? value : null;
+}
+
+/**
+ * Height in hands, where the decimal is INCHES and so only runs 0–3.
+ *
+ * `horses_height_is_hands` enforces this, but a constraint violation reaches
+ * the person as a raw Postgres string. Catching it here means "16.7" gets a
+ * sentence that explains the notation instead.
+ *
+ * Returns `undefined` when the value is unusable, which the callers turn into
+ * an error — distinct from `null`, which means "deliberately not set".
+ */
+function heightOf(formData: FormData): number | null | undefined {
+  const raw = optional(formData, "height_hands");
+  if (raw === null) return null;
+
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value <= 0 || value >= 30) return undefined;
+
+  // One decimal place, and that place is inches: 0-3.
+  const inches = Math.round(value * 10) % 10;
+  if (inches > 3) return undefined;
+
+  return Math.round(value * 10) / 10;
+}
+
+const HEIGHT_HELP =
+  "Height is in hands and the decimal is inches, so it runs .0 to .3 — 16.2 is sixteen hands two inches.";
+
 export async function createHorse(
   _prev: HorseAdminState,
   formData: FormData,
@@ -56,6 +89,9 @@ export async function createHorse(
   const name = String(formData.get("name") ?? "").trim();
   if (!name) return { error: "Give the horse a name.", message: null };
 
+  const height = heightOf(formData);
+  if (height === undefined) return { error: HEIGHT_HELP, message: null };
+
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("horses")
@@ -64,6 +100,9 @@ export async function createHorse(
       barn_name: optional(formData, "barn_name"),
       // "" is the barn itself — a horse with no owning family.
       owner_family_id: optional(formData, "owner_family_id"),
+      colour: optional(formData, "colour"),
+      sex: sexOf(formData),
+      height_hands: height,
       breed: optional(formData, "breed"),
       dob: optional(formData, "dob"),
       notes: optional(formData, "notes"),
@@ -89,6 +128,9 @@ export async function updateHorse(
   if (!id) return { error: "Missing horse.", message: null };
   if (!name) return { error: "Give the horse a name.", message: null };
 
+  const height = heightOf(formData);
+  if (height === undefined) return { error: HEIGHT_HELP, message: null };
+
   const supabase = await createClient();
   const { error } = await supabase
     .from("horses")
@@ -96,6 +138,9 @@ export async function updateHorse(
       name,
       barn_name: optional(formData, "barn_name"),
       owner_family_id: optional(formData, "owner_family_id"),
+      colour: optional(formData, "colour"),
+      sex: sexOf(formData),
+      height_hands: height,
       breed: optional(formData, "breed"),
       dob: optional(formData, "dob"),
       notes: optional(formData, "notes"),
