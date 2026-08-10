@@ -4573,6 +4573,166 @@ async function main() {
   }
 
   // ===========================================================================
+  // training_logs (migration 0020) — the boarder-visible training history
+  //
+  // Gated on the TABLE EXISTING rather than on a flag, so it runs by itself the
+  // moment the migration is applied.
+  //
+  // The whole point of this section is the OWNS-vs-RIDES line. Training is less
+  // sensitive than a medical record, but the visibility question is identical —
+  // whose horse is it — and 0020 mirrors care_events verb for verb precisely so
+  // that one answer serves both. These assertions are the proof it actually
+  // does: a family whose rider merely RIDES a horse must see zero rows.
+  // ===========================================================================
+  {
+    const probe = await admin.from("training_logs").select("id").limit(1);
+    const tableMissing =
+      probe.error?.code === "42P01" || /schema cache/i.test(probe.error?.message ?? "");
+
+    if (tableMissing) {
+      console.log("\n\n═══ training_logs — SKIPPED ═══");
+      console.log("  Migration 0020 has not been applied. Apply it and re-run.");
+      skipped += 1;
+    } else {
+      const horseFx = fixtures.horses ?? {};
+      const owned = horseFx.owned?.id ?? null;
+      const ridden = horseFx.ridden?.id ?? null;
+
+      console.log("\n\n═══ training_logs — ALLOW ═══\n");
+
+      const made = [];
+      const mk = async (client, horseId, focus) => {
+        const { data, error } = await client
+          .from("training_logs")
+          .insert({
+            horse_id: horseId,
+            performed_at: "2026-07-20",
+            discipline: "flatwork",
+            focus,
+            notes: "policy test",
+          })
+          .select()
+          .single();
+        if (data) made.push(data.id);
+        return { data, error };
+      };
+
+      const asAdmin = await mk(admin, owned, "Policy test — admin");
+      check("admin CAN log training", !asAdmin.error && Boolean(asAdmin.data), asAdmin.error?.message);
+
+      // The guard trigger: logged_by is pinned to the caller, never sent.
+      check(
+        "logged_by is pinned to the caller, not left to the client",
+        asAdmin.data?.logged_by === users.admin.profileId,
+        `got ${asAdmin.data?.logged_by}`,
+      );
+      check(
+        "performed_at is NOT pinned to today — a past training day is the normal case",
+        asAdmin.data?.performed_at === "2026-07-20",
+        `got ${asAdmin.data?.performed_at}`,
+      );
+
+      const asStaff = await mk(staff, owned, "Policy test — staff");
+      check("staff CAN log training", !asStaff.error && Boolean(asStaff.data), asStaff.error?.message);
+      check(
+        "and staff's row is attributed to staff, not to whoever they claimed",
+        asStaff.data?.logged_by === users.staff.profileId,
+        `got ${asStaff.data?.logged_by}`,
+      );
+
+      // A client-chosen logged_by must be overwritten, not obeyed.
+      const { data: spoofed } = await staff
+        .from("training_logs")
+        .insert({
+          horse_id: owned,
+          performed_at: "2026-07-21",
+          discipline: "hacking",
+          notes: "policy test spoof",
+          logged_by: users.admin.profileId,
+        })
+        .select()
+        .single();
+      if (spoofed) made.push(spoofed.id);
+      check(
+        "a client-supplied logged_by is OVERWRITTEN with the real caller",
+        spoofed?.logged_by === users.staff.profileId,
+        `stored ${spoofed?.logged_by}`,
+      );
+
+      // Control before the deny: the OWNING family can read.
+      const { ids: ownerSees } = await visibleIds(parent, "training_logs");
+      check(
+        "control: the OWNING family CAN read their horse's training",
+        ownerSees.length > 0,
+        `owner saw ${ownerSees.length}`,
+      );
+
+      console.log("\n═══ training_logs — DENY (adversarial) ═══\n");
+
+      // THE LINE THAT MATTERS. Same rule as care_events: owns, never rides.
+      const riddenLog = await mk(admin, ridden, "Policy test — ridden horse");
+      check("control: a log exists on the RIDDEN horse", Boolean(riddenLog.data));
+
+      const { data: riddenSeen } = await parent
+        .from("training_logs")
+        .select("id")
+        .eq("horse_id", ridden);
+      check(
+        "a family whose rider merely RIDES a horse sees NONE of its training",
+        (riddenSeen?.length ?? 0) === 0,
+        `saw ${riddenSeen?.length} — family_owns_horse has become family_rides_horse`,
+      );
+
+      if (parent2) {
+        const { ids: otherFamily } = await visibleIds(parent2, "training_logs");
+        check(
+          "another family sees none of this family's horse's training",
+          otherFamily.length === 0,
+          `saw ${otherFamily.length}`,
+        );
+      }
+
+      check(
+        "a parent CANNOT log training",
+        await writeRefused(
+          parent
+            .from("training_logs")
+            .insert({ horse_id: owned, performed_at: "2026-07-22", discipline: "jumping" })
+            .select(),
+        ),
+      );
+
+      // Append-only for staff: they log, the barn corrects.
+      check(
+        "staff CANNOT edit a training log — the barn corrects, not the writer",
+        await writeRefused(
+          staff
+            .from("training_logs")
+            .update({ notes: "rewritten" })
+            .eq("id", asStaff.data?.id ?? "")
+            .select(),
+        ),
+      );
+      check(
+        "staff CANNOT delete a training log",
+        await writeRefused(
+          staff.from("training_logs").delete().eq("id", asStaff.data?.id ?? "").select(),
+        ),
+      );
+
+      check(
+        "anon sees no training at all",
+        (await visibleIds(anon, "training_logs")).ids.length === 0,
+      );
+
+      // Clean up so the next run starts where this one did.
+      for (const id of made) await admin.from("training_logs").delete().eq("id", id);
+      const { ids: leftovers } = await visibleIds(admin, "training_logs");
+      check("the test training logs are cleaned up", leftovers.length === 0, `${leftovers.length} left`);
+    }
+  }
+
+  // ===========================================================================
   // STANDING GUARD — a parent row can never carry a permission flag (0018)
   //
   // public.has_permission() short-circuits to true for admin and otherwise

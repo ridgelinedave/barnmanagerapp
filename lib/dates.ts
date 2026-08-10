@@ -1,5 +1,6 @@
 import { barn } from "@/config/barn";
 import { localToUtc } from "@/lib/ical";
+import { ageOn, bandFor } from "@/lib/age";
 
 /**
  * "Today" at the barn, as YYYY-MM-DD.
@@ -64,15 +65,7 @@ export function formatBarnDateFull(isoDate: string): string {
  * string comparison against `MM-DD` gives for free.
  */
 export function ageFromDob(dob: string, on: string = barnToday()): number | null {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(dob) || !/^\d{4}-\d{2}-\d{2}$/.test(on)) return null;
-
-  const years = Number(on.slice(0, 4)) - Number(dob.slice(0, 4));
-  // Birthday not yet reached this year.
-  const hadBirthday = on.slice(5) >= dob.slice(5);
-  const age = hadBirthday ? years : years - 1;
-
-  // A future date of birth is a typo, not a negative age.
-  return age >= 0 ? age : null;
+  return ageOn(dob, on);
 }
 
 /**
@@ -87,8 +80,9 @@ export function ageGroupFor(dob: string | null, on: string = barnToday()): strin
   const age = ageFromDob(dob, on);
   if (age === null) return null;
 
-  const group = barn.riderAgeGroups.find((g) => g.maxAge === null || age <= g.maxAge);
-  return group?.label ?? null;
+  // The arithmetic lives in lib/age.ts, which imports nothing, so it can be
+  // unit tested. This wrapper only supplies the barn's clock and bands.
+  return bandFor(age, barn.riderAgeGroups);
 }
 
 /** ISO weekday for a barn-local date. 1 = Monday … 7 = Sunday. */

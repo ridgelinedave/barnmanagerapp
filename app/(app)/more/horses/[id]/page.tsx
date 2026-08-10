@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { TabPage } from "@/components/TabPage";
 import { CareTimeline } from "@/components/CareTimeline";
+import { TrainingTimeline } from "@/components/TrainingTimeline";
+import { TrainingLogForm } from "@/components/TrainingLogForm";
 import { CareLogForm } from "@/components/CareLogForm";
 import { DocumentList } from "@/components/DocumentList";
 import { DocumentUploadForm } from "@/components/HorseDocuments";
@@ -21,6 +23,7 @@ import { listHorseDocuments } from "@/lib/documents";
 import { currentRole } from "@/lib/guard";
 import { getHorse, listFeedPlans, listHorseRiders } from "@/lib/horses";
 import { listCareEvents, loggerNames, upcoming } from "@/lib/care";
+import { listTrainingLogs } from "@/lib/training";
 import { barnToday, formatBarnDayLabel } from "@/lib/dates";
 import { CARE_TYPE_LABELS, MEAL_LABELS } from "@/lib/types";
 import { barn, featureEnabled } from "@/config/barn";
@@ -56,7 +59,7 @@ export default async function HorseDetailPage({
   const isBarn = role !== "parent";
   const careOn = featureEnabled("care");
   const documentsOn = featureEnabled("documents");
-  const [plans, riders, care, loggers, documents] = await Promise.all([
+  const [plans, riders, care, loggers, documents, training] = await Promise.all([
     listFeedPlans(id),
     listHorseRiders(id),
     careOn ? listCareEvents(id) : Promise.resolve([]),
@@ -66,6 +69,7 @@ export default async function HorseDetailPage({
     // Storage RLS filters this: the barn sees the folder, the owning family
     // sees the folder, anyone else gets an empty list.
     documentsOn ? listHorseDocuments(id) : Promise.resolve([]),
+    listTrainingLogs(id),
   ]);
   const activePlans = plans.filter((p) => p.active);
   const due = upcoming(care);
@@ -212,6 +216,39 @@ export default async function HorseDetailPage({
           )}
         </section>
       )}
+
+      {/* THE BOARDER SURFACE. This is the section Belle asked for: an owner
+          seeing what their horse actually did. RLS decides whether there is
+          anything here — the owning family and the barn get the full history,
+          a family whose rider merely RIDES this horse gets nothing at all, and
+          the empty state below is what that looks like rather than an error.
+          `loggerNames` is undefined for a family, so a boarder reads the work
+          without reading the staff roster. */}
+      <section className="flex flex-col gap-3">
+        <SectionHeader
+          title="Training"
+          count={training.length === 0 ? undefined : `${training.length} sessions`}
+        />
+
+        {isBarn && (
+          <SheetTrigger label="Log training" title="Log training" variant="primary">
+            <TrainingLogForm horseId={horse.id} today={today} />
+          </SheetTrigger>
+        )}
+
+        {training.length === 0 ? (
+          <EmptyState
+            title="Nothing logged yet"
+            body={
+              isBarn
+                ? "Schooling, hacking and groundwork go here."
+                : "When the barn schools your horse, the session shows up here."
+            }
+          />
+        ) : (
+          <TrainingTimeline logs={training} loggerNames={loggers} />
+        )}
+      </section>
 
       {documentsOn && (documents.length > 0 || isBarn) && (
         <section className="flex flex-col gap-3">

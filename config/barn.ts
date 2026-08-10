@@ -220,25 +220,31 @@ export const barn = {
   backfillCutoffMinutes: 120,
 
   /**
-   * PLACEHOLDER — rider age groups.
+   * CONFIRMED BY BELLE — rider age groups.
    *
    * A rider's age group is DERIVED from `dob`, never stored: an age column
    * would be wrong within a year of being typed, and there is exactly one true
    * source for how old someone is. Only the bracket boundaries are a barn fact,
    * so only they live here.
    *
-   * These four brackets are the common horse-show divisions and are a
-   * STARTING POINT, not Belle's. Confirm the real ones with her — different
-   * disciplines cut them differently, and this is the sort of detail a parent
-   * notices immediately. `maxAge` is inclusive; the last entry must be null,
-   * meaning "and up".
+   * Both bounds are INCLUSIVE and the bands do not overlap or leave gaps —
+   * every whole age from 6 to 80 falls in exactly one. A rider outside that
+   * range CLAMPS to the nearest band rather than falling through: a five-year-
+   * old on a lead line shows as 6–9 and an eighty-five-year-old shows as
+   * 51–80, because "no age group" on a real rider reads as a bug, and the
+   * barn would rather see the nearest true thing.
+   *
+   * Order matters — ageGroupFor() takes the first band the age fits, and the
+   * clamp reads the first and last entries.
    */
   riderAgeGroups: [
-    { label: "10 & under", maxAge: 10 },
-    { label: "11–13", maxAge: 13 },
-    { label: "14–17", maxAge: 17 },
-    { label: "Adult", maxAge: null },
-  ] as readonly { label: string; maxAge: number | null }[],
+    { label: "6–9", minAge: 6, maxAge: 9 },
+    { label: "10–12", minAge: 10, maxAge: 12 },
+    { label: "13–17", minAge: 13, maxAge: 17 },
+    { label: "18–29", minAge: 18, maxAge: 29 },
+    { label: "30–50", minAge: 30, maxAge: 50 },
+    { label: "51–80", minAge: 51, maxAge: 80 },
+  ] as readonly { label: string; minAge: number; maxAge: number }[],
 
   /**
    * PLACEHOLDER — staff clock-in geofence (Phase 1). Get the farm's real

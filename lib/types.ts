@@ -359,6 +359,47 @@ export type CareEvent = {
   logged_by: string | null;
 };
 
+export const DISCIPLINES = [
+  "dressage",
+  "jumping",
+  "flatwork",
+  "groundwork",
+  "hacking",
+  "lunging",
+  "conditioning",
+  "other",
+] as const;
+export type Discipline = (typeof DISCIPLINES)[number];
+
+export function isDiscipline(value: unknown): value is Discipline {
+  return typeof value === "string" && (DISCIPLINES as readonly string[]).includes(value);
+}
+
+export const DISCIPLINE_LABELS: Record<Discipline, string> = {
+  dressage: "Dressage",
+  jumping: "Jumping",
+  flatwork: "Flatwork",
+  groundwork: "Groundwork",
+  hacking: "Hacking",
+  lunging: "Lunging",
+  conditioning: "Conditioning",
+  other: "Other",
+};
+
+export type TrainingLog = {
+  id: string;
+  created_at: string;
+  horse_id: string;
+  /** Barn-local date, YYYY-MM-DD. Routinely in the past — work is written up after. */
+  performed_at: string;
+  discipline: Discipline;
+  focus: string | null;
+  notes: string;
+  duration_min: number | null;
+  /** Forced to the logging profile by a trigger; never client-supplied. */
+  logged_by: string | null;
+};
+
 export const FORM_FIELD_TYPES = ["text", "textarea", "checkbox", "date"] as const;
 export type FormFieldType = (typeof FORM_FIELD_TYPES)[number];
 

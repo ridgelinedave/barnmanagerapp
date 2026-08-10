@@ -313,15 +313,12 @@ export default async function ManageTeamPage() {
         </SheetTrigger>
       </section>
 
-      {/* Age groups are derived from each rider's date of birth, never stored,
-          so the brackets themselves are the only barn fact — and they are a
-          placeholder until Belle confirms them. */}
-      <Callout tone="gold" icon="alert">
-        Age groups are worked out from each rider&apos;s date of birth, so they are never out
-        of date. The brackets in use are{" "}
-        {barn.riderAgeGroups.map((group) => group.label).join(", ")} — confirm these are the
-        ones Belle uses before this goes in front of families.
-      </Callout>
+      {/* Derived from each rider's date of birth, never stored. The bands are
+          Belle's, confirmed — this is a statement of fact now, not a query. */}
+      <p className="text-caption text-muted">
+        Age groups come from each rider&apos;s date of birth, so they never go out of date:{" "}
+        {barn.riderAgeGroups.map((group) => group.label).join(" · ")}.
+      </p>
     </TabPage>
   );
 }

@@ -88,9 +88,8 @@ const EXPECTED_TABLES = [
  * just noise.
  */
 const PENDING_TABLES = {
-  // Empty: migration 0017 was audited and applied on 2026-07-31, so `invites`
-  // moved up into EXPECTED_TABLES and is now checked as strictly as any other.
-  // Keep the mechanism — the next audited-pending migration needs it.
+  // Phase 2 — migration 0020 (training_logs), awaiting David's audit.
+  training_logs: "migration 0020 (training_logs) has not been applied yet",
 };
 const EXPECTED_FUNCTIONS = [
   "current_role",

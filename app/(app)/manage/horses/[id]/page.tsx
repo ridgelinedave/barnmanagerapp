@@ -13,10 +13,13 @@ import {
   listHorseRiders,
 } from "@/lib/horses";
 import { CareTimeline } from "@/components/CareTimeline";
+import { TrainingTimeline } from "@/components/TrainingTimeline";
+import { TrainingLogForm } from "@/components/TrainingLogForm";
 import { CareLogForm } from "@/components/CareLogForm";
 import { DocumentList } from "@/components/DocumentList";
 import { DocumentUploadForm } from "@/components/HorseDocuments";
 import { listCareEvents, loggerNames } from "@/lib/care";
+import { listTrainingLogs } from "@/lib/training";
 import { listHorseDocuments } from "@/lib/documents";
 import { barnToday } from "@/lib/dates";
 import { MEAL_LABELS } from "@/lib/types";
@@ -39,7 +42,7 @@ export default async function ManageHorsePage({
 
   const careOn = featureEnabled("care");
   const documentsOn = featureEnabled("documents");
-  const [families, riders, allRiders, plans, care, loggers, documents] = await Promise.all([
+  const [families, riders, allRiders, plans, care, loggers, documents, training] = await Promise.all([
     familyNames(),
     listHorseRiders(id),
     listAssignableRiders(),
@@ -47,6 +50,7 @@ export default async function ManageHorsePage({
     careOn ? listCareEvents(id) : Promise.resolve([]),
     careOn ? loggerNames() : Promise.resolve(new Map<string, string>()),
     documentsOn ? listHorseDocuments(id) : Promise.resolve([]),
+    listTrainingLogs(id),
   ]);
 
   const assigned = new Set(riders.map((r) => r.id));
@@ -170,6 +174,30 @@ export default async function ManageHorsePage({
           )}
         </section>
       )}
+
+      {/* Training sits under Care because they answer the same question about
+          the same animal — what has been done to it and with it. Renders empty
+          until migration 0020 is applied; listTrainingLogs returns [] on a
+          missing table rather than taking the page down. */}
+      <section className="flex flex-col gap-3">
+        <SectionHeader
+          title="Training"
+          count={training.length === 0 ? "Nothing logged" : `${training.length} sessions`}
+        />
+
+        <SheetTrigger label="Log training" title="Log training" variant="primary">
+          <TrainingLogForm horseId={horse.id} today={barnToday()} />
+        </SheetTrigger>
+
+        {training.length === 0 ? (
+          <EmptyState
+            title="Nothing logged yet"
+            body="Schooling, hacking and groundwork go here. The owner can see it too."
+          />
+        ) : (
+          <TrainingTimeline logs={training} loggerNames={loggers} />
+        )}
+      </section>
 
       {documentsOn && (
         <section className="flex flex-col gap-3">

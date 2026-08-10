@@ -76,7 +76,8 @@ async function removeDemoData() {
   await del("tasks", "title");
   await del("task_templates", "title");
   await del("announcements", "title");
-  // care_events and feed_plans cascade from horses; submissions from templates.
+  // care_events, feed_plans and training_logs cascade from horses;
+  // submissions from templates.
   await del("form_templates", "name");
   await del("horses", "name");
   await del("families", "name"); // riders cascade
@@ -372,6 +373,58 @@ async function main() {
     if (!error) careCount++;
   }
   console.log(`  care_events   ${careCount} (2 overdue)`);
+
+  // --- training logs ---------------------------------------------------------
+  // Skipped silently until migration 0020 is applied — the demo seed should not
+  // fail on a table that is deliberately still awaiting audit.
+  const TRAINING = [
+    { discipline: "flatwork", focus: "Shoulder-in both reins", minutes: 45, ago: 1, notes: "Softer left than last week." },
+    { discipline: "jumping", focus: "Grid work, 2'6\"", minutes: 50, ago: 3, notes: "" },
+    { discipline: "hacking", focus: "Hill work out back", minutes: 60, ago: 5, notes: "Good forward walk." },
+    { discipline: "groundwork", focus: "Long-lining", minutes: 30, ago: 8, notes: "" },
+    { discipline: "dressage", focus: "Training level test 3", minutes: 40, ago: 11, notes: "Trot lengthenings coming." },
+    { discipline: "lunging", focus: "Side reins, 20m", minutes: 25, ago: 14, notes: "" },
+    { discipline: "conditioning", focus: "Trot sets", minutes: 35, ago: 18, notes: "" },
+  ];
+
+  let trainingCount = 0;
+  let trainingSkipped = false;
+  for (const [index, horse] of horseIds.entries()) {
+    // Two sessions per horse, offset so the timelines are not identical.
+    for (const offset of [0, 1]) {
+      const t = TRAINING[(index * 2 + offset) % TRAINING.length];
+      const performed = isoDate(-t.ago - index);
+
+      const { data: already, error: readError } = await supabase
+        .from("training_logs")
+        .select("id")
+        .eq("horse_id", horse.id)
+        .eq("performed_at", performed)
+        .maybeSingle();
+
+      if (readError && /schema cache|does not exist/i.test(readError.message)) {
+        trainingSkipped = true;
+        break;
+      }
+      if (already) continue;
+
+      const { error } = await supabase.from("training_logs").insert({
+        horse_id: horse.id,
+        performed_at: performed,
+        discipline: t.discipline,
+        focus: t.focus,
+        notes: t.notes,
+        duration_min: t.minutes,
+      });
+      if (!error) trainingCount++;
+    }
+    if (trainingSkipped) break;
+  }
+  console.log(
+    trainingSkipped
+      ? `  training_logs skipped — migration 0020 not applied yet`
+      : `  training_logs ${trainingCount}`,
+  );
 
   // --- onboarding forms ------------------------------------------------------
   const FORM_TEMPLATES = [
