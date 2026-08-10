@@ -95,7 +95,7 @@ export function InviteForm({ families }: { families: Family[] }) {
               <input
                 type="checkbox"
                 name={flag}
-                className="size-5 shrink-0 accent-[var(--brand-gold-deep)]"
+                className="size-5 shrink-0 accent-[var(--accent)]"
               />
               <span className="text-body text-ink">{PERMISSION_FLAG_LABELS[flag]}</span>
             </label>

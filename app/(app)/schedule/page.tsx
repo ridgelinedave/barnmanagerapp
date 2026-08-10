@@ -125,9 +125,9 @@ export default async function SchedulePage({
             {formatBarnDayLabel(date)}
           </span>
           {isToday ? (
-            <span className="font-display text-eyebrow uppercase text-gold-deep">Today</span>
+            <span className="font-display text-eyebrow uppercase text-accent-text">Today</span>
           ) : (
-            <Link href="/schedule" className="text-caption text-gold-deep underline underline-offset-2">
+            <Link href="/schedule" className="text-caption text-accent-text underline underline-offset-2">
               Back to today
             </Link>
           )}

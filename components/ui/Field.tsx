@@ -12,7 +12,7 @@ import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTML
  */
 const CONTROL =
   "min-h-12 w-full rounded-control border border-line bg-surface px-3 text-body text-ink " +
-  "placeholder:text-muted/80 focus:border-gold-deep";
+  "placeholder:text-muted/80 focus:border-accent-deep";
 
 export function Field({
   label,
@@ -80,7 +80,7 @@ export function CheckRow({
 }: { label: string } & InputHTMLAttributes<HTMLInputElement>) {
   return (
     <label className="flex min-h-12 items-center gap-3 rounded-control border border-line bg-surface px-3">
-      <input type="checkbox" className="size-5 shrink-0 accent-[var(--brand-gold-deep)]" {...rest} />
+      <input type="checkbox" className="size-5 shrink-0 accent-[var(--accent)]" {...rest} />
       <span className="text-body text-ink">{label}</span>
     </label>
   );

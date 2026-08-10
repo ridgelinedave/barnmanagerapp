@@ -65,7 +65,7 @@ export function AnnouncementForm({
               name="audience"
               value={value}
               defaultChecked={(announcement?.audience ?? "all") === value}
-              className="mt-0.5 size-5 accent-[var(--brand-gold-deep)]"
+              className="mt-0.5 size-5 accent-[var(--accent)]"
             />
             <span className="min-w-0">
               <span className="block text-body font-semibold text-ink">{label}</span>
@@ -83,7 +83,7 @@ export function AnnouncementForm({
           name="notify"
           defaultChecked={announcement?.notify ?? false}
           disabled={alreadyNotified}
-          className="mt-0.5 size-5 accent-[var(--brand-gold-deep)] disabled:opacity-50"
+          className="mt-0.5 size-5 accent-[var(--accent)] disabled:opacity-50"
         />
         <span className="min-w-0">
           <span className="block text-body text-ink">Send a notification</span>

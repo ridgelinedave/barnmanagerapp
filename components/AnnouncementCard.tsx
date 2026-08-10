@@ -27,7 +27,7 @@ export function AnnouncementCard({
   const staffOnly = showAudience && audience === "staff";
 
   return (
-    <Card as="article" className={`p-4 ${pinned ? "border-gold" : ""}`}>
+    <Card as="article" className={`p-4 ${pinned ? "border-accent" : ""}`}>
       <div className="flex items-start gap-3">
         <h3 className="min-w-0 flex-1 font-display text-heading leading-snug text-ink">{title}</h3>
         <time dateTime={posted_at} className="shrink-0 pt-0.5 text-caption text-muted">

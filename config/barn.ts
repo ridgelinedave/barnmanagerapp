@@ -26,6 +26,46 @@ export type BarnFeatureFlag =
   | "invoices"
   | "shop";
 
+/**
+ * THE PRODUCT. Monarch is what this software is; a barn is a skin on it.
+ *
+ * Kept in its own object, deliberately separate from `barn` below, because the
+ * split IS the white-label model: everything here ships identically to every
+ * barn, and everything in `barn.brand.accent` swaps per tenant. When this
+ * becomes multi-tenant (§16e) `barn` moves into a database row and this object
+ * does not move at all.
+ */
+export const monarch = {
+  name: "Monarch",
+  descriptor: "Barn Management Software",
+
+  /**
+   * Electric Cobalt — the default accent any barn gets before someone picks
+   * their own. Measured: 5.17:1 carrying white, 5.17:1 as text on white.
+   */
+  accent: {
+    fill: "#2563EB",
+    /** Text and icons ON the fill. */
+    on: "#FFFFFF",
+    /** Pale ground for chips and hover. */
+    tint: "#E6EDFD",
+    /**
+     * The accent used AS TEXT. Deeper than the fill on purpose: #2563EB is
+     * 4.40:1 on its own tint, which fails AA by a hair. #1D4FC4 is 7.08:1 on
+     * white and 6.03:1 on the tint.
+     */
+    text: "#1D4FC4",
+  },
+
+  /**
+   * Cinzel, for the Monarch wordmark ONLY — the marketing surfaces, the
+   * "powered by" mark, the product name where it appears. App UI headings stay
+   * Barlow Condensed. A Roman inscription face is right for a logotype and
+   * wrong for a screen title someone reads forty times a day.
+   */
+  wordmarkFont: "Cinzel",
+} as const;
+
 export const barn = {
   id: "crouse",
   name: "Crouse Equestrian",
@@ -59,6 +99,42 @@ export const barn = {
    */
   brand: {
     /**
+     * ===================================================================
+     * THE ACCENT — the whole white-label mechanism, in four values.
+     * ===================================================================
+     *
+     * This is the ONLY colour block that differs per barn. Swap these four and
+     * the app is that barn's; everything else — white ground, dark text, type,
+     * components, motion — is Monarch and is shared. Omit them and a barn gets
+     * `monarch.accent` (Electric Cobalt).
+     *
+     * WHY FOUR AND NOT ONE. A single accent value cannot survive contrast.
+     * Crouse gold proves it: #DABC51 carries ink at 9.26:1 but white at only
+     * 1.86:1, and as text on white it is 1.86:1 — unusable. So the accent is
+     * split by JOB, not by shade:
+     *
+     *   fill  the surface        gold #DABC51        cobalt #2563EB
+     *   on    text ON that fill  ink  #1C1B18 9.26   white  #FFFFFF 5.17
+     *   tint  pale ground        #F8F2DC             #E6EDFD
+     *   text  accent AS text     #776628 5.65/5.04   #1D4FC4 7.08/6.03
+     *
+     * `on` is what makes gold and cobalt interchangeable: the gold skin puts
+     * dark ink on its buttons, the cobalt skin puts white on its buttons, and
+     * no component has to know which barn it is rendering.
+     *
+     * A future Barn Settings screen (§16d) picks `fill` and DERIVES the other
+     * three under these same rules, so no barn can choose an unreadable combo.
+     */
+    accent: {
+      fill: "#DABC51",
+      /** Gold is light: it carries ink, never white. */
+      on: "#1C1B18",
+      tint: "#F8F2DC",
+      /** 5.65:1 on white, 5.04:1 on the gold tint. */
+      text: "#776628",
+    },
+
+    /**
      * CONFIRMED — sampled from Belle's actual logo, not guessed.
      *
      * The mark is a metallic bevel, so its gold is a gradient: hue is locked
@@ -90,12 +166,18 @@ export const barn = {
     soft: "#FAFAF9",
 
     /**
-     * Body text AND the chrome plane — one near-black doing both jobs now that
-     * the ground is plain white. 17.22:1 on paper, and the header reads as a
-     * separate plane because it is a filled surface, not because it is a
-     * different black.
+     * Body text. MONARCH SHARED, not a barn value — every skin gets this ink.
+     * A hair cooler than the old #1C1B18 so it sits with a blue accent as
+     * comfortably as with gold. 17.38:1 on white.
      */
-    ink: "#1C1B18",
+    ink: "#16192B",
+
+    /**
+     * The dark plane, now used ONLY by the sign-in screen and the splash.
+     * The app's own chrome is white (see §16 / the Monarch mockup): a heavy
+     * black bar at the top and bottom of every screen is a lot to look at all
+     * day, and it was fighting the accent for attention.
+     */
     charcoal: "#1C1B18",
 
     /** The splash/login field. A shade below the chrome so the logo sits in it. */
@@ -111,10 +193,14 @@ export const barn = {
     danger: "#9B2C1F",
 
     /**
-     * Secondary text. 5.70:1 on white — the mockup's #8A857C one step darker,
-     * because 3.67:1 is how body copy quietly fails AA.
+     * Secondary text, and the INACTIVE tab label. 6.34:1 on white.
+     *
+     * The Monarch mockup uses #8A857C for secondary text (3.67:1) and #B7B4AC
+     * for inactive nav (2.07:1). Both fail AA outright — #B7B4AC badly — and a
+     * nav label you cannot read is a nav you have to learn by position. Same
+     * grey family, dark enough to be read.
      */
-    muted: "#6B665D",
+    muted: "#5D5F6B",
 
     /** The hairline that does all the separating now that cards are retired. */
     line: "#E7E6E2",

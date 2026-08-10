@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import { TabPage } from "@/components/TabPage";
 import { StubScreen } from "@/components/StubScreen";
+import { PoweredByMonarch } from "@/components/Wordmark";
 import { InstallPrompt } from "@/components/InstallPrompt";
 import { CalendarSubscribe } from "@/components/CalendarSubscribe";
 import { Card, FactList, SectionHeader } from "@/components/ui/primitives";
@@ -42,7 +43,7 @@ function Row({ href, title, meta, icon }: { href: string; title: string; meta: s
       title={title}
       meta={meta}
       leading={
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-control bg-sunk text-gold-deep">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-control bg-sunk text-accent-text">
           <Icon name={icon} className="size-5" />
         </span>
       }
@@ -81,7 +82,7 @@ export default async function MorePage() {
         <Card className="flex items-center gap-3 p-4">
           <span
             aria-hidden="true"
-            className="flex size-11 shrink-0 items-center justify-center rounded-full bg-gold font-display text-heading font-bold text-ink"
+            className="flex size-11 shrink-0 items-center justify-center rounded-full bg-accent font-display text-heading font-bold text-ink"
           >
             {(name ?? email ?? "?").trim().charAt(0).toUpperCase()}
           </span>
@@ -165,6 +166,11 @@ export default async function MorePage() {
           Sign out
         </Button>
       </form>
+
+      {/* The product signature, at the edge where it belongs. Inside a barn's
+          app the barn's brand leads — their crest, their accent — and Monarch
+          is the maker's mark on the underside, not a second logo. */}
+      <PoweredByMonarch className="pt-1" />
     </TabPage>
   );
 }

@@ -83,16 +83,31 @@ export function ClockButton({ clockedIn }: { clockedIn: boolean }) {
         onClick={onClick}
         disabled={busy}
         className={`flex min-h-32 w-full flex-col items-center justify-center gap-1.5 rounded-sheet transition-transform duration-150 ease-out active:scale-[0.99] disabled:opacity-60 ${
-          clockedIn ? "border-2 border-line bg-surface" : "bg-gold"
+          clockedIn ? "border-2 border-line bg-surface" : "bg-accent"
         }`}
       >
-        <span className="flex items-center gap-2 font-display text-[1.75rem] font-bold leading-none text-ink">
+        {/*
+         * Both lines take their colour from WHICH SURFACE they are on, not from
+         * a fixed token. Off the clock the button is the accent fill, so the
+         * text is `accent-on`; on the clock it is a plain white panel, so the
+         * text is ink and muted. `muted` on the accent measured 3.41:1 and
+         * failed — a sub-label is still text.
+         */}
+        <span
+          className={`flex items-center gap-2 font-display text-[1.75rem] font-bold leading-none ${
+            clockedIn ? "text-ink" : "text-accent-on"
+          }`}
+        >
           {clockedIn && (
             <span aria-hidden="true" className="size-2.5 rounded-full bg-forest" />
           )}
           {busy ? "…" : clockedIn ? "Clock out" : "Clock in"}
         </span>
-        <span className="text-label text-muted">
+        {/* NOT `accent-on/80`. Ink at 80% survives on gold but white at 80%
+            on cobalt is 3.36:1 — an opacity that passes for one skin and
+            fails for another is exactly what the token system exists to
+            prevent. Full strength; prominence comes from size, not alpha. */}
+        <span className={`text-label ${clockedIn ? "text-muted" : "text-accent-on"}`}>
           {locating ? "Getting your location…" : clockedIn ? "You're on the clock" : "Tap to start"}
         </span>
       </button>

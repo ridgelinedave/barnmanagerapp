@@ -370,7 +370,7 @@ export function RiderForm({
             type="checkbox"
             name="active"
             defaultChecked={rider.active}
-            className="size-5 shrink-0 accent-[var(--brand-gold-deep)]"
+            className="size-5 shrink-0 accent-[var(--accent)]"
           />
           <span className="text-body text-ink">Riding at the barn</span>
         </label>

@@ -27,14 +27,14 @@ type Variant = "primary" | "secondary" | "ghost" | "danger";
 const VARIANTS: Record<Variant, string> = {
   // The one gold surface. Ink label at 9.26:1.
   primary:
-    "bg-gold text-ink border-transparent shadow-press " +
-    "active:bg-gold-press active:shadow-press-active active:translate-y-px",
+    "bg-accent text-accent-on border-transparent shadow-press " +
+    "active:bg-accent/85 active:shadow-press-active active:translate-y-px",
   // Ghost. A hairline and ink — not a filled grey box pretending to be a button.
   secondary:
     "bg-transparent text-ink border-line active:bg-sunk active:translate-y-px",
   // Text with an underline on press. For the third action on a screen.
   ghost:
-    "bg-transparent text-gold-deep border-transparent underline-offset-4 active:underline",
+    "bg-transparent text-accent-text border-transparent underline-offset-4 active:underline",
   // Destructive stays a ghost too — a filled red button invites the tap it
   // is trying to make you think about.
   danger:

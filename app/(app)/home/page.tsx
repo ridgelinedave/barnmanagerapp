@@ -104,9 +104,9 @@ export default async function HomePage() {
                 <div className="flex items-start gap-3">
                   <span
                     aria-hidden="true"
-                    className="flex size-12 shrink-0 flex-col items-center justify-center rounded-control bg-gold-soft leading-none"
+                    className="flex size-12 shrink-0 flex-col items-center justify-center rounded-control bg-accent-tint leading-none"
                   >
-                    <span className="font-display text-eyebrow uppercase text-gold-deep">
+                    <span className="font-display text-eyebrow uppercase text-accent-text">
                       {formatBarnDayLabel(nextLesson.date).split(",")[0]}
                     </span>
                     <span className="font-display text-heading font-bold text-ink">

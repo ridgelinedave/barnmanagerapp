@@ -48,10 +48,10 @@ export function ParentLessonCard({
         <span
           aria-hidden="true"
           className={`flex size-12 shrink-0 flex-col items-center justify-center rounded-control leading-none ${
-            cancelled ? "bg-line/60" : "bg-gold-soft"
+            cancelled ? "bg-line/60" : "bg-accent-tint"
           }`}
         >
-          <span className="font-display text-eyebrow uppercase text-gold-deep">
+          <span className="font-display text-eyebrow uppercase text-accent-text">
             {formatBarnDayLabel(instance.date).split(",")[0]}
           </span>
           <span className="font-display text-heading font-bold text-ink">

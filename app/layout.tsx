@@ -1,8 +1,8 @@
 import type { Metadata, Viewport } from "next";
-import { Barlow, Barlow_Condensed } from "next/font/google";
+import { Barlow, Barlow_Condensed, Cinzel } from "next/font/google";
 import type { CSSProperties } from "react";
 import "./globals.css";
-import { barn } from "@/config/barn";
+import { barn, monarch } from "@/config/barn";
 import { ServiceWorkerRegistrar } from "@/components/ServiceWorkerRegistrar";
 
 /**
@@ -32,6 +32,24 @@ const barlow = Barlow({
   variable: "--font-barlow",
   subsets: ["latin"],
   weight: ["400", "500", "600"],
+  display: "swap",
+});
+
+/**
+ * Cinzel — the MONARCH WORDMARK ONLY.
+ *
+ * A Roman inscription face is right for a logotype and wrong for a screen
+ * title someone reads forty times a day: all-caps by design, wide, and slow to
+ * scan at small sizes. So it is loaded here but bound to exactly one component
+ * (`components/Wordmark.tsx`) and to no heading style anywhere. App UI headings
+ * stay Barlow Condensed.
+ *
+ * Self-hosted like the others — no Google request, works offline in the PWA.
+ */
+const cinzel = Cinzel({
+  variable: "--font-cinzel",
+  subsets: ["latin"],
+  weight: ["600"],
   display: "swap",
 });
 
@@ -87,6 +105,16 @@ const APPLE_SPLASH = [
  * only ever name the token.
  */
 const brandVars = {
+  /*
+   * THE ACCENT — four values, and the only ones that differ per barn.
+   * Falls back to Monarch Cobalt when a barn has not chosen its own, which is
+   * what a brand-new tenant gets on day one.
+   */
+  "--accent": barn.brand.accent?.fill ?? monarch.accent.fill,
+  "--accent-on": barn.brand.accent?.on ?? monarch.accent.on,
+  "--accent-tint": barn.brand.accent?.tint ?? monarch.accent.tint,
+  "--accent-text": barn.brand.accent?.text ?? monarch.accent.text,
+
   "--brand-gold": barn.brand.gold,
   "--brand-gold-press": barn.brand.goldPress,
   "--brand-gold-deep": barn.brand.goldDeep,
@@ -109,7 +137,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html
       lang="en"
       style={brandVars}
-      className={`${barlow.variable} ${barlowCondensed.variable} h-full antialiased`}
+      className={`${barlow.variable} ${barlowCondensed.variable} ${cinzel.variable} h-full antialiased`}
     >
       <head>
         {APPLE_SPLASH.map((s) => (

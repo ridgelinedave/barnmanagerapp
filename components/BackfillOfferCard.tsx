@@ -72,19 +72,19 @@ export function BackfillOfferCard({
    * should stop shouting.
    */
   return (
-    <Card as="article" className={`p-4 ${resolved ? "" : "border-2 border-gold"}`}>
+    <Card as="article" className={`p-4 ${resolved ? "" : "border-2 border-accent"}`}>
       <div className="flex items-start gap-3">
         <span
           aria-hidden="true"
           className={`flex size-10 shrink-0 items-center justify-center rounded-control ${
-            resolved ? "bg-sunk text-muted" : "bg-gold text-ink"
+            resolved ? "bg-sunk text-muted" : "bg-accent text-accent-on"
           }`}
         >
           <Icon name={resolved ? "check" : "alert"} className="size-5" strokeWidth={2} />
         </span>
 
         <div className="min-w-0 flex-1">
-          <p className="font-display text-eyebrow uppercase text-gold-deep">
+          <p className="font-display text-eyebrow uppercase text-accent-text">
             {resolved ? "Backfill spot" : "A spot opened up"}
           </p>
           <h3 className="mt-0.5 font-display text-heading text-ink">{riderName}</h3>

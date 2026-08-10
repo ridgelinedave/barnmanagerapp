@@ -183,3 +183,47 @@ Each still follows the standing rules: any new SQL printed for audit before appl
 - **Instant provisioning** — "pay on the website → your barn is live in seconds." Requires multi-tenant; can't be instant with the clone-per-barn model.
 - **Marketing website** — pricing + checkout; also where a prospect first evaluates on desktop.
 - **Gating decision:** whether/when to pursue selling determines when the multi-tenant conversion happens. Until then, a **clone-per-barn** works for a first pilot barn or two.
+- **DECIDED: we are pursuing selling.** So the multi-tenant + product-brand layer is a real milestone, scheduled *before* barn #2 (see §16). Build Belle-first now; keep new work tenant-safe.
+
+---
+
+## 16. Product brand & white-label — MONARCH
+
+**The product is Monarch. Barns are skins on it. Crouse Equestrian is skin #1.**
+
+### 16a. Product identity
+- **Name:** Monarch. **Domain:** monarchbarns.com (purchased). **Descriptor:** "Barn Management Software" (this is where the SEO-friendly plain words live — NOT in the name).
+- **Tagline (pick one):** "Barn management, elevated." / "Run your barn beautifully." / "The modern barn, in one place." — with "Barn Management Software" as the sub-descriptor.
+- **Wordmark:** MONARCH in **Cinzel** (Roman inscription caps). **No icon for now** — wordmark only; a pro refines a mark later.
+- **Palette (Monarch brand):** **Electric Cobalt `#2563EB`** accent on **white**, dark ink text (`#16192B`). Bright-on-white — deliberately loud where the whole barn-software market is earth-toned and quiet. NOT black/gold (too heavy for an all-day phone tool). Optional warm secondary pop (amber `#F5A623`) used sparingly.
+- **Accent is a per-barn THEME TOKEN — this is the white-label mechanism.** Monarch default = Cobalt. **Crouse (skin #1) keeps its gold `#DABC51`** so Belle sees her own brand. A new/unconfigured barn gets Monarch Cobalt. Shared across all barns: white base, dark text, Cinzel/Barlow type, components, layout, motion. Swaps per barn: accent color + logo.
+- **Trademark:** quick USPTO check still pending before it goes on public/marketing assets. Not a blocker for building.
+
+### 16b. The two brand layers (the whole model)
+- **Product character (Monarch) — stays on every barn:** the white + accent system, buttons, motion, layout, login pattern, icon set, skeletons, Cinzel wordmark, and the Cobalt/Monarch signature at the edges (marketing, app icon, store listing, a "powered by Monarch" mark).
+- **Barn skin (per tenant) — swaps per barn:** name, logo, **accent color**, hero photo(s). Crouse = the crest + Crouse gold `#DABC51`. Monarch default (and any new barn) = Cobalt `#2563EB`.
+
+### 16c. White-label model — product-forward, barn-prominent
+- **Inside a barn's app:** THEIR logo in the header, THEIR accent color, THEIR photos — so Crouse members feel it's "the Crouse app."
+- **Monarch lives lightly at the edges:** a small Monarch mark / "powered by Monarch" on login/splash; the marketing site, app icon and store listing are pure Monarch.
+- **Recommended default:** the barn's brand leads their members' experience; Monarch is the quiet product signature. **Full white-label** (hide Monarch entirely) = a premium tier later.
+- Today Crouse is the only skin, so the app shows the Crouse crest — correct. Nothing changes now.
+
+### 16d. Barn Settings screen — the white-label control (future build)
+An admin-editable screen that is `config/barn.ts` turned into per-tenant settings:
+- barn **name**, **logo** upload, **accent color** (curated set, or a picker with the **AA-contrast guardrails Claude Code already built**, so no barn can pick an unreadable combo), **timezone**, **hero photo(s)**.
+- Saved to a per-tenant `barns` table, loaded at runtime by tenant.
+
+### 16e. Engineering path (ties to §15)
+- **Now:** `config/barn.ts` (build-time, single barn) — fine for Crouse.
+- **Milestone before barn #2:** multi-tenant conversion (every table tenant-scoped by RLS) + a `barns` table for skins + the Barn Settings screen + runtime branding + the Monarch product-brand layer. Crouse becomes skin #1 running on it.
+- Keep all new Belle-first work tenant-safe so this conversion stays cheap.
+
+### 16f. Asset checklist
+- [x] Domain monarchbarns.com
+- [x] Wordmark font: Cinzel
+- [x] Product palette: Electric Cobalt `#2563EB` on white
+- [ ] USPTO trademark sanity check
+- [ ] Accent-as-theme-token in code (Monarch Cobalt default; Crouse gold skin)
+- [ ] Marketing site (later)
+- [ ] Refined logo mark (pro, later) — wordmark-only for now

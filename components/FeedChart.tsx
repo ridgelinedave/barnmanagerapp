@@ -65,9 +65,12 @@ export function FeedChart({
 
   return (
     <>
-      {/* --- banner: the horse, unmistakably ----------------------------- */}
-      <div className="-mx-4 -mt-5 bg-chrome px-5 pb-5 text-white">
-        <div className="-mx-5 mb-4 h-32 overflow-hidden bg-black">
+      {/* --- banner: the horse, unmistakably -----------------------------
+          Was a charcoal plane. The app's chrome is white now, and a black
+          block at the top of one screen would read as a leftover. The photo
+          carries the identification; the type carries the rest. */}
+      <div className="-mx-4 -mt-5 border-b border-line px-5 pb-5">
+        <div className="-mx-5 mb-4 h-32 overflow-hidden bg-sunk">
           {horse.photo_url ? (
             /* eslint-disable-next-line @next/next/no-img-element */
             <img src={horse.photo_url} alt="" className="size-full object-cover" />
@@ -75,7 +78,7 @@ export function FeedChart({
             <div className="flex size-full items-end p-4">
               <span
                 aria-hidden="true"
-                className="font-display text-[2.5rem] font-bold leading-none tracking-[0.04em] text-white/15"
+                className="font-display text-[2.5rem] font-bold leading-none tracking-[0.04em] text-accent/35"
               >
                 {horseInitials(horse)}
               </span>
@@ -83,10 +86,10 @@ export function FeedChart({
           )}
         </div>
 
-        <h1 className="font-display text-[1.875rem] font-bold uppercase leading-none tracking-[0.03em]">
+        <h1 className="font-display text-[1.875rem] font-bold uppercase leading-none tracking-[0.03em] text-ink">
           {horse.barn_name || horse.name}
         </h1>
-        {subtitle && <p className="mt-1.5 text-caption text-white/70">{subtitle}</p>}
+        {subtitle && <p className="mt-1.5 text-caption text-muted">{subtitle}</p>}
       </div>
 
       {plans.length === 0 ? (

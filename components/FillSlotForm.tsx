@@ -121,7 +121,7 @@ export function FillSlotForm({
                         type="checkbox"
                         name="rider_ids"
                         value={rider.id}
-                        className="size-5 accent-[var(--brand-gold-deep)]"
+                        className="size-5 accent-[var(--accent)]"
                       />
                       <span className="text-body text-ink">{rider.name}</span>
                     </label>

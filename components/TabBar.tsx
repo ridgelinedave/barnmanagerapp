@@ -6,16 +6,19 @@ import { TABS_BY_ROLE } from "@/lib/nav";
 import type { Role } from "@/lib/types";
 
 /**
- * The bottom tab bar.
+ * The bottom tab bar. White, with a hairline above it.
  *
- * Charcoal, matching the header, so the app is framed top and bottom by the
- * barn's own colour and the paper-white content sits between them like a page on a
- * board.
+ * It was charcoal to match the old dark header. Both are white now — the app
+ * is one continuous light surface, and the accent is the only colour on it.
  *
- * The active tab gets a gold pill behind the icon AND a gold label AND a
+ * The active tab gets a tinted pill behind the icon AND an accent label AND a
  * weight change — three signals, because "the active one is a slightly
- * different grey" is how people end up unsure which screen they are on. Gold
- * on charcoal measures 9.26:1.
+ * different grey" is how people end up unsure which screen they are on.
+ *
+ * THE INACTIVE LABEL IS NOT PALE GREY. The Monarch mockup uses #B7B4AC, which
+ * measures 2.07:1 on white; a nav label you cannot read is a nav you navigate
+ * by position. It uses `muted` (6.34:1) instead, and the active/inactive
+ * distinction is carried by colour, weight and the pill together.
  *
  * Max 5 tabs; every target is 56px tall and a full fifth of the width.
  */
@@ -26,7 +29,7 @@ export function TabBar({ role }: { role: Role }) {
   return (
     <nav
       aria-label="Main"
-      className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-chrome"
+      className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface"
     >
       <ul className="mx-auto flex max-w-screen-sm">
         {tabs.map((tab) => {
@@ -40,7 +43,7 @@ export function TabBar({ role }: { role: Role }) {
               >
                 <span
                   className={`flex h-7 w-12 items-center justify-center rounded-chip transition-colors duration-150 ease-out ${
-                    active ? "bg-gold/20" : "bg-transparent"
+                    active ? "bg-accent-tint" : "bg-transparent"
                   }`}
                 >
                   <svg
@@ -51,14 +54,14 @@ export function TabBar({ role }: { role: Role }) {
                     strokeWidth={active ? 2 : 1.6}
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    className={`size-6 ${active ? "text-gold" : "text-white/65"}`}
+                    className={`size-6 ${active ? "text-accent-text" : "text-muted"}`}
                   >
                     <path d={tab.icon} />
                   </svg>
                 </span>
                 <span
                   className={`truncate text-[0.6875rem] leading-none ${
-                    active ? "font-semibold text-gold" : "font-medium text-white/65"
+                    active ? "font-semibold text-accent-text" : "font-medium text-muted"
                   }`}
                 >
                   {tab.label}

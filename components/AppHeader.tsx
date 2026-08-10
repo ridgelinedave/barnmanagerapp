@@ -6,11 +6,16 @@ import { NotificationBell } from "@/components/NotificationBell";
 import { Icon } from "@/components/ui/Icon";
 
 /**
- * The app header: a charcoal plane the content scrolls under.
+ * The app header: white, with a hairline under it.
  *
- * The charcoal is the barn's own — it is the field the gold crest sits on, on
- * the sign and on the launch screen — so opening the app lands you somewhere
- * recognisable rather than on another white page with a grey title.
+ * It used to be a charcoal plane. A heavy black bar pinned to the top of every
+ * screen, with a second one at the bottom, is a lot to look at for a tool
+ * someone opens forty times a day — and it competed with the accent for
+ * attention, which meant the one colour that should mean "this is the action"
+ * was the third loudest thing on screen.
+ *
+ * White chrome, dark text, and the accent spent only where it does work: the
+ * barn kicker, the active tab, the primary button, a chip.
  *
  * Three shapes, one component:
  *   root      the crest, the barn name, the screen title, the bell
@@ -34,13 +39,13 @@ export function AppHeader({
   bell?: boolean;
 }) {
   return (
-    <header className="safe-top sticky top-0 z-30 bg-chrome shadow-chrome">
+    <header className="safe-top sticky top-0 z-30 border-b border-line bg-surface">
       <div className="mx-auto flex max-w-screen-sm items-center gap-3 px-4 py-3">
         {back ? (
           <Link
             href={back}
             aria-label="Back"
-            className="-ml-2 flex size-11 shrink-0 items-center justify-center rounded-chip text-white/85"
+            className="-ml-2 flex size-11 shrink-0 items-center justify-center rounded-chip text-ink"
           >
             <Icon name="back" className="size-5.5" strokeWidth={2} />
           </Link>
@@ -64,31 +69,31 @@ export function AppHeader({
               <img
                 src={subject.photoUrl}
                 alt=""
-                className="size-12 shrink-0 rounded-full border border-white/20 object-cover"
+                className="size-12 shrink-0 rounded-full border border-line object-cover"
               />
             ) : (
               <span
                 aria-hidden="true"
-                className="flex size-12 shrink-0 items-center justify-center rounded-full bg-gold font-display text-title font-bold text-ink"
+                className="flex size-12 shrink-0 items-center justify-center rounded-full bg-accent font-display text-title font-bold text-accent-on"
               >
                 {subject.name.trim().charAt(0).toUpperCase()}
               </span>
             )}
             <div className="min-w-0 flex-1">
-              <h1 className="truncate font-display text-display text-white">{subject.name}</h1>
+              <h1 className="truncate font-display text-display text-ink">{subject.name}</h1>
               {subject.meta && (
-                <p className="truncate text-caption text-white/70">{subject.meta}</p>
+                <p className="truncate text-caption text-muted">{subject.meta}</p>
               )}
             </div>
           </div>
         ) : (
           <div className="min-w-0 flex-1">
             {!back && (
-              <p className="truncate font-display text-eyebrow uppercase text-gold">
+              <p className="truncate font-display text-eyebrow uppercase text-accent-text">
                 {barn.shortName}
               </p>
             )}
-            <h1 className="truncate font-display text-display leading-none text-white">{title}</h1>
+            <h1 className="truncate font-display text-display leading-none text-ink">{title}</h1>
           </div>
         )}
 

@@ -203,7 +203,7 @@ export function HorseForm({
             type="checkbox"
             name="active"
             defaultChecked={horse.active}
-            className="size-5 accent-brand-gold-deep"
+            className="size-5 accent-[var(--accent)]"
           />
           <span className="text-base">In work at the barn</span>
         </label>

@@ -37,7 +37,7 @@ function HorseAvatar({ entry }: { entry: HorseFeed }) {
   return (
     <span
       aria-hidden="true"
-      className="flex size-[3.25rem] shrink-0 items-center justify-center rounded-avatar bg-chrome font-display text-[1.375rem] font-bold tracking-[0.04em] text-white"
+      className="flex size-[3.25rem] shrink-0 items-center justify-center rounded-avatar bg-accent font-display text-[1.375rem] font-bold tracking-[0.04em] text-accent-on"
     >
       {horseInitials(horse)}
     </span>
@@ -78,7 +78,7 @@ export function FeedBoard({ board }: { board: HorseFeed[] }) {
               </span>
 
               {cadence ? (
-                <span className="shrink-0 rounded-[0.375rem] bg-gold-soft px-2 py-1 text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-gold-deep">
+                <span className="shrink-0 rounded-[0.375rem] bg-accent-tint px-2 py-1 text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-accent-text">
                   {cadence}
                 </span>
               ) : (

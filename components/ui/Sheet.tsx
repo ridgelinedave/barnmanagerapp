@@ -111,7 +111,7 @@ export function SheetTrigger({
 
   const styles =
     variant === "primary"
-      ? "bg-gold text-ink border-transparent"
+      ? "bg-accent text-accent-on border-transparent"
       : "bg-surface text-ink border-line";
 
   return (

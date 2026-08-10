@@ -126,7 +126,7 @@ function Group({ title, entries }: { title: string; entries: Entry[] }) {
           title={entry.title}
           meta={entry.meta}
           leading={
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-control bg-sunk text-gold-deep">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-control bg-sunk text-accent-text">
               <Icon name={entry.icon} className="size-5" />
             </span>
           }

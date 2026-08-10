@@ -4197,11 +4197,25 @@ async function main() {
           `admin saw ${byAdmin?.length} token row(s) including the parent's`,
         );
 
-        const { data: byStaff } = await staff.from("ical_tokens").select("token");
+        // "Staff sees zero rows" was the old assertion, and it was wrong: the
+        // policy is READ OWN, so a staff member who has ever opened /more has
+        // a token of their own and legitimately reads it. That test only
+        // passed while the fixture had never used the app, which is an
+        // assumption about usage rather than about the policy — it went red
+        // the first time anyone browsed as staff.
+        //
+        // What actually matters is that staff cannot read SOMEONE ELSE'S,
+        // which is what the admin assertion above already checks.
+        const { data: byStaff } = await staff.from("ical_tokens").select("token, profile_id");
         check(
-          "staff CANNOT read anyone's calendar token",
-          (byStaff ?? []).length === 0,
-          `staff saw ${byStaff?.length}`,
+          "staff CANNOT read anyone ELSE'S calendar token",
+          (byStaff ?? []).every((row) => row.profile_id === users.staff.profileId),
+          `staff saw ${byStaff?.length} row(s), including one not their own`,
+        );
+        check(
+          "control: staff sees at most their own single row",
+          (byStaff ?? []).length <= 1,
+          `saw ${byStaff?.length}`,
         );
 
         const { data: byOther } = await parent2

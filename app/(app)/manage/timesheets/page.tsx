@@ -68,7 +68,7 @@ export default async function ManageTimesheetsPage({
               href={`/manage/timesheets?period=${p.id}`}
               aria-current={p.id === period?.id ? "page" : undefined}
               className={`flex min-h-11 items-center rounded-chip px-3 text-label font-semibold ${
-                p.id === period?.id ? "bg-gold text-ink" : "border border-line bg-surface text-ink"
+                p.id === period?.id ? "bg-accent text-accent-on" : "border border-line bg-surface text-ink"
               }`}
             >
               {formatBarnDayLabel(p.start_date)}

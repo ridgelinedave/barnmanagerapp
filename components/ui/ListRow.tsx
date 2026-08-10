@@ -42,7 +42,7 @@ export function Avatar({
   return (
     <span
       aria-hidden="true"
-      className={`${sizes[size]} ${text[size]} flex shrink-0 items-center justify-center rounded-full bg-gold font-display font-bold text-ink`}
+      className={`${sizes[size]} ${text[size]} flex shrink-0 items-center justify-center rounded-full bg-accent font-display font-bold text-ink`}
     >
       {name.trim().charAt(0).toUpperCase()}
     </span>

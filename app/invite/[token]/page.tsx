@@ -65,7 +65,7 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
         </Callout>
         <p className="text-caption text-muted">
           If you already have an account, you can{" "}
-          <Link href="/sign-in" className="font-medium text-gold-deep underline underline-offset-4">
+          <Link href="/sign-in" className="font-medium text-accent-text underline underline-offset-4">
             sign in here
           </Link>
           .

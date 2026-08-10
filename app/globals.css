@@ -21,17 +21,37 @@
  */
 
 :root {
+  /*
+   * THE ACCENT — the white-label mechanism, split by JOB rather than by shade.
+   * The root layout overwrites these from config/barn.ts; the values here are
+   * Monarch Cobalt, i.e. what an unconfigured barn gets.
+   *
+   *   --accent       the fill: buttons, active tab, avatars
+   *   --accent-on    text and icons sitting ON that fill
+   *   --accent-tint  the pale ground under a chip
+   *   --accent-text  the accent used AS text, on white or on the tint
+   *
+   * `--accent-text` exists because one value cannot do both jobs and stay
+   * legible. Cobalt #2563EB is 5.17:1 on white but only 4.40:1 on its own
+   * tint, and Crouse gold is 1.86:1 as text and unusable. Splitting them is
+   * what lets a gold barn and a cobalt barn share every component.
+   */
+  --accent: #2563eb;
+  --accent-on: #ffffff;
+  --accent-tint: #e6edfd;
+  --accent-text: #1d4fc4;
+
   --brand-gold: #dabc51;
   --brand-gold-press: #c9aa3f;
   --brand-gold-deep: #776628;
   --brand-paper: #ffffff;
   --brand-soft: #fafaf9;
-  --brand-ink: #1c1b18;
+  --brand-ink: #16192b;
   --brand-charcoal: #1c1b18;
   --brand-black: #0f0e0c;
   --brand-forest: #2f4a34;
   --brand-danger: #9b2c1f;
-  --brand-muted: #6b665d;
+  --brand-muted: #5d5f6b;
   --brand-line: #e7e6e2;
   --brand-gold-soft: #f8f2dc;
   --brand-forest-soft: #e9efe9;
@@ -39,8 +59,23 @@
 }
 
 @theme inline {
+  /* --- Accent (per barn) ------------------------------------------------ */
+  /*
+   * Components name THESE, never `gold`. That is the entire discipline: a
+   * component written against `bg-accent text-accent-on` renders correctly for
+   * a gold barn and a cobalt barn without knowing which it is.
+   */
+  --color-accent: var(--accent);
+  --color-accent-on: var(--accent-on);
+  --color-accent-tint: var(--accent-tint);
+  --color-accent-text: var(--accent-text);
+
   /* --- Brand ------------------------------------------------------------ */
-  /* Surface gold — buttons, keylines, the active tab. Always carries ink. */
+  /*
+   * The literal golds. Kept because the sign-in screen and the splash are
+   * Crouse's own dark surfaces and are staying that way for now — but app UI
+   * must use the accent tokens above, not these.
+   */
   --color-gold: var(--brand-gold);
   /* The pressed surface under a gold button. NEVER text: 2.26:1 on white. */
   --color-gold-press: var(--brand-gold-press);
@@ -85,6 +120,13 @@
    */
   --font-display: var(--font-barlow-condensed), ui-sans-serif, system-ui, sans-serif;
   --font-sans: var(--font-barlow), ui-sans-serif, system-ui, sans-serif;
+  /*
+   * Cinzel, bound to the MONARCH WORDMARK and nothing else. It is not a
+   * heading face — an inscription capital is slow to read at 19px and the app
+   * has screen titles someone sees forty times a day. `components/Wordmark.tsx`
+   * is the only consumer.
+   */
+  --font-wordmark: var(--font-cinzel), ui-serif, Georgia, serif;
 
   /* Screen titles in the header. */
   --text-display: 1.9375rem;
@@ -172,11 +214,12 @@ body {
 }
 
 /*
- * Focus: visible, on-brand, and never removed. Gold reads on both the paper
- * ground and the charcoal chrome, so one ring works everywhere.
+ * Focus: visible, on-brand, and never removed. Follows the ACCENT, so a
+ * cobalt barn gets a cobalt ring — the ring is part of the skin, not a
+ * hard-coded gold left over from barn #1.
  */
 :focus-visible {
-  outline: 2px solid var(--brand-gold);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
   border-radius: 2px;
 }

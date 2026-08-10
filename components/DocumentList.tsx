@@ -40,7 +40,7 @@ export function DocumentList({
           key={doc.path}
           className="flex min-h-16 items-center gap-3 p-4"
         >
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-control bg-sunk text-gold-deep">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-control bg-sunk text-accent-text">
             <Icon name="document" className="size-5" />
           </span>
 

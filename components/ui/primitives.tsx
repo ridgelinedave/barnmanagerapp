@@ -39,9 +39,13 @@ export function Card({
 }
 
 /**
- * A card with a charcoal cap — the barn-board look. Used for the one or two
+ * A panel with a tinted cap — the barn-board look. Used for the one or two
  * groupings on a screen that are genuinely a *board* rather than a section, so
  * it stays a signal instead of decoration.
+ *
+ * The cap was charcoal. On a white app a black bar inside the content reads as
+ * a second header; a wash of the accent tint says "this is a group" without
+ * shouting, and it follows the skin.
  */
 export function Board({
   label,
@@ -54,15 +58,15 @@ export function Board({
 }) {
   return (
     <section className="overflow-hidden rounded-card border border-line bg-surface">
-      <div className="flex items-center gap-2 bg-chrome px-4 py-2.5">
-        <h2 className="font-display text-eyebrow uppercase text-white">{label}</h2>
+      <div className="flex items-center gap-2 border-b border-line bg-accent-tint px-4 py-2.5">
+        <h2 className="font-display text-eyebrow uppercase text-accent-text">{label}</h2>
         {action && (
           /* The hit area is 44px even though the label is 19px: padding plus a
              negative margin gives the finger a real target without inflating
              the bar. A text link that only looks tappable is not tappable. */
           <Link
             href={action.href}
-            className="-my-2.5 ml-auto flex min-h-11 shrink-0 items-center text-caption font-medium text-gold underline-offset-4 hover:underline"
+            className="-my-2.5 ml-auto flex min-h-11 shrink-0 items-center text-caption font-medium text-accent-text underline-offset-4 hover:underline"
           >
             {action.label}
           </Link>
@@ -85,7 +89,7 @@ export function Sunk({
 }) {
   const tones = {
     neutral: "bg-sunk text-ink",
-    gold: "bg-gold-soft text-ink",
+    gold: "bg-accent-tint text-ink",
     forest: "bg-forest-soft text-ink",
     danger: "bg-danger-soft text-ink",
   } as const;
@@ -123,7 +127,7 @@ export function SectionHeader({
         /* Same 44px hit area, same trick. */
         <Link
           href={action.href}
-          className="-my-2 ml-auto flex min-h-11 shrink-0 items-center text-label font-medium text-gold-deep underline-offset-4 hover:underline"
+          className="-my-2 ml-auto flex min-h-11 shrink-0 items-center text-label font-medium text-accent-text underline-offset-4 hover:underline"
         >
           {action.label}
         </Link>
@@ -158,7 +162,7 @@ export function Chip({
 }) {
   const tones = {
     neutral: "bg-sunk text-ink",
-    gold: "bg-gold-soft text-gold-deep",
+    gold: "bg-accent-tint text-accent-text",
     forest: "bg-forest-soft text-forest",
     danger: "bg-danger-soft text-danger",
   } as const;
@@ -229,11 +233,11 @@ export function Callout({
   children: ReactNode;
 }) {
   const tones = {
-    gold: "border-gold/45 bg-gold-soft text-ink",
+    gold: "border-accent/40 bg-accent-tint text-ink",
     forest: "border-forest/25 bg-forest-soft text-ink",
     danger: "border-danger/30 bg-danger-soft text-ink",
   } as const;
-  const iconTones = { gold: "text-gold-deep", forest: "text-forest", danger: "text-danger" } as const;
+  const iconTones = { gold: "text-accent-text", forest: "text-forest", danger: "text-danger" } as const;
 
   return (
     <div className={`flex gap-2.5 rounded-control border p-3 ${tones[tone]}`}>

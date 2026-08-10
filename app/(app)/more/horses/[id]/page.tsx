@@ -245,7 +245,7 @@ export default async function HorseDetailPage({
       {role === "staff" && (
         <Link
           href="/tasks/feed"
-          className="py-1 text-center text-label font-medium text-gold-deep underline underline-offset-4"
+          className="py-1 text-center text-label font-medium text-accent-text underline underline-offset-4"
         >
           Today&apos;s feed board
         </Link>

@@ -39,7 +39,7 @@ export default async function NotificationsPage() {
             <Card
               as="li"
               key={item.id}
-              className={`p-4 ${item.read_at ? "" : "border-gold/60"}`}
+              className={`p-4 ${item.read_at ? "" : "border-accent/60"}`}
             >
               <div className="flex items-start gap-2">
                 <h2 className="min-w-0 flex-1 font-display text-heading leading-snug text-ink">

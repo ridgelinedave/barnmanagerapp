@@ -34,7 +34,7 @@ export function DocumentUploadForm({ horseId }: { horseId: string }) {
           name="file"
           type="file"
           required
-          className="min-h-12 w-full rounded-control border border-line bg-surface p-2.5 text-caption text-ink file:mr-3 file:min-h-9 file:rounded-[0.5rem] file:border-0 file:bg-gold file:px-3 file:text-label file:font-semibold file:text-ink"
+          className="min-h-12 w-full rounded-control border border-line bg-surface p-2.5 text-caption text-ink file:mr-3 file:min-h-9 file:rounded-[0.5rem] file:border-0 file:bg-accent file:px-3 file:text-label file:font-semibold file:text-ink"
         />
       </Field>
 

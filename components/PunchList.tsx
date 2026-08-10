@@ -43,7 +43,7 @@ export function PunchList({
           <Card
             as="li"
             key={punch.id}
-            className={`p-3 ${correction ? "border-gold/50 bg-gold-soft" : ""}`}
+            className={`p-3 ${correction ? "border-accent/50 bg-accent-tint" : ""}`}
           >
             <div className="flex items-baseline gap-2">
               {/* Direction as a word, not just a colour — this is a pay record. */}

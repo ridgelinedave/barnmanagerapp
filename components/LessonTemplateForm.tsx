@@ -81,7 +81,7 @@ export function LessonTemplateForm({
               value={value}
               defaultChecked={value === "private"}
               onChange={() => setType(value)}
-              className="mt-0.5 size-5 accent-[var(--brand-gold-deep)]"
+              className="mt-0.5 size-5 accent-[var(--accent)]"
             />
             <span className="min-w-0">
               <span className="block text-body font-semibold text-ink">{label}</span>
