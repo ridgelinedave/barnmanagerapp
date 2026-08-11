@@ -122,7 +122,7 @@ const brandVars = {
   "--brand-soft": barn.brand.soft,
   "--brand-ink": barn.brand.ink,
   "--brand-charcoal": barn.brand.charcoal,
-  "--brand-black": barn.brand.black,
+  "--brand-deep": barn.brand.deep,
   "--brand-forest": barn.brand.forest,
   "--brand-danger": barn.brand.danger,
   "--brand-muted": barn.brand.muted,

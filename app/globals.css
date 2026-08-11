@@ -32,14 +32,15 @@
    *   --accent-text  the accent used AS text, on white or on the tint
    *
    * `--accent-text` exists because one value cannot do both jobs and stay
-   * legible. Cobalt #2563EB is 5.17:1 on white but only 4.40:1 on its own
-   * tint, and Crouse gold is 1.86:1 as text and unusable. Splitting them is
-   * what lets a gold barn and a cobalt barn share every component.
+   * legible. Belle's oxblood #4A002A is superb as text (15.85:1 on white) but
+   * at L* 13.4 a button filled with it reads as a black slab, so the fill is
+   * lifted to #6E1A3D. Crouse gold went the other way — 1.86:1 as text and
+   * unusable. Splitting the jobs is what lets any skin share every component.
    */
-  --accent: #2563eb;
+  --accent: #6e1a3d;
   --accent-on: #ffffff;
-  --accent-tint: #e6edfd;
-  --accent-text: #1d4fc4;
+  --accent-tint: #f1e9e9;
+  --accent-text: #4a002a;
 
   --brand-gold: #dabc51;
   --brand-gold-press: #c9aa3f;
@@ -48,7 +49,7 @@
   --brand-soft: #fafaf9;
   --brand-ink: #16192b;
   --brand-charcoal: #1c1b18;
-  --brand-black: #0f0e0c;
+  --brand-deep: #4a002a;
   --brand-forest: #2f4a34;
   --brand-danger: #9b2c1f;
   --brand-muted: #5d5f6b;
@@ -100,8 +101,8 @@
   --color-sunk: var(--brand-soft);
   /* Header, tab bar. */
   --color-chrome: var(--brand-charcoal);
-  /* Splash and sign-in. A shade below the chrome. */
-  --color-black: var(--brand-black);
+  /* Splash and sign-in — the one deliberately deep screen. Belle's oxblood. */
+  --color-deep: var(--brand-deep);
 
   /* --- Semantic text ---------------------------------------------------- */
   --color-ink: var(--brand-ink);

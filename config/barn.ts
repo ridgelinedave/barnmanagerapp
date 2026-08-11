@@ -40,21 +40,40 @@ export const monarch = {
   descriptor: "Barn Management Software",
 
   /**
-   * Electric Cobalt — the default accent any barn gets before someone picks
-   * their own. Measured: 5.17:1 carrying white, 5.17:1 as text on white.
+   * OXBLOOD — Belle's scheme, and the default any barn gets before it picks
+   * its own. Replaces Electric Cobalt (§16a).
+   *
+   * WHY THE FILL IS NOT THE HERO VALUE. Belle's oxblood is `#4A002A`, and it
+   * is the right brand colour — but at L* 13.4 it is very dark. Measured two
+   * ways, because contrast ratio alone answers the wrong question here:
+   *
+   *   luminance   #4A002A vs the body ink is 1.10:1 — nearly identical
+   *               LIGHTNESS, which is what made it look like "basically black"
+   *   perceptual  ΔE 32 from the ink and ΔE 38 from pure black — which is
+   *               "obviously a different colour" to a human eye
+   *
+   * So it is genuinely wine and not black; the ratio was just measuring the
+   * wrong property. It is kept verbatim as the TEXT and the hero field.
+   *
+   * The FILL is lifted to `#6E1A3D` anyway, for a different reason: a button
+   * is a slab of colour rather than a stroke of it, and at L* 13.4 that slab
+   * reads as near-black at a glance even though the pixels are wine. `#6E1A3D`
+   * is L* 24.9, unmistakably wine as an area, and still carries white at
+   * 11.18:1.
    */
   accent: {
-    fill: "#2563EB",
-    /** Text and icons ON the fill. */
+    /** Lifted interactive wine. Buttons, active pills, avatars. */
+    fill: "#6E1A3D",
+    /** Text and icons ON the fill. 11.18:1. */
     on: "#FFFFFF",
-    /** Pale ground for chips and hover. */
-    tint: "#E6EDFD",
+    /** Blush — Belle's soft tint. Chips and hover grounds. */
+    tint: "#F1E9E9",
     /**
-     * The accent used AS TEXT. Deeper than the fill on purpose: #2563EB is
-     * 4.40:1 on its own tint, which fails AA by a hair. #1D4FC4 is 7.08:1 on
-     * white and 6.03:1 on the tint.
+     * Belle's hero oxblood, used AS TEXT. 15.85:1 on white and 13.27:1 on the
+     * blush tint — and ΔE 32 from the body ink, so an accent link does not
+     * read as ordinary body copy.
      */
-    text: "#1D4FC4",
+    text: "#4A002A",
   },
 
   /**
@@ -78,24 +97,18 @@ export const barn = {
   timezone: "America/New_York",
 
   /**
-   * BLACK · WHITE · GOLD. There is no cream in this app.
+   * OXBLOOD · WHITE · GOLD (§16a). There is no cream and no cobalt in this app.
    *
-   * Light content, dark chrome — paper-white screens so a phone stays readable
-   * in daylight, near-black header and tab bar, gold as the only accent. Every
-   * value below is measured against the surface it actually sits on, and the
-   * ratio is recorded beside it.
+   * White content, light chrome, one accent. Belle's scheme: oxblood carries
+   * every interactive surface and every accent word, gold is decorative only,
+   * blush is the soft tint. Every value below is measured against the surface
+   * it actually sits on and the ratio is recorded beside it.
    *
-   * TWO PLACES THIS DELIBERATELY DIVERGES FROM design/mockups, both because
-   * accessibility outranks the design system when they disagree:
-   *
-   *   the mockup's `--muted:#8A857C` measures 3.67:1 on white and fails AA for
-   *   body text, so secondary text here is one step darker;
-   *
-   *   the mockup's `--gold-deep:#C9AA3F` measures 2.26:1 on white. It is kept
-   *   EXACTLY as the mockup uses it — a pressed/hover SURFACE under the gold
-   *   button — and a separate, darker gold carries text.
-   *
-   * Do not "simplify" either back to a single value.
+   * THE ONE PLACE THIS DIVERGES FROM design/mockups, because accessibility
+   * outranks the design system when they disagree: the Monarch mockup's
+   * `--muted:#8A857C` is 3.67:1 on white and fails AA for body text, so
+   * secondary text here is a step darker. Belle's charcoal #4B4B4B (8.72:1) is
+   * available if that neutral is ever wanted instead.
    */
   brand: {
     /**
@@ -106,52 +119,61 @@ export const barn = {
      * This is the ONLY colour block that differs per barn. Swap these four and
      * the app is that barn's; everything else — white ground, dark text, type,
      * components, motion — is Monarch and is shared. Omit them and a barn gets
-     * `monarch.accent` (Electric Cobalt).
+     * `monarch.accent` (oxblood).
      *
-     * WHY FOUR AND NOT ONE. A single accent value cannot survive contrast.
-     * Crouse gold proves it: #DABC51 carries ink at 9.26:1 but white at only
-     * 1.86:1, and as text on white it is 1.86:1 — unusable. So the accent is
+     * WHY FOUR AND NOT ONE. A single accent value cannot survive contrast, and
+     * the two skins built so far prove it from opposite ends: Crouse gold
+     * (#DABC51) carries ink at 9.26:1 but white at 1.86:1, while Belle's
+     * oxblood carries white at 15.85:1 and ink not at all. So the accent is
      * split by JOB, not by shade:
      *
-     *   fill  the surface        gold #DABC51        cobalt #2563EB
-     *   on    text ON that fill  ink  #1C1B18 9.26   white  #FFFFFF 5.17
-     *   tint  pale ground        #F8F2DC             #E6EDFD
-     *   text  accent AS text     #776628 5.65/5.04   #1D4FC4 7.08/6.03
+     *   fill  the surface        oxblood #6E1A3D     gold #DABC51
+     *   on    text ON that fill  white  11.18:1      ink  9.26:1
+     *   tint  pale ground        blush  #F1E9E9      #F8F2DC
+     *   text  accent AS text     #4A002A 15.85/13.27 #776628 5.65/5.04
      *
-     * `on` is what makes gold and cobalt interchangeable: the gold skin puts
-     * dark ink on its buttons, the cobalt skin puts white on its buttons, and
-     * no component has to know which barn it is rendering.
+     * `on` is what makes them interchangeable: an oxblood skin puts white on
+     * its buttons, a gold skin puts dark ink on its buttons, and no component
+     * has to know which barn it is rendering.
      *
      * A future Barn Settings screen (§16d) picks `fill` and DERIVES the other
      * three under these same rules, so no barn can choose an unreadable combo.
      */
     accent: {
-      fill: "#DABC51",
-      /** Gold is light: it carries ink, never white. */
-      on: "#1C1B18",
-      tint: "#F8F2DC",
-      /** 5.65:1 on white, 5.04:1 on the gold tint. */
-      text: "#776628",
+      // Belle authored both the product palette and this skin, so Crouse runs
+      // the same oxblood as the Monarch default for now. A future barn
+      // overrides these four and gets its own app; nothing else moves.
+      fill: "#6E1A3D",
+      on: "#FFFFFF",
+      tint: "#F1E9E9",
+      text: "#4A002A",
     },
 
     /**
-     * CONFIRMED — sampled from Belle's actual logo, not guessed.
-     *
-     * The mark is a metallic bevel, so its gold is a gradient: hue is locked
-     * around 47° and saturation around 0.63, but value runs 0.26 → 0.90 across
-     * 35 palette entries. `gold` is the single most-used gold pixel in the
-     * image, i.e. the tone the eye reads as "the Crouse gold".
-     *
-     * A SURFACE colour: buttons, the chrome keyline, the active tab. Carries
-     * ink at 9.26:1. Never used as text on white (1.86:1).
+     * Belle's gold — the SECONDARY, decorative value from her brand board.
+     * It is the crest and small ornament. See goldPress below for why it can
+     * never be text or a light-labelled fill.
      */
-    gold: "#DABC51",
+    gold: "#C2AE6D",
 
     /**
-     * The pressed state of that button, straight from the mockup. A SURFACE,
-     * never text: 2.26:1 on white.
+     * DECORATIVE ONLY, and the measurements say why.
+     *
+     * Belle's gold #C2AE6D is 2.19:1 as text on white and 2.19:1 carrying
+     * white — it fails AA in both directions. The ONLY legible thing it can do
+     * is carry dark ink (7.92:1). So it is the crest and small ornament, never
+     * a text colour and never a button fill under a light label.
+     *
+     * It is deliberately NOT wired into the accent tokens. If it were, a
+     * component saying `bg-accent text-accent-on` would render an unreadable
+     * button the moment a barn chose gold.
+     *
+     * `goldPress` is Belle's gold one step down, for the pressed state of the
+     * sign-in button — the one place gold IS a fill, because it sits on the
+     * oxblood field carrying ink at 7.92:1 (5.83:1 pressed). Gold on oxblood
+     * measures 7.22:1, which is why the crest reads on that screen.
      */
-    goldPress: "#C9AA3F",
+    goldPress: "#A8945A",
 
     /**
      * TEXT gold — links, chip labels, the active nav label on white.
@@ -180,8 +202,18 @@ export const barn = {
      */
     charcoal: "#1C1B18",
 
-    /** The splash/login field. A shade below the chrome so the logo sits in it. */
-    black: "#0F0E0C",
+    /**
+     * THE DEEP FIELD — the sign-in screen and the splash.
+     *
+     * Belle's hero oxblood. Was #0F0E0C near-black; this is the one screen in
+     * the app that is deliberately a deep colour, and making it the brand's
+     * own is the whole point — the gold crest on oxblood is Belle's brand
+     * board, and gold on this field measures 6.79:1.
+     *
+     * Named `deep`, not `black`, because it is no longer black and a token
+     * whose name lies is a token someone will misuse.
+     */
+    deep: "#4A002A",
 
     /**
      * SECONDARY — the pasture green. Clears AA as text on white (9.77:1) and as
@@ -342,15 +374,14 @@ export const barn = {
     installTitle: "Add to your home screen",
     installBody: "Install the app for one-tap access from your phone.",
     /**
-     * BLACK, not grey. The old #2B2B2B put the logo on a grey card, which is
-     * the thing that read as unfinished. This is the same field the sign-in
-     * screen uses, so launch → sign-in is one continuous surface rather than
-     * two shades of almost-black.
+     * OXBLOOD. Belle's #4A002A, the same field the sign-in screen uses, so
+     * launch → splash → sign-in is one continuous surface. It was near-black
+     * (#0F0E0C), and before that a grey card that read as unfinished.
      *
      * Baked into the generated splash PNGs — changing it means re-running
      * `npm run brand:assets`, which this change did.
      */
-    launchBackground: "#0F0E0C",
+    launchBackground: "#4A002A",
   },
 } as const;
 

@@ -16,7 +16,7 @@ export const metadata = { title: "Forgot my password" };
  */
 export default function ResetPage() {
   return (
-    <main className="flex min-h-dvh flex-col justify-center bg-black px-7 text-white">
+    <main className="flex min-h-dvh flex-col justify-center bg-deep px-7 text-white">
       <h1 className="font-display text-[1.75rem] font-semibold uppercase tracking-[0.08em]">
         Forgot my password
       </h1>

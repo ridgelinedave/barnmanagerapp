@@ -9,12 +9,12 @@ import { supabaseConfigured } from "@/lib/env";
 import { barn } from "@/config/barn";
 
 /**
- * Sign in. THE ONE DARK SCREEN in the app.
+ * Sign in. THE ONE DEEP SCREEN in the app.
  *
- * Everything past this door is paper-white with black chrome; this is the
- * threshold, and it is the same black as the launch splash so opening the app
- * and signing in read as one continuous surface rather than two shades of
- * almost-black.
+ * Everything past this door is paper-white with light chrome; this is the
+ * threshold, and it is Belle's oxblood #4A002A — the same field as the launch
+ * splash, so opening the app and signing in read as one continuous surface.
+ * Gold on oxblood is her brand board, and it measures 7.22:1.
  *
  * Built to design/mockups/login.html, variant B:
  *
@@ -87,7 +87,7 @@ export function SignInForm() {
   const label = "mb-1.5 block pl-0.5 text-[0.6875rem] uppercase tracking-[0.13em] text-white/60";
 
   return (
-    <div className="flex min-h-dvh flex-col bg-black px-7 text-white">
+    <div className="flex min-h-dvh flex-col bg-deep px-7 text-white">
       <div className="flex flex-1 flex-col justify-center py-10">
         {/*
          * --- the crest: "Crouse skin", swaps per barn ---------------------
@@ -180,9 +180,10 @@ export function SignInForm() {
           )}
 
           {/*
-           * The gold button, squared and tactile. Written out rather than
-           * using <Button> because this is the one screen on black, and the
-           * shared component's focus and press states are tuned for paper.
+           * GOLD, not the accent — this is the one place gold is a fill.
+           * An oxblood button on an oxblood field is invisible, and Belle's
+           * gold carries ink at 7.92:1 here. Written out rather than using
+           * <Button> because the shared component is tuned for paper.
            */}
           <button
             type="submit"

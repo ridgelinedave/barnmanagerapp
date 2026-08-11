@@ -195,13 +195,14 @@ Each still follows the standing rules: any new SQL printed for audit before appl
 - **Name:** Monarch. **Domain:** monarchbarns.com (purchased). **Descriptor:** "Barn Management Software" (this is where the SEO-friendly plain words live — NOT in the name).
 - **Tagline (pick one):** "Barn management, elevated." / "Run your barn beautifully." / "The modern barn, in one place." — with "Barn Management Software" as the sub-descriptor.
 - **Wordmark:** MONARCH in **Cinzel** (Roman inscription caps). **No icon for now** — wordmark only; a pro refines a mark later.
-- **Palette (Monarch brand):** **Electric Cobalt `#2563EB`** accent on **white**, dark ink text (`#16192B`). Bright-on-white — deliberately loud where the whole barn-software market is earth-toned and quiet. NOT black/gold (too heavy for an all-day phone tool). Optional warm secondary pop (amber `#F5A623`) used sparingly.
-- **Accent is a per-barn THEME TOKEN — this is the white-label mechanism.** Monarch default = Cobalt. **Crouse (skin #1) keeps its gold `#DABC51`** so Belle sees her own brand. A new/unconfigured barn gets Monarch Cobalt. Shared across all barns: white base, dark text, Cinzel/Barlow type, components, layout, motion. Swaps per barn: accent color + logo.
+- **Palette (Belle's scheme — DECIDED, replaces Cobalt):** primary accent **Oxblood `#4A002A`**, secondary/decorative **Gold `#C2AE6D`**, neutral **Charcoal `#4B4B4B`**, soft tint **Blush `#F1E9E9`**, on **white**. Deeply equestrian (oxblood leather / hunt coats / boots), bold, premium, and used by no competitor. NOTE: `#4A002A` is very deep — validate it reads as wine (not black) at button size; lift the interactive shade if needed while keeping `#4A002A` as the hero/brand color.
+- **Accent is a per-barn THEME TOKEN — the white-label mechanism.** For now the Monarch default AND the Crouse skin both use Belle's oxblood palette (she authored both). Gold stays as the Crouse crest + decorative secondary. A future barn overrides the accent token to differ. Shared across all barns: white base, dark text, Cinzel/Barlow type, components, layout. Swaps per barn: accent color + logo.
+- **Tagline (Belle):** marketing line "Barn Management Software That Gets You Back In The Saddle"; plain descriptor stays "Barn Management Software". Alt name floated — "Tacked Up" — Monarch wins (higher-end).
 - **Trademark:** quick USPTO check still pending before it goes on public/marketing assets. Not a blocker for building.
 
 ### 16b. The two brand layers (the whole model)
-- **Product character (Monarch) — stays on every barn:** the white + accent system, buttons, motion, layout, login pattern, icon set, skeletons, Cinzel wordmark, and the Cobalt/Monarch signature at the edges (marketing, app icon, store listing, a "powered by Monarch" mark).
-- **Barn skin (per tenant) — swaps per barn:** name, logo, **accent color**, hero photo(s). Crouse = the crest + Crouse gold `#DABC51`. Monarch default (and any new barn) = Cobalt `#2563EB`.
+- **Product character (Monarch) — stays on every barn:** the white + accent system, buttons, motion, layout, login pattern, icon set, skeletons, Cinzel wordmark, and the Monarch signature at the edges (marketing, app icon, store listing, a "powered by Monarch" mark).
+- **Barn skin (per tenant) — swaps per barn:** name, logo, **accent color**, hero photo(s). Crouse = the crest + Belle's oxblood. Monarch default (and any new barn) = the same oxblood until a barn overrides it. IMPLEMENTED: interactive fill `#6E1A3D` (oxblood lifted so a button reads as wine, not a black slab), text/hero `#4A002A`, tint blush `#F1E9E9`, on-fill white.
 
 ### 16c. White-label model — product-forward, barn-prominent
 - **Inside a barn's app:** THEIR logo in the header, THEIR accent color, THEIR photos — so Crouse members feel it's "the Crouse app."
@@ -222,8 +223,8 @@ An admin-editable screen that is `config/barn.ts` turned into per-tenant setting
 ### 16f. Asset checklist
 - [x] Domain monarchbarns.com
 - [x] Wordmark font: Cinzel
-- [x] Product palette: Electric Cobalt `#2563EB` on white
+- [x] Product palette: Oxblood `#4A002A` (Belle's scheme) on white — replaced Cobalt
 - [ ] USPTO trademark sanity check
-- [ ] Accent-as-theme-token in code (Monarch Cobalt default; Crouse gold skin)
+- [x] Accent-as-theme-token in code — four tokens (fill / on / tint / text), oxblood for both the Monarch default and the Crouse skin; a future barn overrides them
 - [ ] Marketing site (later)
 - [ ] Refined logo mark (pro, later) — wordmark-only for now

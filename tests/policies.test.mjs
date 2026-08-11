@@ -4746,9 +4746,21 @@ async function main() {
       );
 
       // Clean up so the next run starts where this one did.
+      //
+      // NOT "the table is empty". Demo data lives in this table too, and it is
+      // supposed to — the assertion is that none of the rows THIS SECTION made
+      // survive, which is the only thing the section is responsible for. The
+      // empty-table version passed only until `npm run demo:seed` had ever
+      // been run, which is the third time that shape of assumption has bitten
+      // in this suite (see also the ical-token and parent2 cases).
       for (const id of made) await admin.from("training_logs").delete().eq("id", id);
-      const { ids: leftovers } = await visibleIds(admin, "training_logs");
-      check("the test training logs are cleaned up", leftovers.length === 0, `${leftovers.length} left`);
+      const { ids: remaining } = await visibleIds(admin, "training_logs");
+      const survivors = made.filter((id) => remaining.includes(id));
+      check(
+        "the test training logs are cleaned up",
+        survivors.length === 0,
+        `${survivors.length} of this section's ${made.length} rows survived`,
+      );
     }
   }
 
