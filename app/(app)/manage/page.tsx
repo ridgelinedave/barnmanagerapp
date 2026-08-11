@@ -30,6 +30,12 @@ type Entry = {
 
 const TODAY: Entry[] = [
   {
+    href: "/calendar",
+    title: "Calendar",
+    meta: "Lessons, events and care due — the whole month",
+    icon: "calendar",
+  },
+  {
     flag: "tasks",
     href: "/manage/tasks",
     title: "Tasks",
@@ -46,9 +52,9 @@ const TODAY: Entry[] = [
   {
     flag: "events",
     href: "/manage/events",
-    title: "Calendar",
-    meta: "Shows, clinics, farrier and vet days, closures",
-    icon: "calendar",
+    title: "Barn events",
+    meta: "Add shows, clinics, farrier and vet days, closures",
+    icon: "pin",
   },
 ];
 

@@ -51,8 +51,24 @@ export const TABS_BY_ROLE: Record<Role, Tab[]> = {
   ],
 };
 
+/**
+ * Routes every signed-in role may reach that are NOT tabs.
+ *
+ * The bottom nav is capped at five per role (SPEC §7) and staff and admin are
+ * both at five, so a shared screen cannot always be a tab. The calendar is the
+ * first of these: it is genuinely for everyone, and what each role SEES on it
+ * is decided by RLS rather than by the nav.
+ *
+ * This is navigation hygiene, not a security boundary — same as the tab list.
+ * A route added here is reachable by any signed-in user, so it must be a screen
+ * where the policies already scope the content.
+ */
+const SHARED_PATHS = ["/calendar"];
+
 /** True when `role` is allowed to see `pathname`. Keeps stub routes role-scoped. */
 export function roleCanAccess(role: Role, pathname: string): boolean {
+  if (SHARED_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return true;
+
   return TABS_BY_ROLE[role].some(
     (tab) => pathname === tab.href || pathname.startsWith(`${tab.href}/`),
   );

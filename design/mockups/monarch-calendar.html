@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Monarch — Calendar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ox:#4A002A;--ox-fill:#6E1A3D;--gold:#C2AE6D;--blush:#F1E9E9;
+    --ink:#23202A;--muted:#6B6773;--line:#ECEAE6;--white:#fff;
+    --c-lesson:#6E1A3D;--c-show:#B08A2E;--c-vet:#5B6470;--c-farrier:#9A8760;--c-care:#A65A6B;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Barlow',sans-serif;background:#EAE8E3;color:#26251f;padding:40px 18px 70px}
+  .head{max-width:760px;margin:0 auto 26px;text-align:center}
+  .head h1{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:24px;letter-spacing:.5px;text-transform:uppercase}
+  .head p{margin-top:7px;color:#6b675e;font-size:14px}
+  .stage{display:flex;gap:40px;justify-content:center;flex-wrap:wrap;max-width:820px;margin:0 auto}
+  .cell-col{display:flex;flex-direction:column;align-items:center;gap:14px}
+  .cap{font-size:12px;color:#8a857c}
+
+  .phone{width:326px;border-radius:30px;overflow:hidden;border:9px solid #17150f;box-shadow:0 16px 38px rgba(0,0,0,.24);background:var(--white)}
+
+  .top{padding:16px 16px 12px;border-bottom:1px solid var(--line)}
+  .toprow{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+  .ttl{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:23px;letter-spacing:.5px;text-transform:uppercase;color:var(--ink)}
+  .toggle{display:flex;background:#F3F1EE;border-radius:8px;padding:3px}
+  .toggle span{font-size:11px;font-weight:600;padding:5px 11px;border-radius:6px;color:var(--muted);letter-spacing:.5px}
+  .toggle span.on{background:var(--white);color:var(--ox);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+  .monthnav{display:flex;align-items:center;justify-content:space-between}
+  .monthnav .m{font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:17px;letter-spacing:1px;text-transform:uppercase;color:var(--ink)}
+  .monthnav .arw{width:28px;height:28px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:18px}
+
+  .dow{display:grid;grid-template-columns:repeat(7,1fr);padding:8px 8px 2px}
+  .dow span{text-align:center;font-size:10px;font-weight:600;letter-spacing:1px;color:var(--muted)}
+  .grid{display:grid;grid-template-columns:repeat(7,1fr);padding:0 8px 8px}
+  .d{height:44px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:5px;position:relative;cursor:pointer}
+  .d .n{font-size:13px;font-weight:500;color:var(--ink);width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:50%}
+  .d.out .n{color:#C7C3BC}
+  .d.today .n{background:var(--ox-fill);color:#fff;font-weight:600}
+  .d.sel{background:var(--blush);border-radius:10px}
+  .d.sel .n{color:var(--ox);font-weight:700}
+  .dots{display:flex;gap:3px;margin-top:3px;height:5px}
+  .dot{width:5px;height:5px;border-radius:50%}
+
+  .agenda{padding:12px 16px 16px;border-top:1px solid var(--line);background:#FCFBFA}
+  .agenda .ah{font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--ox);margin-bottom:10px}
+  .it{display:flex;gap:11px;padding:9px 0;border-bottom:1px solid var(--line)}
+  .it:last-child{border-bottom:none}
+  .it .bar{width:3px;border-radius:2px;flex-shrink:0}
+  .it .tm{font-size:11px;font-weight:600;color:var(--muted);min-width:52px;padding-top:1px}
+  .it .bd{flex:1}
+  .it .t1{font-size:13px;font-weight:600;color:var(--ink);line-height:1.2}
+  .it .t2{font-size:11.5px;color:var(--muted);margin-top:1px}
+  .chip{font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:3px 7px;border-radius:20px;align-self:flex-start;margin-top:2px}
+
+  /* list view */
+  .list{padding:6px 16px 16px}
+  .daygroup{margin-top:14px}
+  .daygroup .dh{font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);padding:6px 0;border-bottom:1px solid var(--line);margin-bottom:4px}
+  .daygroup .dh.today{color:var(--ox)}
+</style>
+</head>
+<body>
+  <div class="head">
+    <h1>Monarch — Calendar</h1>
+    <p>Oxblood theme. Month grid + selected-day agenda, and the list view. Types shown by restrained tints, not a rainbow.</p>
+  </div>
+
+  <div class="stage">
+
+    <!-- MONTH -->
+    <div class="cell-col">
+      <div class="phone">
+        <div class="top">
+          <div class="toprow">
+            <div class="ttl">Calendar</div>
+            <div class="toggle"><span class="on">Month</span><span>List</span></div>
+          </div>
+          <div class="monthnav"><div class="arw">‹</div><div class="m">August 2026</div><div class="arw">›</div></div>
+        </div>
+        <div class="dow"><span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span></div>
+        <div class="grid">
+          <!-- row 1 -->
+          <div class="d out"><div class="n">27</div></div>
+          <div class="d out"><div class="n">28</div></div>
+          <div class="d out"><div class="n">29</div></div>
+          <div class="d out"><div class="n">30</div></div>
+          <div class="d out"><div class="n">31</div></div>
+          <div class="d out"><div class="n">1</div></div>
+          <div class="d"><div class="n">2</div></div>
+          <!-- row 2 -->
+          <div class="d"><div class="n">3</div></div>
+          <div class="d"><div class="n">4</div></div>
+          <div class="d"><div class="n">5</div><div class="dots"><span class="dot" style="background:var(--c-lesson)"></span></div></div>
+          <div class="d"><div class="n">6</div></div>
+          <div class="d"><div class="n">7</div></div>
+          <div class="d"><div class="n">8</div><div class="dots"><span class="dot" style="background:var(--c-lesson)"></span><span class="dot" style="background:var(--c-show)"></span></div></div>
+          <div class="d"><div class="n">9</div></div>
+          <!-- row 3 -->
+          <div class="d"><div class="n">10</div></div>
+          <div class="d today"><div class="n">11</div><div class="dots"><span class="dot" style="background:var(--c-farrier)"></span><span class="dot" style="background:var(--c-lesson)"></span></div></div>
+          <div class="d sel"><div class="n">12</div><div class="dots"><span class="dot" style="background:var(--c-vet)"></span><span class="dot" style="background:var(--c-lesson)"></span><span class="dot" style="background:var(--c-care)"></span></div></div>
+          <div class="d"><div class="n">13</div><div class="dots"><span class="dot" style="background:var(--c-lesson)"></span></div></div>
+          <div class="d"><div class="n">14</div></div>
+          <div class="d"><div class="n">15</div><div class="dots"><span class="dot" style="background:var(--c-show)"></span></div></div>
+          <div class="d"><div class="n">16</div></div>
+          <!-- row 4 -->
+          <div class="d"><div class="n">17</div></div>
+          <div class="d"><div class="n">18</div><div class="dots"><span class="dot" style="background:var(--c-lesson)"></span></div></div>
+          <div class="d"><div class="n">19</div><div class="dots"><span class="dot" style="background:var(--c-vet)"></span></div></div>
+          <div class="d"><div class="n">20</div><div class="dots"><span class="dot" style="background:var(--c-lesson)"></span></div></div>
+          <div class="d"><div class="n">21</div></div>
+          <div class="d"><div class="n">22</div><div class="dots"><span class="dot" style="background:var(--c-show)"></span></div></div>
+          <div class="d"><div class="n">23</div></div>
+          <!-- row 5 -->
+          <div class="d"><div class="n">24</div></div>
+          <div class="d"><div class="n">25</div><div class="dots"><span class="dot" style="background:var(--c-lesson)"></span></div></div>
+          <div class="d"><div class="n">26</div></div>
+          <div class="d"><div class="n">27</div><div class="dots"><span class="dot" style="background:var(--c-care)"></span></div></div>
+          <div class="d"><div class="n">28</div></div>
+          <div class="d"><div class="n">29</div><div class="dots"><span class="dot" style="background:var(--c-lesson)"></span></div></div>
+          <div class="d"><div class="n">30</div></div>
+          <!-- row 6 -->
+          <div class="d"><div class="n">31</div></div>
+          <div class="d out"><div class="n">1</div></div>
+          <div class="d out"><div class="n">2</div></div>
+          <div class="d out"><div class="n">3</div></div>
+          <div class="d out"><div class="n">4</div></div>
+          <div class="d out"><div class="n">5</div></div>
+          <div class="d out"><div class="n">6</div></div>
+        </div>
+        <div class="agenda">
+          <div class="ah">Wed, August 12</div>
+          <div class="it"><div class="bar" style="background:var(--c-vet)"></div><div class="tm">11:00 AM</div><div class="bd"><div class="t1">Vet — Winston</div><div class="t2">Coggins pull</div></div><span class="chip" style="background:#EBEDEF;color:var(--c-vet)">Vet</span></div>
+          <div class="it"><div class="bar" style="background:var(--c-lesson)"></div><div class="tm">3:30 PM</div><div class="bd"><div class="t1">Lesson — Ella</div><div class="t2">on Winston · Ring 1</div></div><span class="chip" style="background:var(--blush);color:var(--ox)">Lesson</span></div>
+          <div class="it"><div class="bar" style="background:var(--c-care)"></div><div class="tm">Due</div><div class="bd"><div class="t1">Dakota — deworming</div><div class="t2">due today</div></div><span class="chip" style="background:#F6EAED;color:var(--c-care)">Care</span></div>
+        </div>
+      </div>
+      <div class="cap">Month — tap a day, its agenda opens below</div>
+    </div>
+
+    <!-- LIST -->
+    <div class="cell-col">
+      <div class="phone">
+        <div class="top">
+          <div class="toprow">
+            <div class="ttl">Calendar</div>
+            <div class="toggle"><span>Month</span><span class="on">List</span></div>
+          </div>
+          <div class="monthnav"><div class="arw">‹</div><div class="m">August 2026</div><div class="arw">›</div></div>
+        </div>
+        <div class="list">
+          <div class="daygroup">
+            <div class="dh today">Today · Tue, Aug 11</div>
+            <div class="it"><div class="bar" style="background:var(--c-farrier)"></div><div class="tm">9:00 AM</div><div class="bd"><div class="t1">Farrier — barn</div><div class="t2">full round</div></div><span class="chip" style="background:#F2EEE6;color:var(--c-farrier)">Farrier</span></div>
+            <div class="it"><div class="bar" style="background:var(--c-lesson)"></div><div class="tm">4:00 PM</div><div class="bd"><div class="t1">Lesson — Ava</div><div class="t2">on Miller · Ring 2</div></div><span class="chip" style="background:var(--blush);color:var(--ox)">Lesson</span></div>
+          </div>
+          <div class="daygroup">
+            <div class="dh">Wed, Aug 12</div>
+            <div class="it"><div class="bar" style="background:var(--c-vet)"></div><div class="tm">11:00 AM</div><div class="bd"><div class="t1">Vet — Winston</div><div class="t2">Coggins pull</div></div><span class="chip" style="background:#EBEDEF;color:var(--c-vet)">Vet</span></div>
+            <div class="it"><div class="bar" style="background:var(--c-lesson)"></div><div class="tm">3:30 PM</div><div class="bd"><div class="t1">Lesson — Ella</div><div class="t2">on Winston · Ring 1</div></div><span class="chip" style="background:var(--blush);color:var(--ox)">Lesson</span></div>
+          </div>
+          <div class="daygroup">
+            <div class="dh">Sat, Aug 15</div>
+            <div class="it"><div class="bar" style="background:var(--c-show)"></div><div class="tm">All day</div><div class="bd"><div class="t1">Tryon Summer II</div><div class="t2">show · team traveling</div></div><span class="chip" style="background:#F7F0DE;color:#8A6A18">Show</span></div>
+          </div>
+          <div class="daygroup">
+            <div class="dh">Tue, Aug 18</div>
+            <div class="it"><div class="bar" style="background:var(--c-lesson)"></div><div class="tm">4:00 PM</div><div class="bd"><div class="t1">Lesson — Ava</div><div class="t2">on Miller · Ring 2</div></div><span class="chip" style="background:var(--blush);color:var(--ox)">Lesson</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="cap">List — everything upcoming, grouped by day</div>
+    </div>
+
+  </div>
+</body>
+</html>

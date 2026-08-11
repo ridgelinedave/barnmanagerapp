@@ -47,6 +47,29 @@ export async function listAllEvents(): Promise<BarnEvent[]> {
  * inline during render is an impure call in a component — React's rules ban it,
  * and the lint enforces that. A module function is the right home for it.
  */
+/**
+ * Events overlapping a window, for the calendar.
+ *
+ * `start_at` is a timestamptz, so the bounds are widened by a day either side
+ * and the exact barn-local day is decided in the aggregator. Comparing a
+ * timestamp to a bare date in SQL would silently use UTC, which is how an
+ * 8pm event lands on tomorrow's grid for a barn in New York.
+ */
+export async function listEventsBetween(from: string, through: string): Promise<BarnEvent[]> {
+  if (!supabaseConfigured()) return [];
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("events")
+    .select("*")
+    .gte("start_at", `${from}T00:00:00Z`)
+    .lte("start_at", `${through}T23:59:59Z`)
+    .order("start_at", { ascending: true });
+
+  if (error) return [];
+  return (data ?? []) as BarnEvent[];
+}
+
 export function partitionEvents(events: BarnEvent[]): {
   upcoming: BarnEvent[];
   past: BarnEvent[];

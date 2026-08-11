@@ -76,6 +76,7 @@ async function removeDemoData() {
   await del("tasks", "title");
   await del("task_templates", "title");
   await del("announcements", "title");
+  await del("events", "title");
   // care_events, feed_plans and training_logs cascade from horses;
   // submissions from templates.
   await del("form_templates", "name");
@@ -342,13 +343,17 @@ async function main() {
   console.log(`  horse_riders  ${assigned} assignments`);
 
   // --- care events, some overdue so the due-soon screen has teeth ------------
+  // Due dates are spread across the CALENDAR WINDOW (this month and the next
+  // few) rather than a year out, so the grid has something on it. Two are
+  // deliberately overdue — the due-soon screen needs teeth, and an overdue
+  // Coggins is exactly what a barn wants to see on a calendar.
   const CARE = [
-    { type: "vaccine", description: "Spring 5-way", performed: -120, due: 245 },
-    { type: "coggins", description: "Annual Coggins", performed: -200, due: 165 },
     { type: "farrier", description: "Reset, front shoes", performed: -38, due: -4 },
     { type: "deworm", description: "Ivermectin", performed: -95, due: -12 },
-    { type: "dental", description: "Float", performed: -300, due: 65 },
-    { type: "vet", description: "Lameness recheck — sound", performed: -21, due: null },
+    { type: "vaccine", description: "Spring 5-way booster", performed: -160, due: 6 },
+    { type: "coggins", description: "Annual Coggins", performed: -320, due: 13 },
+    { type: "dental", description: "Float", performed: -300, due: 21 },
+    { type: "vet", description: "Lameness recheck", performed: -21, due: 34 },
   ];
 
   let careCount = 0;
@@ -583,6 +588,52 @@ async function main() {
   }
   console.log(`  announcements ${ANNOUNCEMENTS.length}`);
 
+  // --- barn events -----------------------------------------------------------
+  // Spread across the calendar window so the month grid is populated. Times are
+  // barn-local wall clock converted to an instant, the same way the app does it.
+  // Titles must be UNIQUE: the dedupe below is by title, so two events called
+  // the same thing silently collapse into one.
+  const EVENTS = [
+    { type: "farrier", title: "Farrier day — front shoes", days: 3, hour: 8, location: "Main barn", visibility: "all" },
+    { type: "clinic", title: "Dressage clinic — Anne Fielding", days: 9, hour: 9, location: "Outdoor arena", visibility: "all" },
+    { type: "vet", title: "Spring shots and Coggins pulls", days: 14, hour: 10, location: "Main barn", visibility: "all" },
+    { type: "show", title: "Schooling show at Tryon", days: 19, hour: 7, location: "Tryon International", visibility: "all" },
+    { type: "closure", title: "Barn closed — staff training", days: 24, hour: 0, location: "", visibility: "all" },
+    { type: "other", title: "Tack room deep clean", days: 27, hour: 13, location: "Tack room", visibility: "staff" },
+    { type: "farrier", title: "Farrier day — full set", days: 31, hour: 8, location: "Main barn", visibility: "all" },
+    { type: "clinic", title: "Jumping clinic — grids", days: 38, hour: 9, location: "Outdoor arena", visibility: "all" },
+  ];
+
+  let eventCount = 0;
+  for (const e of EVENTS) {
+    const title = `${DEMO_TAG} ${e.title}`;
+    const { data: existing } = await supabase
+      .from("events")
+      .select("id")
+      .eq("title", title)
+      .maybeSingle();
+    if (existing) continue;
+
+    // isoDate() gives the barn-local day; the hour is appended and the whole
+    // thing read as an instant. Good enough for demo data — the app's own
+    // barnLocalToUtc() is the real conversion for anything user-entered.
+    const day = isoDate(e.days);
+    const startAt = new Date(`${day}T${String(e.hour).padStart(2, "0")}:00:00-04:00`).toISOString();
+    const endAt = new Date(new Date(startAt).getTime() + 2 * 3600 * 1000).toISOString();
+
+    const { error } = await supabase.from("events").insert({
+      type: e.type,
+      title,
+      description: "",
+      start_at: startAt,
+      end_at: e.hour === 0 ? null : endAt,
+      location: e.location,
+      visibility: e.visibility,
+    });
+    if (!error) eventCount++;
+  }
+  console.log(`  events        ${eventCount}`);
+
   // --- tasks -----------------------------------------------------------------
   const TASK_TEMPLATES = [
     { title: `${DEMO_TAG} Morning feed`, recurrence: "daily", weekday: null },
@@ -638,7 +689,7 @@ async function main() {
   console.log(`  tasks         ${demoTemplates?.length ?? 0} templates, today's generated (${doneCount} done)`);
 
   // --- lessons ---------------------------------------------------------------
-  // Two weeks of instances, tagged in `notes` so teardown can find them.
+  // Six weeks of instances, tagged in `notes` so teardown can find them.
   const SLOTS = [
     { weekday: 1, start: "16:00:00", type: "private", seats: 1, level: "Training" },
     { weekday: 2, start: "17:00:00", type: "group", seats: 4, level: "Intro" },
@@ -647,7 +698,8 @@ async function main() {
   ];
 
   const instanceIds = [];
-  for (let offset = 0; offset < 14; offset++) {
+  // 45 days, so the month grid and the next month both have lessons on them.
+  for (let offset = 0; offset < 45; offset++) {
     const date = isoDate(offset);
     const isoDow = ((new Date(`${date}T12:00:00Z`).getUTCDay() + 6) % 7) + 1;
     for (const slot of SLOTS) {

@@ -89,6 +89,44 @@ export async function careDueSoon(): Promise<DueSoonEntry[]> {
   return out;
 }
 
+/**
+ * Care falling due inside an arbitrary window, for the calendar.
+ *
+ * careDueSoon() is fixed to the next 30 days from today, which is right for
+ * the barn's standing due list and wrong for a calendar someone can page
+ * backwards through. Same two-query shape and the same reason: an embed
+ * returns a null horse for any row whose horse the caller cannot read, and a
+ * due item with no horse name is worse than no due item.
+ *
+ * Unfiltered by role — RLS returns a parent only their own horses' items.
+ */
+export async function careDueBetween(from: string, through: string): Promise<DueSoonEntry[]> {
+  if (!supabaseConfigured()) return [];
+
+  const supabase = await createClient();
+  const { data: events, error } = await supabase
+    .from("care_events")
+    .select("*")
+    .not("due_next", "is", null)
+    .gte("due_next", from)
+    .lte("due_next", through)
+    .order("due_next", { ascending: true });
+
+  if (error || !events?.length) return [];
+
+  const horseIds = [...new Set(events.map((e) => e.horse_id as string))];
+  const { data: horses } = await supabase.from("horses").select("*").in("id", horseIds);
+  const byId = new Map((horses ?? []).map((h) => [h.id as string, h as Horse]));
+
+  const out: DueSoonEntry[] = [];
+  for (const event of events as CareEvent[]) {
+    const horse = byId.get(event.horse_id);
+    if (!horse) continue;
+    out.push({ event, horse });
+  }
+  return out;
+}
+
 /** Upcoming due items for ONE horse — the parent-facing "what's coming up". */
 export function upcoming(events: CareEvent[]): CareEvent[] {
   const today = barnToday();

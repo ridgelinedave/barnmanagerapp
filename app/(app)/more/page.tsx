@@ -95,6 +95,20 @@ export default async function MorePage() {
         </Card>
       )}
 
+      {/* The calendar is for everyone and is not a tab — the bottom nav is
+          capped at five and staff and admin are both full. It leads this
+          section because "what is on this week" is the commonest reason
+          anyone opens More. */}
+      <section className="flex flex-col gap-3">
+        <SectionHeader title="The month" />
+        <Row
+          href="/calendar"
+          title="Calendar"
+          meta="Lessons, barn events and care due"
+          icon="calendar"
+        />
+      </section>
+
       {hasLinks && (
         <section className="flex flex-col gap-3">
           <SectionHeader title="Your things" />
