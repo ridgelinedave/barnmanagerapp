@@ -4684,11 +4684,31 @@ async function main() {
       );
 
       if (parent2) {
-        const { ids: otherFamily } = await visibleIds(parent2, "training_logs");
+        // NOT "parent2 sees zero rows". The fixture's `ridden` horse is OWNED
+        // BY THE CONTROL FAMILY — that is how it is a horse the test family's
+        // rider rides without owning — so parent2 reading a log on it is the
+        // policy working, not failing. The real question is whether they can
+        // reach the horse that belongs to the OTHER family.
+        const { data: otherFamily } = await parent2
+          .from("training_logs")
+          .select("id")
+          .eq("horse_id", owned);
         check(
-          "another family sees none of this family's horse's training",
-          otherFamily.length === 0,
-          `saw ${otherFamily.length}`,
+          "another family sees NONE of this family's OWN horse's training",
+          (otherFamily?.length ?? 0) === 0,
+          `saw ${otherFamily?.length}`,
+        );
+
+        // Control, so the deny above cannot pass by parent2 simply seeing
+        // nothing at all: they must still read their own horse's training.
+        const { data: ownHorse } = await parent2
+          .from("training_logs")
+          .select("id")
+          .eq("horse_id", ridden);
+        check(
+          "control: that family DOES read the training on the horse they own",
+          (ownHorse?.length ?? 0) > 0,
+          `saw ${ownHorse?.length}`,
         );
       }
 

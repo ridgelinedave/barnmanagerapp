@@ -73,6 +73,8 @@ const EXPECTED_TABLES = [
   "ical_tokens",
   // Phase 2 provisioning slice — invites.
   "invites",
+  // Phase 2 — training history.
+  "training_logs",
 ];
 
 /**
@@ -88,8 +90,9 @@ const EXPECTED_TABLES = [
  * just noise.
  */
 const PENDING_TABLES = {
-  // Phase 2 — migration 0020 (training_logs), awaiting David's audit.
-  training_logs: "migration 0020 (training_logs) has not been applied yet",
+  // Empty: 0020 was audited and applied on 2026-07-31, so `training_logs`
+  // moved up into EXPECTED_TABLES and is now checked as strictly as any other.
+  // Keep the mechanism — the next audited-pending migration needs it.
 };
 const EXPECTED_FUNCTIONS = [
   "current_role",
