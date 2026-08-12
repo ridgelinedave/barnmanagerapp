@@ -400,8 +400,22 @@ export type TrainingLog = {
   logged_by: string | null;
 };
 
-export const FORM_FIELD_TYPES = ["text", "textarea", "checkbox", "date"] as const;
+export const FORM_FIELD_TYPES = [
+  "text",
+  "textarea",
+  "date",
+  "checkbox",
+  "signature",
+] as const;
 export type FormFieldType = (typeof FORM_FIELD_TYPES)[number];
+
+export const FORM_FIELD_TYPE_LABELS: Record<FormFieldType, string> = {
+  text: "Short text",
+  textarea: "Long text",
+  date: "Date",
+  checkbox: "Tick box",
+  signature: "Signature",
+};
 
 export type FormField = {
   key: string;

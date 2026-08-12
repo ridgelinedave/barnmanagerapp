@@ -30,6 +30,22 @@ function SchemaField({
     );
   }
 
+  // A `signature` field is a MARKER, not a second signature box.
+  //
+  // The submission carries exactly one signature — signed_name / signed_at,
+  // set by the guarded sign action at the bottom of this form. Rendering an
+  // input here would give a family two places to type their name and the barn
+  // two answers to "who signed", one of which no policy protects. So it points
+  // at the real one instead.
+  if (field.type === "signature") {
+    return (
+      <div className="rounded-control border border-dashed border-line px-3 py-2.5">
+        <p className="text-label font-medium text-ink">{field.label}</p>
+        <p className="mt-0.5 text-caption text-muted">You sign at the bottom of this form.</p>
+      </div>
+    );
+  }
+
   if (field.type === "textarea") {
     return (
       <Field label={field.label} htmlFor={id} optional={!field.required}>

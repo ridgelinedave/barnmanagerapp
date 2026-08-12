@@ -134,3 +134,82 @@ export async function familyProgress(): Promise<FamilyProgress[]> {
     // Families who owe something first — that is the whole point of the screen.
     .sort((a, b) => b.pending - a.pending || a.familyName.localeCompare(b.familyName));
 }
+
+/** Per-template completion, for the "6 of 9 families signed" line. */
+export type TemplateProgress = {
+  template: FormTemplate;
+  issued: number;
+  complete: number;
+};
+
+/**
+ * How far along each template is.
+ *
+ * Counts ISSUED submissions, not families — a rider-scoped template can have
+ * several rows per family, and saying "6 of 9 families" when it is really nine
+ * riders would be wrong in the one direction that matters (it would look more
+ * done than it is). The label the screen renders says what is being counted.
+ */
+export async function templateProgress(): Promise<TemplateProgress[]> {
+  if (!supabaseConfigured()) return [];
+
+  const supabase = await createClient();
+  const [templates, { data: submissions }] = await Promise.all([
+    listAllTemplates(),
+    supabase.from("form_submissions").select("template_id, status"),
+  ]);
+
+  const counts = new Map<string, { issued: number; complete: number }>();
+  for (const row of submissions ?? []) {
+    const key = row.template_id as string;
+    const entry = counts.get(key) ?? { issued: 0, complete: 0 };
+    entry.issued += 1;
+    if (row.status === "complete") entry.complete += 1;
+    counts.set(key, entry);
+  }
+
+  return templates.map((template) => ({
+    template,
+    ...(counts.get(template.id) ?? { issued: 0, complete: 0 }),
+  }));
+}
+
+/** One outstanding form, with enough context to act on it. */
+export type SubmissionRow = {
+  submission: FormSubmission;
+  templateName: string;
+  familyName: string;
+  riderName: string | null;
+};
+
+/**
+ * Every submission with its template, family and rider names resolved.
+ *
+ * Three reads and a join in memory rather than a nested PostgREST select: the
+ * embedded form applies the parent table's policy to the child rows in a way
+ * that is easy to misread, and an outstanding form showing a blank family name
+ * is worse than none at all. The barn has tens of families, not thousands.
+ */
+export async function submissionRows(): Promise<SubmissionRow[]> {
+  if (!supabaseConfigured()) return [];
+
+  const supabase = await createClient();
+  const [{ data: submissions }, templates, { data: families }, { data: riders }] =
+    await Promise.all([
+      supabase.from("form_submissions").select("*").order("created_at", { ascending: false }),
+      listAllTemplates(),
+      supabase.from("families").select("id, name"),
+      supabase.from("riders").select("id, name"),
+    ]);
+
+  const templateName = new Map(templates.map((t) => [t.id, t.name]));
+  const familyName = new Map((families ?? []).map((f) => [f.id as string, f.name as string]));
+  const riderName = new Map((riders ?? []).map((r) => [r.id as string, r.name as string]));
+
+  return ((submissions ?? []) as FormSubmission[]).map((submission) => ({
+    submission,
+    templateName: templateName.get(submission.template_id) ?? "Form",
+    familyName: familyName.get(submission.family_id) ?? "Unknown family",
+    riderName: submission.rider_id ? (riderName.get(submission.rider_id) ?? null) : null,
+  }));
+}

@@ -1,7 +1,7 @@
 import { TabPage } from "@/components/TabPage";
 import { StubScreen } from "@/components/StubScreen";
-import { Chip, ChipRow, EmptyState } from "@/components/ui/primitives";
-import { ListRow } from "@/components/ui/ListRow";
+import { Card, Chip, EmptyState, SectionHeader } from "@/components/ui/primitives";
+import { ButtonLink } from "@/components/ui/Button";
 import { currentRole } from "@/lib/guard";
 import { listActiveTemplates, listSubmissions, onboardingOutstanding } from "@/lib/forms";
 import { featureEnabled } from "@/config/barn";
@@ -36,45 +36,76 @@ export default async function FormsPage() {
   }
 
   const [submissions, templates] = await Promise.all([listSubmissions(), listActiveTemplates()]);
-  const templateName = new Map(templates.map((t) => [t.id, t.name]));
+  const byId = new Map(templates.map((t) => [t.id, t]));
   const outstanding = onboardingOutstanding(submissions);
+  const done = submissions.filter((s) => s.status === "complete");
 
-  return (
-    <TabPage title="Forms" back="/more">
-      {submissions.length === 0 ? (
+  if (submissions.length === 0) {
+    return (
+      <TabPage title="Forms" back="/more">
         <EmptyState
           title="Nothing to fill in"
           body="Anything the barn needs signed appears here."
         />
-      ) : (
-        <>
-          <p className="text-caption text-muted">
-            {outstanding.length === 0
-              ? "Everything is signed and on file. Thank you."
-              : `${outstanding.length} still to complete.`}
-          </p>
+      </TabPage>
+    );
+  }
 
-          {submissions.map((submission) => {
-            const done = submission.status === "complete";
+  return (
+    <TabPage title="Forms" back="/more">
+      {/* To sign leads, and each is a card with ONE action. A family opening
+          this screen wants to know what is left, not to read a list of
+          everything they have ever signed. */}
+      <section className="flex flex-col gap-3">
+        <SectionHeader
+          title="To sign"
+          count={outstanding.length === 0 ? "All done" : `${outstanding.length}`}
+        />
+
+        {outstanding.length === 0 ? (
+          <EmptyState
+            title="Everything is signed"
+            body="Your paperwork is on file with the barn."
+          />
+        ) : (
+          outstanding.map((submission) => {
+            const template = byId.get(submission.template_id);
             return (
-              <ListRow
-                key={submission.id}
-                href={`/more/forms/${submission.id}`}
-                title={templateName.get(submission.template_id) ?? "Form"}
-                muted={done}
-                chips={
-                  <ChipRow>
-                    {done ? (
-                      <Chip value={`Signed by ${submission.signed_name}`} icon="check" tone="forest" />
-                    ) : (
-                      <Chip value="Not started" icon="alert" tone="gold" />
-                    )}
-                  </ChipRow>
-                }
-              />
+              <Card key={submission.id} className="flex flex-col gap-3 p-4">
+                <div>
+                  <h3 className="font-display text-heading leading-snug text-ink">
+                    {template?.name ?? "Form"}
+                  </h3>
+                  {template?.description && (
+                    <p className="mt-1 text-caption text-muted">{template.description}</p>
+                  )}
+                </div>
+                <ButtonLink href={`/more/forms/${submission.id}`} variant="primary" block>
+                  Open
+                </ButtonLink>
+              </Card>
             );
-          })}
-        </>
+          })
+        )}
+      </section>
+
+      {done.length > 0 && (
+        <section className="flex flex-col gap-3">
+          <SectionHeader title="Signed" count={`${done.length}`} />
+          {done.map((submission) => (
+            <Card key={submission.id} className="flex items-baseline gap-3 p-4">
+              <span className="min-w-0 flex-1">
+                <span className="block font-display text-heading leading-snug text-muted">
+                  {byId.get(submission.template_id)?.name ?? "Form"}
+                </span>
+                <span className="mt-0.5 block text-caption text-muted">
+                  Signed by {submission.signed_name}
+                </span>
+              </span>
+              <Chip value="On file" icon="check" tone="forest" />
+            </Card>
+          ))}
+        </section>
       )}
     </TabPage>
   );
