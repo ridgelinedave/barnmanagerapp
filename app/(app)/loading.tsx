@@ -1,13 +1,12 @@
-import { LaunchScreen } from "@/components/LaunchScreen";
+import { AppLoading } from "@/components/AppLoading";
 
 /**
- * Shown while the shell resolves who is looking — which means a session lookup
- * and a profile read before the first tab can render.
+ * The (app) segment's Suspense fallback.
  *
- * Using the branded launch screen here means an installed PWA carries the same
- * dark field from the iOS splash straight through to the app, instead of the
- * splash handing over to a blank white frame.
+ * Deliberately thin: WHICH wait this is — a cold start or a tab switch — can
+ * only be answered in the browser, so the decision lives in the client
+ * component. See components/AppLoading.tsx.
  */
-export default function AppLoading() {
-  return <LaunchScreen />;
+export default function AppLoadingBoundary() {
+  return <AppLoading />;
 }

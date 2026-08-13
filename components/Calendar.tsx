@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { EmptyState } from "@/components/ui/primitives";
 import { formatTime } from "@/lib/dates";
@@ -21,8 +21,15 @@ import type { CalendarItem, CalendarKind } from "@/lib/calendar";
  * All the data for the whole window arrives once from the server, so paging
  * months and tapping days is instant and never refetches. The arrows stop at
  * the edges of that window rather than paging into a silently empty month.
+ *
+ * WHICH VIEW IS SHOWING IS NOT THIS COMPONENT'S DECISION any more. Month, day
+ * and agenda are three views of one screen — the Schedule tab — and the day
+ * view is server-rendered because it carries the lesson controls. So the view
+ * lives in the URL and the switcher lives on the page; this component renders
+ * the one it is handed. It used to own a month/agenda toggle and remember it in
+ * a cookie, which would now be a second switcher fighting the first.
  */
-type View = "month" | "list";
+export type CalendarView = "month" | "list";
 
 const KIND_ICON: Record<CalendarKind, IconName> = {
   lesson: "calendar",
@@ -106,17 +113,16 @@ function DayAgenda({ date, items, today }: { date: string; items: CalendarItem[]
 export function Calendar({
   items,
   today,
-  initialView,
+  view,
   windowFrom,
   windowThrough,
 }: {
   items: CalendarItem[];
   today: string;
-  initialView: View;
+  view: CalendarView;
   windowFrom: string;
   windowThrough: string;
 }) {
-  const [view, setView] = useState<View>(initialView);
   const [month, setMonth] = useState(() => startOfMonth(today));
   const [selected, setSelected] = useState<string | null>(today);
 
@@ -131,16 +137,6 @@ export function Calendar({
   }, [items]);
 
   const grid = useMemo(() => monthGrid(month), [month]);
-
-  // Remembered across visits. A cookie rather than localStorage so the SERVER
-  // can read it and render the right view first time — localStorage would
-  // paint the month grid and then swap, which is a flash on every open.
-  //
-  // Written from an effect rather than the click handler: `document.cookie` is
-  // a global mutation, and the React compiler is right to refuse it inline.
-  useEffect(() => {
-    document.cookie = `calendar_view=${view}; path=/; max-age=31536000; samesite=lax`;
-  }, [view]);
 
   const canPrev = startOfMonth(addMonths(month, -1)) >= startOfMonth(windowFrom);
   const canNext = startOfMonth(addMonths(month, 1)) <= startOfMonth(windowThrough);
@@ -161,29 +157,6 @@ export function Calendar({
 
   return (
     <>
-      {/* --- view toggle: a segmented control, one accent fill ------------- */}
-      <div role="tablist" aria-label="Calendar view" className="flex gap-1 rounded-control bg-sunk p-1">
-        {(
-          [
-            ["month", "Month"],
-            ["list", "Agenda"],
-          ] as const
-        ).map(([value, label]) => (
-          <button
-            key={value}
-            role="tab"
-            type="button"
-            aria-selected={view === value}
-            onClick={() => setView(value)}
-            className={`min-h-11 flex-1 rounded-[0.25rem] font-display text-label font-bold uppercase tracking-[0.08em] transition-colors duration-150 ${
-              view === value ? "bg-accent text-accent-on" : "text-muted"
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
       {view === "month" ? (
         <>
           <div className="flex items-center gap-2">

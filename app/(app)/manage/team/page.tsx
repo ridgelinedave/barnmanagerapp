@@ -286,23 +286,37 @@ export default async function ManageTeamPage() {
             body="Intro, Training, First. Levels decide who gets offered a seat."
           />
         ) : (
+          /*
+           * NAME ON ITS OWN LINE, CONTROLS UNDER IT.
+           *
+           * These were one row: name, Rename, two nudge arrows. `SheetTrigger`
+           * renders a `w-full` button, so in a flex row it claimed the whole
+           * line and the arrows took a fixed 92px — which left the name a
+           * sliver, and "Intermediate Dressage" arrived clipped to about four
+           * characters at 390px and worse at 320px. Truncating the one piece of
+           * data on the row to make room for two chrome controls is backwards.
+           */
           <ul className="flex flex-col gap-2">
             {levels.map((level, index) => (
               <li
                 key={level.id}
-                className="flex items-center gap-2 rounded-card border border-line bg-surface p-3"
+                className="flex flex-col gap-2.5 rounded-card border border-line bg-surface p-3"
               >
-                <span className="min-w-0 flex-1 font-display text-heading leading-snug text-ink">
+                <span className="font-display text-heading leading-snug text-ink">
                   {level.name}
                 </span>
-                <SheetTrigger label="Rename" title={level.name}>
-                  <LevelForm level={level} />
-                </SheetTrigger>
-                <LevelOrder
-                  level={level}
-                  isFirst={index === 0}
-                  isLast={index === levels.length - 1}
-                />
+                <div className="flex items-center gap-2">
+                  <div className="min-w-0 flex-1">
+                    <SheetTrigger label="Rename" title={level.name}>
+                      <LevelForm level={level} />
+                    </SheetTrigger>
+                  </div>
+                  <LevelOrder
+                    level={level}
+                    isFirst={index === 0}
+                    isLast={index === levels.length - 1}
+                  />
+                </div>
               </li>
             ))}
           </ul>
@@ -313,12 +327,12 @@ export default async function ManageTeamPage() {
         </SheetTrigger>
       </section>
 
-      {/* Derived from each rider's date of birth, never stored. The bands are
-          Belle's, confirmed — this is a statement of fact now, not a query. */}
-      <p className="text-caption text-muted">
-        Age groups come from each rider&apos;s date of birth, so they never go out of date:{" "}
-        {barn.riderAgeGroups.map((group) => group.label).join(" · ")}.
-      </p>
+      {/* The age-group explainer that used to close this screen is gone. It
+          listed the six bands and explained that they are derived from date of
+          birth — true, and nobody needed telling twice: the rider form already
+          says the date of birth sets the age group, and each rider card shows
+          the band it produced. A paragraph of documentation at the foot of a
+          working screen is the chatter the design master exists to remove. */}
     </TabPage>
   );
 }

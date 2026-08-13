@@ -1,54 +1,21 @@
-import { Suspense } from "react";
-import { cookies } from "next/headers";
-import { TabPage } from "@/components/TabPage";
-import { Calendar } from "@/components/Calendar";
-import { SkeletonSection } from "@/components/ui/Skeleton";
-import { requireTab } from "@/lib/guard";
-import { barnToday } from "@/lib/dates";
-import { calendarWindow, loadCalendar } from "@/lib/calendar";
-
-export const metadata = { title: "Calendar" };
+import { redirect } from "next/navigation";
 
 /**
- * The barn calendar — lessons, events and care due, in one place.
+ * /calendar is now /schedule.
  *
- * Reachable by every signed-in role (lib/nav.ts SHARED_PATHS) and scoped
- * entirely by RLS: a parent sees their family's lessons, the events marked
- * visible to everyone, and care due on horses they own; staff and admin see
- * the barn's whole month. Nothing on this screen filters by role, deliberately.
+ * The barn calendar and the lesson schedule were two screens over the same
+ * hours, reachable from two different places, and neither could tell you it
+ * was the complete picture. The Schedule tab is the one time surface now, with
+ * Day, Month and Agenda views (see app/(app)/schedule/page.tsx).
  *
- * No new SQL. Three existing reads and a group-by.
+ * This route stays as a redirect rather than being deleted: it has been in the
+ * Manage index and the More list for months, so it is in browser histories, in
+ * home-screen shortcuts, and quite possibly in a text message from Belle.
+ * Landing on the month view is exactly what those links meant.
+ *
+ * No guard needed — the (app) layout has already established there is a signed
+ * in viewer with a profile, and /schedule does its own role check.
  */
-async function CalendarBody({ initialView }: { initialView: "month" | "list" }) {
-  const today = barnToday();
-  const { from, through } = calendarWindow(today);
-  const items = await loadCalendar(today);
-
-  return (
-    <Calendar
-      items={items}
-      today={today}
-      initialView={initialView}
-      windowFrom={from}
-      windowThrough={through}
-    />
-  );
-}
-
-export default async function CalendarPage() {
-  await requireTab("/calendar");
-
-  // Read on the SERVER so the remembered view renders first time. Doing this
-  // from localStorage in the client would paint the month grid and then swap
-  // to the agenda — a flash on every open for anyone who prefers the list.
-  const store = await cookies();
-  const initialView = store.get("calendar_view")?.value === "list" ? "list" : "month";
-
-  return (
-    <TabPage title="Calendar">
-      <Suspense fallback={<SkeletonSection rows={4} label="Loading the calendar" />}>
-        <CalendarBody initialView={initialView} />
-      </Suspense>
-    </TabPage>
-  );
+export default function CalendarPage() {
+  redirect("/schedule?view=month");
 }

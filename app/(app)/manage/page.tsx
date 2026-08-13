@@ -27,12 +27,19 @@ type Entry = {
   icon: IconName;
 };
 
+/*
+ * No Calendar row any more. It pointed at a second screen showing the same
+ * hours as the Schedule tab, one tap away in the bottom nav; the month and
+ * agenda views live on Schedule now, so a row here would be an index entry for
+ * a tab.
+ */
 const TODAY: Entry[] = [
   {
-    href: "/calendar",
-    title: "Calendar",
-    meta: "Lessons, events and care due — the whole month",
-    icon: "calendar",
+    flag: "clockIn",
+    href: "/manage/timesheets",
+    title: "Clock-ins & timesheets",
+    meta: "Who's on the clock right now, hours, corrections and export",
+    icon: "clock",
   },
   {
     flag: "tasks",
@@ -72,13 +79,6 @@ const RECORDS: Entry[] = [
     meta: "Vaccines, Coggins, worming and farrier dates coming up",
     icon: "alert",
   },
-  {
-    flag: "clockIn",
-    href: "/manage/timesheets",
-    title: "Timesheets",
-    meta: "Review hours, add corrections, approve and export",
-    icon: "clock",
-  },
 ];
 
 const FAMILIES: Entry[] = [
@@ -115,9 +115,9 @@ const FAMILIES: Entry[] = [
 const TEAM: Entry[] = [
   {
     href: "/manage/team",
-    title: "Team",
-    meta: "People, invites, roles, families",
-    icon: "grid",
+    title: "Team & access",
+    meta: "Invite someone, set roles and permissions, families and riders",
+    icon: "people",
   },
 ];
 

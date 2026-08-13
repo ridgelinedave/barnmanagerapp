@@ -11,8 +11,14 @@ import { Icon, type IconName } from "@/components/ui/Icon";
  * a list feel native rather than web.
  *
  * `Avatar` takes the horse's photo where there is one and falls back to its
- * initial on gold. A real photo is worth more than any icon on a screen full
- * of animals people know by sight.
+ * initial on the accent. A real photo is worth more than any icon on a screen
+ * full of animals people know by sight.
+ *
+ * THE INITIAL IS `accent-on`, NOT `ink`. It was ink, left over from the gold
+ * skin where the accent fill carried dark text at 9.26:1. On Belle's oxblood
+ * fill (#6E1A3D) ink measures 1.19:1 — a letter you cannot see. `accent-on` is
+ * the token that exists precisely so a component does not have to know which
+ * skin it is rendering: white here at 11.18:1, ink on a gold barn.
  */
 export function Avatar({
   name,
@@ -42,7 +48,7 @@ export function Avatar({
   return (
     <span
       aria-hidden="true"
-      className={`${sizes[size]} ${text[size]} flex shrink-0 items-center justify-center rounded-full bg-accent font-display font-bold text-ink`}
+      className={`${sizes[size]} ${text[size]} flex shrink-0 items-center justify-center rounded-full bg-accent font-display font-bold text-accent-on`}
     >
       {name.trim().charAt(0).toUpperCase()}
     </span>

@@ -1,7 +1,7 @@
 import { TabPage } from "@/components/TabPage";
 import { StubScreen } from "@/components/StubScreen";
 import { InstallPrompt } from "@/components/InstallPrompt";
-import { AnnouncementCard } from "@/components/AnnouncementCard";
+import { AnnouncementFeed } from "@/components/AnnouncementFeed";
 import { BackfillOfferCard } from "@/components/BackfillOfferCard";
 import { Board, Chip, ChipRow, EmptyState, SectionHeader } from "@/components/ui/primitives";
 import { currentRole } from "@/lib/guard";
@@ -147,9 +147,7 @@ export default async function HomePage() {
                   body="Barn news lands here."
                 />
               ) : (
-                announcements.map((announcement) => (
-                  <AnnouncementCard key={announcement.id} announcement={announcement} />
-                ))
+                <AnnouncementFeed announcements={announcements} />
               )}
             </section>
           )}
@@ -174,13 +172,7 @@ export default async function HomePage() {
                   }
                 />
               ) : (
-                announcements.map((announcement) => (
-                  <AnnouncementCard
-                    key={announcement.id}
-                    announcement={announcement}
-                    showAudience
-                  />
-                ))
+                <AnnouncementFeed announcements={announcements} showAudience />
               )}
             </section>
           )}

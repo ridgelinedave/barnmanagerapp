@@ -169,15 +169,21 @@ export function FillSlotForm({
   );
 }
 
-/** Queue tomorrow's reminders. Idempotent in the database. */
-export function SendRemindersButton({ date }: { date: string }) {
+/**
+ * Queue the day's lesson reminders. Idempotent in the database.
+ *
+ * Lives in the Schedule tab's admin overflow, so the label names the day it
+ * will act on rather than relying on "this day" meaning whatever the screen
+ * happened to be showing when the sheet was opened.
+ */
+export function SendRemindersButton({ date, dayLabel }: { date: string; dayLabel: string }) {
   const [state, formAction, pending] = useActionState(sendLessonReminders, EMPTY);
 
   return (
     <form action={formAction} className="flex flex-col gap-2">
       <input type="hidden" name="date" value={date} />
-      <Button type="submit" variant="secondary" block disabled={pending} icon="bell">
-        {pending ? "Sending…" : "Send reminders for this day"}
+      <Button type="submit" size="menu" block disabled={pending} icon="bell">
+        {pending ? "Sending reminders…" : `Send lesson reminders for ${dayLabel}`}
       </Button>
       <Feedback state={state} />
     </form>

@@ -42,14 +42,35 @@ const VARIANTS: Record<Variant, string> = {
 };
 
 const BASE =
-  "inline-flex min-h-12 items-center justify-center gap-2 rounded-control border px-5 " +
-  "font-display text-[1.0625rem] font-bold uppercase tracking-[0.11em] leading-none " +
+  "inline-flex items-center gap-2 rounded-control border " +
   "transition-[transform,background-color,box-shadow] duration-100 ease-out " +
   "disabled:pointer-events-none disabled:opacity-50";
+
+/**
+ * Two sizes, because a menu row is not a button that happens to be wide.
+ *
+ * `default` is the signage treatment described above — condensed, uppercase,
+ * tracked, centred. It is right for "CANCEL THIS LESSON" and wrong for a plain
+ * sentence: an uppercase tracked label of eight words wraps into a shouted
+ * paragraph, which is exactly what the old cryptic controls did.
+ *
+ * `menu` is what a quiet overflow sheet is built from — sentence case, left
+ * aligned, in the reading face, so a long plain label ("Generate lessons from
+ * the weekly schedule") reads as an option rather than a billboard.
+ */
+type Size = "default" | "menu";
+
+const SIZES: Record<Size, string> = {
+  default:
+    "min-h-12 justify-center px-5 " +
+    "font-display text-[1.0625rem] font-bold uppercase tracking-[0.11em] leading-none",
+  menu: "min-h-14 justify-start px-4 py-2.5 text-left text-body font-semibold leading-snug",
+};
 
 export function Button({
   children,
   variant = "secondary",
+  size = "default",
   icon,
   /** Trailing arrow. On by default for primary — the tap goes somewhere. */
   arrow,
@@ -59,20 +80,21 @@ export function Button({
 }: {
   children: ReactNode;
   variant?: Variant;
+  size?: Size;
   icon?: IconName;
   arrow?: boolean;
   block?: boolean;
   className?: string;
 } & ButtonHTMLAttributes<HTMLButtonElement>) {
-  const showArrow = arrow ?? variant === "primary";
+  const showArrow = arrow ?? (size === "default" && variant === "primary");
 
   return (
     <button
-      className={`${BASE} ${VARIANTS[variant]} ${block ? "w-full" : ""} ${className}`}
+      className={`${BASE} ${SIZES[size]} ${VARIANTS[variant]} ${block ? "w-full" : ""} ${className}`}
       {...rest}
     >
       {icon && <Icon name={icon} className="size-4.5 shrink-0" strokeWidth={2} />}
-      {children}
+      {size === "menu" ? <span className="min-w-0 flex-1">{children}</span> : children}
       {showArrow && <Icon name="arrow" className="size-4 shrink-0" strokeWidth={2} />}
     </button>
   );
@@ -83,6 +105,7 @@ export function ButtonLink({
   children,
   href,
   variant = "secondary",
+  size = "default",
   icon,
   arrow,
   block = false,
@@ -91,20 +114,21 @@ export function ButtonLink({
   children: ReactNode;
   href: string;
   variant?: Variant;
+  size?: Size;
   icon?: IconName;
   arrow?: boolean;
   block?: boolean;
   className?: string;
 }) {
-  const showArrow = arrow ?? variant === "primary";
+  const showArrow = arrow ?? (size === "default" && variant === "primary");
 
   return (
     <Link
       href={href}
-      className={`${BASE} ${VARIANTS[variant]} ${block ? "w-full" : ""} ${className}`}
+      className={`${BASE} ${SIZES[size]} ${VARIANTS[variant]} ${block ? "w-full" : ""} ${className}`}
     >
       {icon && <Icon name={icon} className="size-4.5 shrink-0" strokeWidth={2} />}
-      {children}
+      {size === "menu" ? <span className="min-w-0 flex-1">{children}</span> : children}
       {showArrow && <Icon name="arrow" className="size-4 shrink-0" strokeWidth={2} />}
     </Link>
   );

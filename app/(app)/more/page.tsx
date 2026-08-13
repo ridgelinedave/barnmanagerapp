@@ -1,6 +1,5 @@
 import { headers } from "next/headers";
 import { TabPage } from "@/components/TabPage";
-import { StubScreen } from "@/components/StubScreen";
 import { PoweredByMonarch } from "@/components/Wordmark";
 import { InstallPrompt } from "@/components/InstallPrompt";
 import { CalendarSubscribe } from "@/components/CalendarSubscribe";
@@ -11,9 +10,24 @@ import { Icon, type IconName } from "@/components/ui/Icon";
 import { currentRole } from "@/lib/guard";
 import { getViewer } from "@/lib/session";
 import { myCalendarToken } from "@/lib/events";
+import { TABS_BY_ROLE } from "@/lib/nav";
 import { barn, featureEnabled } from "@/config/barn";
 
-export const metadata = { title: "More" };
+export const metadata = { title: "Settings" };
+
+/**
+ * SETTINGS — the far-right tab.
+ *
+ * The tab is still labelled "More" in the bottom bar, deliberately: five fixed
+ * labels are what people navigate by and renaming one moves the furniture. The
+ * SCREEN is a settings hub, because "More" described where it sat rather than
+ * what it held, and an admin looking for the place to invite an instructor had
+ * no reason to open a drawer called More.
+ *
+ * The order is who-you-are, then what-you-run, then your things, then the app.
+ * "Team & access" leads the admin block by name — that phrase is what someone
+ * is scanning for when a new instructor starts.
+ */
 
 /**
  * The absolute base URL, taken from the request.
@@ -29,12 +43,6 @@ async function baseUrl(): Promise<string> {
     headerList.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
   return `${protocol}://${host}`;
 }
-
-const STILL_TO_COME = {
-  parent: "Family profile and riders, FAQ, resources and notification preferences",
-  staff: "The FAQ and your notification preferences",
-  admin: "Barn settings, QuickBooks connection and CSV utilities",
-} as const;
 
 function Row({ href, title, meta, icon }: { href: string; title: string; meta: string; icon: IconName }) {
   return (
@@ -69,20 +77,25 @@ export default async function MorePage() {
         })()
       : null;
 
+  // A role with no Schedule tab still needs a way to the calendar, which now
+  // lives on that screen. Staff and admin have it in the bottom bar already.
+  const hasScheduleTab = TABS_BY_ROLE[role].some((tab) => tab.href === "/schedule");
+
   const hasLinks =
+    !hasScheduleTab ||
     (featureEnabled("clockIn") && role !== "parent") ||
     featureEnabled("horses") ||
     (featureEnabled("forms") && role === "parent");
 
   return (
-    <TabPage title="More">
+    <TabPage title="Settings">
       {/* Who you are signed in as, first — this is the screen people come to
           when they are not sure. */}
       {(name || email) && (
         <Card className="flex items-center gap-3 p-4">
           <span
             aria-hidden="true"
-            className="flex size-11 shrink-0 items-center justify-center rounded-full bg-accent font-display text-heading font-bold text-ink"
+            className="flex size-11 shrink-0 items-center justify-center rounded-full bg-accent font-display text-heading font-bold text-accent-on"
           >
             {(name ?? email ?? "?").trim().charAt(0).toUpperCase()}
           </span>
@@ -95,23 +108,43 @@ export default async function MorePage() {
         </Card>
       )}
 
-      {/* The calendar is for everyone and is not a tab — the bottom nav is
-          capped at five and staff and admin are both full. It leads this
-          section because "what is on this week" is the commonest reason
-          anyone opens More. */}
-      <section className="flex flex-col gap-3">
-        <SectionHeader title="The month" />
-        <Row
-          href="/calendar"
-          title="Calendar"
-          meta="Lessons, barn events and care due"
-          icon="calendar"
-        />
-      </section>
+      {/*
+       * Running the barn. Admin only, and Team & access leads it: adding a
+       * person, changing what they can see and revoking a login are the three
+       * things that are urgent when they come up, and none of them were
+       * findable from a screen called More.
+       */}
+      {role === "admin" && (
+        <section className="flex flex-col gap-3">
+          <SectionHeader title="Barn admin" />
+          <Row
+            href="/manage/team"
+            title="Team & access"
+            meta="Invite someone, set roles and permissions, families and riders"
+            icon="people"
+          />
+          {featureEnabled("clockIn") && (
+            <Row
+              href="/manage/timesheets"
+              title="Clock-ins & timesheets"
+              meta="Who's on the clock right now, hours and approvals"
+              icon="clock"
+            />
+          )}
+        </section>
+      )}
 
       {hasLinks && (
         <section className="flex flex-col gap-3">
           <SectionHeader title="Your things" />
+          {!hasScheduleTab && (
+            <Row
+              href="/schedule?view=month"
+              title="Calendar"
+              meta="Lessons, barn events and care due — the whole month"
+              icon="calendar"
+            />
+          )}
           {featureEnabled("clockIn") && role !== "parent" && (
             <Row
               href="/more/timesheet"
@@ -172,8 +205,6 @@ export default async function MorePage() {
           />
         </Card>
       </section>
-
-      <StubScreen heading="Still to come" phase="Phases 2–3" detail={STILL_TO_COME[role]} />
 
       <form action="/auth/sign-out" method="post">
         <Button type="submit" block variant="secondary">

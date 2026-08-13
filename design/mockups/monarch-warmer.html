@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Crouse — warmer palette</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ox:#4A002A;--ox-fill:#6E1A3D;--gold:#C2AE6D;--blush:#F1E9E9;
+    --page:#F6EDEF;--card:#fff;--ink:#221F27;--muted:#6B6773;--line:#ECE2E4;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Barlow',sans-serif;background:#DED9DA;color:#26251f;padding:40px 18px 70px}
+  .head{max-width:760px;margin:0 auto 26px;text-align:center}
+  .head h1{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:24px;letter-spacing:.5px;text-transform:uppercase}
+  .head p{margin-top:7px;color:#5a5652;font-size:14px}
+  .stage{display:flex;gap:40px;justify-content:center;flex-wrap:wrap;max-width:760px;margin:0 auto}
+  .col{display:flex;flex-direction:column;align-items:center;gap:13px}
+  .cap{font-size:12.5px;color:#4a463e;text-align:center;max-width:300px}
+  .cap b{color:#1c1b18}
+
+  .phone{width:330px;border-radius:30px;overflow:hidden;border:9px solid #17150f;box-shadow:0 16px 38px rgba(0,0,0,.26);background:var(--page)}
+
+  /* header variants */
+  .hdr{display:flex;align-items:center;justify-content:space-between;padding:16px 16px 13px;position:relative}
+  .hdr::after{content:"";position:absolute;left:16px;right:16px;bottom:0;height:2px;background:var(--gold);opacity:.8}
+  .hdr .brand{display:flex;align-items:center;gap:10px}
+  .crest{width:34px;height:34px;transform:rotate(45deg);background:#1C1B18;border:1.5px solid var(--gold);border-radius:6px;display:flex;align-items:center;justify-content:center}
+  .crest span{transform:rotate(-45deg);font-family:'Barlow Condensed';font-weight:700;color:var(--gold);font-size:13px}
+  .hdr .kick{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--gold);font-weight:700}
+  .hdr .ttl{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:22px;letter-spacing:.5px;text-transform:uppercase;color:var(--ink);line-height:.95}
+  .bell{width:26px;height:26px;border-radius:50%;background:var(--ox-fill);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center}
+
+  /* oxblood header (bold variant) */
+  .hdr.bold{background:var(--ox)}
+  .hdr.bold::after{background:var(--gold);opacity:1}
+  .hdr.bold .crest{background:transparent;border-color:var(--gold)}
+  .hdr.bold .kick{color:var(--gold)}
+  .hdr.bold .ttl{color:#fff}
+  .hdr.bold .bell{background:rgba(255,255,255,.15);color:#fff}
+
+  .body{padding:16px 14px}
+  .sec{display:flex;align-items:center;justify-content:space-between;margin:2px 4px 12px}
+  .sec .st{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:17px;letter-spacing:.6px;text-transform:uppercase;color:var(--ox);position:relative;padding-bottom:5px}
+  .sec .st::after{content:"";position:absolute;left:0;bottom:0;width:26px;height:2px;background:var(--gold)}
+  .sec .mg{font-size:12px;font-weight:600;color:var(--ox-fill)}
+
+  .cardx{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--ox);border-radius:12px;padding:14px 15px;margin-bottom:12px;box-shadow:0 2px 6px rgba(74,0,42,.05)}
+  .cardx .row1{display:flex;justify-content:space-between;align-items:baseline}
+  .cardx .t{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:17px;color:var(--ink);letter-spacing:.3px}
+  .cardx .dt{font-size:11px;color:var(--muted)}
+  .chip{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;padding:4px 9px;border-radius:20px;margin:9px 0 8px;background:var(--blush);color:var(--ox)}
+  .chip.staff{background:#F0E7DA;color:#8A6A2E}
+  .cardx .bd{font-size:13px;color:#4B4750;line-height:1.35}
+
+  .nav{display:flex;justify-content:space-around;padding:9px 0 15px;background:var(--card);border-top:1px solid var(--line)}
+  .nav div{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:9px;font-weight:600;color:#B4AEB0;text-transform:capitalize}
+  .nav div.on{color:var(--ox)}
+  .nav .ic{width:20px;height:20px;border-radius:6px;background:currentColor;opacity:.85}
+  .nav div.on .ic{background:var(--ox)}
+  .nav .pill{padding:4px 12px;border-radius:12px;background:var(--blush)}
+</style>
+</head>
+<body>
+  <div class="head">
+    <h1>Crouse — bringing the palette in</h1>
+    <p>Blush page tint, white cards, oxblood + gold accents. Two levels of how bold the header goes.</p>
+  </div>
+
+  <div class="stage">
+
+    <!-- SUBTLE -->
+    <div class="col">
+      <div class="phone">
+        <div class="hdr">
+          <div class="brand"><div class="crest"><span>CE</span></div><div><div class="kick">Crouse</div><div class="ttl">Home</div></div></div>
+          <div class="bell">20</div>
+        </div>
+        <div class="body">
+          <div class="sec"><div class="st">From the barn</div><div class="mg">Manage</div></div>
+          <div class="cardx">
+            <div class="row1"><div class="t">Arena footing refreshed</div><div class="dt">Aug 11</div></div>
+            <div class="chip">Pinned</div>
+            <div class="bd">The outdoor arena was dragged and watered this week. It's riding beautifully — come use it.</div>
+          </div>
+          <div class="cardx">
+            <div class="row1"><div class="t">Feed order day</div><div class="dt">Aug 11</div></div>
+            <div class="chip staff">Staff only</div>
+            <div class="bd">Feed orders now go in on Wednesdays. Let me know Tuesday if you're short.</div>
+          </div>
+          <div class="cardx">
+            <div class="row1"><div class="t">Winter blanket check</div><div class="dt">Aug 11</div></div>
+            <div class="bd">Please make sure your horse's blankets are labelled before the cold snap.</div>
+          </div>
+        </div>
+        <div class="nav">
+          <div class="on"><div class="ic"></div><span class="pill">Home</span></div>
+          <div><div class="ic"></div>Schedule</div>
+          <div><div class="ic"></div>Manage</div>
+          <div><div class="ic"></div>Shows</div>
+          <div><div class="ic"></div>More</div>
+        </div>
+      </div>
+      <div class="cap"><b>Subtle.</b> White header + gold hairline, blush page, oxblood section titles &amp; card edges. Light, but unmistakably branded.</div>
+    </div>
+
+    <!-- BOLD -->
+    <div class="col">
+      <div class="phone">
+        <div class="hdr bold">
+          <div class="brand"><div class="crest"><span>CE</span></div><div><div class="kick">Crouse</div><div class="ttl">Home</div></div></div>
+          <div class="bell">20</div>
+        </div>
+        <div class="body">
+          <div class="sec"><div class="st">From the barn</div><div class="mg">Manage</div></div>
+          <div class="cardx">
+            <div class="row1"><div class="t">Arena footing refreshed</div><div class="dt">Aug 11</div></div>
+            <div class="chip">Pinned</div>
+            <div class="bd">The outdoor arena was dragged and watered this week. It's riding beautifully — come use it.</div>
+          </div>
+          <div class="cardx">
+            <div class="row1"><div class="t">Feed order day</div><div class="dt">Aug 11</div></div>
+            <div class="chip staff">Staff only</div>
+            <div class="bd">Feed orders now go in on Wednesdays. Let me know Tuesday if you're short.</div>
+          </div>
+          <div class="cardx">
+            <div class="row1"><div class="t">Winter blanket check</div><div class="dt">Aug 11</div></div>
+            <div class="bd">Please make sure your horse's blankets are labelled before the cold snap.</div>
+          </div>
+        </div>
+        <div class="nav">
+          <div class="on"><div class="ic"></div><span class="pill">Home</span></div>
+          <div><div class="ic"></div>Schedule</div>
+          <div><div class="ic"></div>Manage</div>
+          <div><div class="ic"></div>Shows</div>
+          <div><div class="ic"></div>More</div>
+        </div>
+      </div>
+      <div class="cap"><b>Bold.</b> Same, but the top bar goes deep oxblood with the gold crest — the brand hits you immediately. Still light everywhere you read.</div>
+    </div>
+
+  </div>
+</body>
+</html>

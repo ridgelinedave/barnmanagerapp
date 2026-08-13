@@ -1,18 +1,25 @@
 import Link from "next/link";
 import { TabPage } from "@/components/TabPage";
 import { EmployeeTimesheetCard, NewPayPeriodForm } from "@/components/TimesheetAdmin";
-import { Card, Chip, EmptyState } from "@/components/ui/primitives";
+import { Avatar } from "@/components/ui/ListRow";
+import { Card, Chip, EmptyState, SectionHeader } from "@/components/ui/primitives";
 import { Button } from "@/components/ui/Button";
 import { SheetTrigger } from "@/components/ui/Sheet";
 import { requireTab } from "@/lib/guard";
 import { listPunchesBetween, listPayPeriods, listApprovals } from "@/lib/punches";
 import { listAssignableProfiles, nameMap } from "@/lib/tasks";
 import { formatBarnDayLabel } from "@/lib/dates";
-import { pairPunches, totalMinutes, flagsForPunch } from "@/lib/timeclock";
+import {
+  currentlyClockedIn,
+  formatMinutes,
+  pairPunches,
+  totalMinutes,
+  flagsForPunch,
+} from "@/lib/timeclock";
 import { barn } from "@/config/barn";
 import { setPeriodStatus, suggestedPeriod } from "./actions";
 
-export const metadata = { title: "Timesheets" };
+export const metadata = { title: "Clock-ins & timesheets" };
 
 const timeFormatter = new Intl.DateTimeFormat("en-US", {
   weekday: "short",
@@ -20,6 +27,42 @@ const timeFormatter = new Intl.DateTimeFormat("en-US", {
   minute: "2-digit",
   timeZone: barn.timezone,
 });
+
+const clockFormatter = new Intl.DateTimeFormat("en-US", {
+  hour: "numeric",
+  minute: "2-digit",
+  timeZone: barn.timezone,
+});
+
+/**
+ * How far back to look for an open in-punch.
+ *
+ * Long enough to cover any real shift plus an overnight forgotten punch-out,
+ * short enough that the query stays small. Someone who punched in more than
+ * two days ago and never out will not show here — they will show on their
+ * timesheet card below as an unclosed pair, which is where a correction gets
+ * made anyway.
+ */
+const ON_CLOCK_LOOKBACK_HOURS = 48;
+
+/**
+ * Read the clock once, here rather than in the component body.
+ *
+ * The React compiler rightly refuses `Date.now()` inside a render: a value that
+ * changes every call cannot be re-derived on a re-render and stay the same.
+ * Reading it in a plain function is the same pattern the home greeting uses,
+ * and this page renders once per request on the server.
+ */
+function onClockWindow(): { now: number; from: string; to: string } {
+  const now = Date.now();
+  return {
+    now,
+    from: new Date(now - ON_CLOCK_LOOKBACK_HOURS * 3_600_000).toISOString(),
+    // A hair into the future, so a punch recorded a moment ago is not missed by
+    // a clock that has already moved on.
+    to: new Date(now + 60_000).toISOString(),
+  };
+}
 
 /** Card stack: one card per employee for the selected pay period. */
 export default async function ManageTimesheetsPage({
@@ -42,6 +85,44 @@ export default async function ManageTimesheetsPage({
 
   const names = nameMap(people);
 
+  /*
+   * WHO IS ON THE CLOCK RIGHT NOW.
+   *
+   * The screen opened straight onto pay periods, which answers a fortnightly
+   * question. The daily one — is anyone here, and how long have they been here
+   * — had no surface at all, even though every punch needed to answer it was
+   * already in the table.
+   *
+   * No new SQL: one read of the last two days, grouped by person, and the same
+   * `currentlyClockedIn` the staff clock screen uses. RLS returns every
+   * person's punches to an admin and only their own to staff, so this is the
+   * admin view by policy rather than by a filter written here.
+   */
+  const { now, from, to } = onClockWindow();
+  const recent = await listPunchesBetween(from, to);
+
+  const recentByProfile = new Map<string, typeof recent>();
+  for (const punch of recent) {
+    const list = recentByProfile.get(punch.profile_id) ?? [];
+    list.push(punch);
+    recentByProfile.set(punch.profile_id, list);
+  }
+
+  const onClock = [...recentByProfile.entries()]
+    .flatMap(([profileId, theirs]) => {
+      const open = currentlyClockedIn(theirs);
+      if (!open) return [];
+      return [
+        {
+          profileId,
+          name: names.get(profileId) ?? "Unnamed",
+          since: open.punched_at,
+          minutes: Math.max(0, Math.round((now - Date.parse(open.punched_at)) / 60_000)),
+        },
+      ];
+    })
+    .sort((a, b) => a.since.localeCompare(b.since));
+
   const punches = period
     ? await listPunchesBetween(`${period.start_date}T00:00:00Z`, `${period.end_date}T23:59:59Z`)
     : [];
@@ -59,7 +140,39 @@ export default async function ManageTimesheetsPage({
   const employees = people.filter((p) => p.role === "staff" || byProfile.has(p.id));
 
   return (
-    <TabPage title="Timesheets" back="/manage">
+    <TabPage title="Clock-ins" back="/manage">
+      {/* The daily question, above the fortnightly one. */}
+      <section className="flex flex-col gap-3">
+        <SectionHeader
+          title="On the clock now"
+          count={onClock.length === 1 ? "1 person" : `${onClock.length} people`}
+        />
+
+        {onClock.length === 0 ? (
+          <EmptyState
+            title="Nobody is on the clock"
+            body="Anyone who punches in from the Clock tab appears here until they punch out."
+          />
+        ) : (
+          <Card className="flex flex-col gap-3 p-4">
+            {onClock.map((person) => (
+              <div key={person.profileId} className="flex items-center gap-3">
+                <Avatar name={person.name} size="sm" />
+                <div className="min-w-0 flex-1">
+                  <p className="font-display text-heading leading-snug text-ink">{person.name}</p>
+                  <p className="mt-0.5 text-caption text-muted">
+                    In at {clockFormatter.format(new Date(person.since))}
+                  </p>
+                </div>
+                <Chip value={formatMinutes(person.minutes)} icon="clock" tone="forest" />
+              </div>
+            ))}
+          </Card>
+        )}
+      </section>
+
+      <SectionHeader title="Hours & approvals" />
+
       {periods.length > 0 && (
         <nav aria-label="Pay period" className="flex flex-wrap gap-2">
           {periods.slice(0, 6).map((p) => (

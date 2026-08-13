@@ -30,6 +30,8 @@ export type IconName =
   | "list"
   | "pin"
   | "bucket"
+  | "people"
+  | "more"
   | "eye"
   | "eyeOff";
 
@@ -56,6 +58,14 @@ const PATHS: Record<IconName, string> = {
   list: "M4 7h2.5M4 12h2.5M4 17h2.5M10 7h10M10 12h10M10 17h10",
   pin: "M12 21s7-5.7 7-11a7 7 0 1 0-14 0c0 5.3 7 11 7 11Zm0-8.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z",
   bucket: "M4 7h16l-1.6 12.2a2 2 0 0 1-2 1.8H7.6a2 2 0 0 1-2-1.8L4 7Zm4-3h8l1 3H7l1-3Z",
+  // Two figures. "Team & access" is about people, and a grid tile said filing.
+  people:
+    "M15 20v-1.5a4 4 0 0 0-4-4H6.5a4 4 0 0 0-4 4V20M8.75 10.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm12.75 9.5v-1.5a4 4 0 0 0-3-3.87M15.5 3.75a4 4 0 0 1 0 7.5",
+  /**
+   * The overflow affordance. Three dots, drawn as zero-length segments so the
+   * round linecap renders them — one path, same stroke as everything else.
+   */
+  more: "M6 12h.01M12 12h.01M18 12h.01",
 };
 
 export function Icon({

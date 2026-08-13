@@ -3,6 +3,7 @@ import { getViewer } from "@/lib/session";
 import { devRoleSwitcherEnabled } from "@/lib/dev-role";
 import { DevRoleSwitcher } from "@/components/DevRoleSwitcher";
 import { TabBar } from "@/components/TabBar";
+import { BootMarker } from "@/components/BootMarker";
 import { ViewerProvider } from "@/components/ViewerContext";
 
 /**
@@ -29,6 +30,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <ViewerProvider value={{ role: viewer.role, isDevRole: viewer.isDevRole }}>
       <div className="flex min-h-dvh flex-col">
+        {/* Mounts once per document, and only in the browser. From its effect
+            onwards the loading fallback knows this is a navigation rather than
+            a cold start, so the launch screen stops flashing between tabs. */}
+        <BootMarker />
         {devRoleSwitcherEnabled() && (
           <DevRoleSwitcher current={viewer.isDevRole ? viewer.role : null} />
         )}

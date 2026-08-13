@@ -24,14 +24,19 @@ function Feedback({ state }: { state: ScheduleState }) {
  * Visible and manual because the nightly cron is deferred. It reports the count
  * it created — a generation step that silently did nothing is indistinguishable
  * from a broken one.
+ *
+ * The label says what it makes, not how. "Generate the next 4 weeks" named a
+ * window and a mechanism and left out both the noun (lessons) and where they
+ * come from, which is why it read as jargon on the day screen. It lives in the
+ * admin overflow now, in the menu size — a sentence, not a shouted slab.
  */
 export function GenerateInstancesButton() {
   const [state, formAction, pending] = useActionState(generateInstances, EMPTY);
 
   return (
     <form action={formAction} className="flex flex-col gap-2">
-      <Button type="submit" variant="primary" block disabled={pending} icon="calendar">
-        {pending ? "Generating…" : "Generate the next 4 weeks"}
+      <Button type="submit" size="menu" block disabled={pending} icon="calendar">
+        {pending ? "Generating lessons…" : "Generate lessons from the weekly schedule"}
       </Button>
       <Feedback state={state} />
     </form>

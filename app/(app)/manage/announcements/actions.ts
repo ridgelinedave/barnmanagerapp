@@ -108,4 +108,9 @@ export async function deleteAnnouncement(formData: FormData): Promise<void> {
 
   revalidatePath("/manage/announcements");
   revalidatePath("/home");
+
+  // Called from the edit screen now, not from a row on the list — so it has to
+  // send you somewhere. Staying put would re-render a page whose announcement
+  // no longer exists, which is a 404 as a reward for a successful delete.
+  redirect("/manage/announcements");
 }
