@@ -375,7 +375,9 @@ export const barn = {
      * ever leaked before revoking it individually is enough.
      */
     invites: true,
-    shows: false,
+    /* ON for David's review: the hub is built and the demo shows are seeded,
+       so it needs to be populated and reachable to be judged. */
+    shows: true,
     invoices: false,
     shop: false,
   } satisfies Record<BarnFeatureFlag, boolean>,

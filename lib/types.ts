@@ -508,3 +508,48 @@ export type Notification = {
   read_at: string | null;
   created_at: string;
 };
+
+/* -------------------------------------------------------------------------- */
+/* Shows (migration 0021)                                                      */
+/* -------------------------------------------------------------------------- */
+
+/** Same switch as BarnEvent, deliberately — see the 0021 migration header. */
+export type ShowVisibility = EventVisibility;
+
+export type Show = {
+  id: string;
+  created_at: string;
+  name: string;
+  location: string;
+  start_date: string;
+  end_date: string;
+  description: string;
+  image_path: string | null;
+  pinned: boolean;
+  visibility: ShowVisibility;
+};
+
+export type ShowEntry = {
+  id: string;
+  created_at: string;
+  show_id: string;
+  rider_id: string;
+  horse_id: string | null;
+  classes: string;
+  ride_time: string | null;
+};
+
+export type ShowResult = {
+  id: string;
+  created_at: string;
+  show_id: string;
+  rider_id: string;
+  /**
+   * Nullable — eliminated, retired and withdrawn are real outcomes. The column
+   * is a quoted reserved word in Postgres; PostgREST quotes identifiers itself,
+   * so it is plain here.
+   */
+  placing: number | null;
+  score: number | null;
+  class: string;
+};

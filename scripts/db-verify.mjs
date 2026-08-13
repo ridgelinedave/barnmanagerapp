@@ -75,6 +75,10 @@ const EXPECTED_TABLES = [
   "invites",
   // Phase 2 — training history.
   "training_logs",
+  // Phase 2 — the shows hub (0021).
+  "shows",
+  "show_entries",
+  "show_results",
 ];
 
 /**
@@ -90,9 +94,10 @@ const EXPECTED_TABLES = [
  * just noise.
  */
 const PENDING_TABLES = {
-  // Empty: 0020 was audited and applied on 2026-07-31, so `training_logs`
-  // moved up into EXPECTED_TABLES and is now checked as strictly as any other.
-  // Keep the mechanism — the next audited-pending migration needs it.
+  // Empty: 0021 was audited and applied on 2026-08-13, so shows/show_entries/
+  // show_results moved up into EXPECTED_TABLES and are now checked as strictly
+  // as any other. Keep the mechanism — the next audited-pending migration
+  // needs it.
 };
 const EXPECTED_FUNCTIONS = [
   "current_role",
@@ -110,6 +115,9 @@ const EXPECTED_FUNCTIONS = [
   "enqueue_care_due_digest",
   // Phase 2 slices 3–4.
   "family_may_read_document",
+  // 0021 — the shows visibility rule, and its storage-path wrapper.
+  "show_is_readable",
+  "show_banner_is_readable",
   "form_submissions_guard",
   "ensure_family_onboarding",
   // Phase 2 slice 5.

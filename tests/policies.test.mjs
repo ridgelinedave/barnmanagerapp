@@ -4578,14 +4578,22 @@ async function main() {
       );
 
       // --- clean up so the next run starts where this one did ------------------
+      //
+      // Asserts THIS RUN'S invites are gone, NOT that the table is empty. The
+      // empty-table version passed only while the suite was the sole writer;
+      // the moment Belle was actually invited through the app it failed, and
+      // the only way to make it pass again would have been to delete a real
+      // pending invitation. A fixture assertion must never be satisfiable by
+      // destroying live data.
       for (const id of madeInvites) {
         await admin.from("invites").delete().eq("id", id);
       }
       const { ids: leftovers } = await visibleIds(admin, "invites");
+      const mineLeft = leftovers.filter((id) => madeInvites.includes(id));
       check(
         "the test invites are cleaned up",
-        leftovers.length === 0,
-        `${leftovers.length} left behind`,
+        mineLeft.length === 0,
+        `${mineLeft.length} of this run's invites left behind`,
       );
     }
   }

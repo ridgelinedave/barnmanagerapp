@@ -77,6 +77,8 @@ async function removeDemoData() {
   await del("task_templates", "title");
   await del("announcements", "title");
   await del("events", "title");
+  // show_entries and show_results cascade from shows.
+  await del("shows", "name");
   // care_events, feed_plans and training_logs cascade from horses;
   // submissions from templates.
   await del("form_templates", "name");
@@ -633,6 +635,141 @@ async function main() {
     if (!error) eventCount++;
   }
   console.log(`  events        ${eventCount}`);
+
+
+  // --- shows -----------------------------------------------------------------
+  // Fixed calendar dates rather than offsets from today: these are real
+  // fixtures on the 2026 calendar and David reviews them by name and date.
+  const SHOWS = [
+    {
+      name: `${DEMO_TAG} Tryon International`,
+      location: "Mill Spring, NC",
+      start_date: "2026-08-22",
+      end_date: "2026-08-24",
+      description: "Three days at TIEC. Stalls booked Friday morning; haul-in from 7am.",
+      pinned: true,
+    },
+    {
+      name: `${DEMO_TAG} Stableview`,
+      location: "Aiken, SC",
+      start_date: "2026-09-05",
+      end_date: "2026-09-07",
+      description: "Entries close two weeks out. Let Belle know if you want a stall.",
+      pinned: false,
+    },
+  ];
+
+  const showIdByName = new Map();
+  let showsSkipped = false;
+  for (const show of SHOWS) {
+    const { data: existing } = await supabase
+      .from("shows")
+      .select("id")
+      .eq("name", show.name)
+      .maybeSingle();
+    if (existing) {
+      showIdByName.set(show.name, existing.id);
+      continue;
+    }
+    const { data, error } = await supabase.from("shows").insert(show).select("id").single();
+    if (error) {
+      // 0021 not applied on this database — say so rather than dying.
+      if (/does not exist|schema cache/i.test(error.message)) {
+        showsSkipped = true;
+        break;
+      }
+      fail(`Could not create show ${show.name}`, error);
+    }
+    showIdByName.set(show.name, data.id);
+  }
+
+  if (showsSkipped) {
+    console.log("  shows         skipped — migration 0021 not applied yet");
+  } else {
+    const tryon = showIdByName.get(`${DEMO_TAG} Tryon International`);
+    const stableview = showIdByName.get(`${DEMO_TAG} Stableview`);
+
+    // Ride times are barn-local wall clock turned into an instant, the same way
+    // the events above are built. Stableview has none on purpose: it is the
+    // "entries open" case the next-up list has to render.
+    const at = (day, hour, minute) =>
+      new Date(
+        `${day}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00-04:00`,
+      ).toISOString();
+
+    const ENTRIES = [
+      { show: tryon, rider: 0, horse: 0, classes: "Training Level Test 2 & 3", ride_time: at("2026-08-22", 8, 40) },
+      { show: tryon, rider: 2, horse: 1, classes: "First Level Test 1", ride_time: at("2026-08-22", 9, 15) },
+      { show: tryon, rider: 3, horse: 2, classes: "Training Level Test 2", ride_time: at("2026-08-23", 10, 5) },
+      { show: tryon, rider: 5, horse: 3, classes: "Second Level Test 1", ride_time: at("2026-08-23", 13, 30) },
+      { show: stableview, rider: 4, horse: 4, classes: "Intro A & B", ride_time: null },
+      { show: stableview, rider: 6, horse: 0, classes: "First Level Test 2", ride_time: null },
+    ];
+
+    // Pre-check then insert, NOT upsert. The uniqueness on this table is two
+    // PARTIAL indexes (horse_id null / not null), and ON CONFLICT cannot infer
+    // a partial index from a column list — it fails with 42P10. Re-running is
+    // still safe; the check is what makes it so.
+    let entryCount = 0;
+    for (const e of ENTRIES) {
+      if (!e.show || !demoRiders[e.rider]) continue;
+      const horse = horseIds[e.horse % horseIds.length];
+      const riderId = demoRiders[e.rider];
+
+      const { data: already } = await supabase
+        .from("show_entries")
+        .select("id")
+        .eq("show_id", e.show)
+        .eq("rider_id", riderId)
+        .maybeSingle();
+      if (already) continue;
+
+      const { error } = await supabase.from("show_entries").insert({
+        show_id: e.show,
+        rider_id: riderId,
+        horse_id: horse?.id ?? null,
+        classes: e.classes,
+        ride_time: e.ride_time,
+      });
+      // Loud, not silent. A swallowed error here is how this seeded two shows
+      // and zero riders on the first run and still printed a success line.
+      if (error) fail(`Could not create show entry for rider ${riderId}`, error);
+      entryCount++;
+    }
+
+    // Results on Tryon only. One rider is deliberately unplaced — withdrawn is
+    // a real outcome, and the detail screen has a branch for it that would
+    // otherwise never be exercised.
+    const RESULTS = [
+      { rider: 3, placing: 1, score: 71.2, class: "Training Level Test 2" },
+      { rider: 0, placing: 2, score: 68.75, class: "Training Level Test 3" },
+      { rider: 2, placing: 5, score: 64.1, class: "First Level Test 1" },
+      { rider: 5, placing: null, score: null, class: "Second Level Test 1 — withdrawn" },
+    ];
+
+    let resultCount = 0;
+    if (tryon) {
+      for (const r of RESULTS) {
+        if (!demoRiders[r.rider]) continue;
+        const { error } = await supabase.from("show_results").upsert(
+          {
+            show_id: tryon,
+            rider_id: demoRiders[r.rider],
+            placing: r.placing,
+            score: r.score,
+            class: r.class,
+          },
+          { onConflict: "show_id,rider_id,class", ignoreDuplicates: true },
+        );
+        if (error) fail(`Could not create show result for rider ${demoRiders[r.rider]}`, error);
+        resultCount++;
+      }
+    }
+
+    console.log(
+      `  shows         ${showIdByName.size} with ${entryCount} entries, ${resultCount} results`,
+    );
+  }
 
   // --- tasks -----------------------------------------------------------------
   const TASK_TEMPLATES = [
