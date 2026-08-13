@@ -24,6 +24,7 @@
  * Run:  npm run test:policies
  */
 import { createClient } from "@supabase/supabase-js";
+import pg from "pg";
 import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -33,8 +34,25 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
+/**
+ * A direct connection, used by ONE section — the at-least-one-admin guard.
+ *
+ * That section tests a TRIGGER, not a policy, and it needs a transaction it
+ * can roll back so it never touches a real account. PostgREST gives no
+ * transaction control, so it cannot be done through the anon client. Required
+ * rather than optional: a missing URL must fail loudly, because a section that
+ * quietly skips itself is a guard nobody notices has stopped running.
+ */
+const DB_URL = process.env.SUPABASE_DB_URL;
+
 if (!SUPABASE_URL || !ANON_KEY) {
   console.error("Missing NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY.");
+  process.exit(1);
+}
+if (!DB_URL) {
+  console.error(
+    "Missing SUPABASE_DB_URL — the at-least-one-admin guard needs a transaction it can roll back.",
+  );
   process.exit(1);
 }
 if (SUPABASE_URL.includes("placeholder") || ANON_KEY.includes("placeholder")) {
@@ -4873,113 +4891,176 @@ async function main() {
   // instant could both pass. Migration 0016 moves the rule into a trigger,
   // which is the one place a race cannot slip through.
   //
-  // POSITIVE CONTROL FIRST, as everywhere else here: a demotion that leaves an
-  // admin standing must SUCCEED. Without it, a trigger that refused every
-  // demotion — or a policy that refused every profile write — would pass the
-  // deny cases and look correct.
+  // WHY THIS ONE SECTION USES A DIRECT CONNECTION. Everything else in this file
+  // goes through the anon key with a real session, because a test that bypasses
+  // RLS proves nothing about RLS. This section is the exception, deliberately:
+  // the subject is a TRIGGER, which fires on every write no matter who
+  // connects, so the connection is irrelevant to what is being proven. What the
+  // trigger DOES need is a state no shared database can be assumed to be in —
+  // exactly one admin — and a transaction to undo it.
   //
-  // Every change below is reverted before the section ends, so the fixtures are
-  // in exactly the state the next run expects. Nothing here is conditional:
-  // conditional assertions make the suite's totals drift between runs.
+  // The old version simply asserted the barn had one admin and mutated the
+  // fixtures in place. That held only while the seed was the only thing in the
+  // database. The moment a real permanent admin existed, "the last admin" was
+  // no longer last: the demotion SUCCEEDED, the admin fixture was left demoted,
+  // and every admin assertion after this point failed for reasons that had
+  // nothing to do with them. So the state is now built here and thrown away.
+  //
+  // Everything happens inside BEGIN … ROLLBACK. Real accounts — David's
+  // permanent admin included — are demoted only inside that transaction and
+  // are never actually written. The final assertion re-reads every profile
+  // after the rollback and proves the table is byte-for-byte what it was.
+  //
+  // The assertion COUNT is fixed at ten regardless of how many real admins
+  // exist: the stand-down is a single statement, not one assertion per admin,
+  // and every check is emitted after the transaction closes so a mid-way
+  // failure cannot make the suite's totals drift between runs.
   // ===========================================================================
   console.log("\n\n═══ STANDING GUARD — the barn always has at least one admin ═══\n");
   {
     const adminProfileId = users.admin.profileId;
     const staffProfileId = users.staff.profileId;
 
-    const adminCount = async () => {
-      const { count } = await admin
-        .from("profiles")
-        .select("id", { count: "exact", head: true })
-        .eq("role", "admin");
-      return count ?? 0;
+    const db = new pg.Client({
+      connectionString: DB_URL,
+      ssl: { rejectUnauthorized: false },
+      connectionTimeoutMillis: 15000,
+    });
+    await db.connect();
+
+    /** Every profile's id and role, ordered — the before/after fingerprint. */
+    const snapshot = async () =>
+      (await db.query("select id, role from public.profiles order by id")).rows;
+    const adminIds = async () =>
+      (await db.query("select id from public.profiles where role = 'admin' order by id")).rows.map(
+        (r) => r.id,
+      );
+
+    /** Run a statement expected to FAIL, without poisoning the transaction. */
+    const attempt = async (name, sql, params) => {
+      await db.query(`savepoint ${name}`);
+      try {
+        await db.query(sql, params);
+        await db.query(`rollback to savepoint ${name}`);
+        return null; // no error — the write was accepted
+      } catch (error) {
+        await db.query(`rollback to savepoint ${name}`);
+        return error;
+      }
     };
 
-    check("control: the barn starts with exactly one admin", (await adminCount()) === 1);
+    const before = await snapshot();
 
-    // --- CONTROL 1: promoting a second admin is allowed ----------------------
-    const { error: promoteError } = await admin
-      .from("profiles")
-      .update({ role: "admin", family_id: null })
-      .eq("id", staffProfileId);
+    // Defaults chosen so that if anything below throws unexpectedly, each
+    // assertion fails rather than silently vanishing from the totals.
+    const r = {
+      soleAdmin: null,
+      promoted: null,
+      twoAdmins: null,
+      demoteTwoError: "did not run",
+      oneLeft: null,
+      lastDemote: null,
+      lastDelete: null,
+      unexpected: null,
+    };
+
+    try {
+      await db.query("begin");
+
+      // --- build the state this guard needs, transiently -------------------
+      // Promote the fixture first so an admin is standing at every instant,
+      // THEN stand every other admin down. Done in the other order the last
+      // demotion would trip the very trigger under test.
+      await db.query("update public.profiles set role = 'admin' where id = $1", [adminProfileId]);
+      await db.query(
+        "update public.profiles set role = 'staff' where role = 'admin' and id <> $1",
+        [adminProfileId],
+      );
+      const sole = await adminIds();
+      r.soleAdmin = sole.length === 1 && sole[0] === adminProfileId ? true : sole;
+
+      // --- CONTROL 1: promoting a second admin is allowed ------------------
+      await db.query("update public.profiles set role = 'admin' where id = $1", [staffProfileId]);
+      r.promoted = true;
+      r.twoAdmins = (await adminIds()).length;
+
+      // --- CONTROL 2: demoting one of TWO admins is allowed ----------------
+      // The assertion that proves the trigger discriminates rather than
+      // refusing every demotion outright.
+      try {
+        await db.query("update public.profiles set role = 'staff' where id = $1", [staffProfileId]);
+        r.demoteTwoError = null;
+      } catch (error) {
+        r.demoteTwoError = error.message;
+      }
+      r.oneLeft = (await adminIds()).length;
+
+      // --- DENY: the last admin cannot be demoted --------------------------
+      r.lastDemote = await attempt(
+        "s_demote",
+        "update public.profiles set role = 'staff' where id = $1",
+        [adminProfileId],
+      );
+
+      // --- DENY: the last admin cannot be deleted --------------------------
+      // A separate branch in the trigger. Deleting the row leaves zero admins
+      // just as surely as demoting it.
+      r.lastDelete = await attempt("s_delete", "delete from public.profiles where id = $1", [
+        adminProfileId,
+      ]);
+    } catch (error) {
+      r.unexpected = error.message;
+    } finally {
+      // Unconditional. Nothing above is allowed to survive this line.
+      await db.query("rollback").catch(() => {});
+    }
+
+    const after = await snapshot();
+    await db.end();
+
+    const same =
+      before.length === after.length &&
+      before.every((row, i) => row.id === after[i].id && row.role === after[i].role);
+
     check(
-      "control: admin CAN promote the staff fixture to admin",
-      !promoteError,
-      promoteError?.message,
+      "setup: inside the transaction the fixture is the only admin",
+      r.soleAdmin === true,
+      r.unexpected ?? `admins: ${JSON.stringify(r.soleAdmin)}`,
     );
-    check("control: there are now two admins", (await adminCount()) === 2);
-
-    // --- CONTROL 2: demoting one of TWO admins is allowed --------------------
-    // This is the assertion that proves the trigger is discriminating rather
-    // than simply refusing every demotion.
-    const { error: demoteError } = await admin
-      .from("profiles")
-      .update({ role: "staff" })
-      .eq("id", staffProfileId);
+    check("control: the staff fixture CAN be promoted to admin", r.promoted === true, r.unexpected);
+    check("control: there are now two admins", r.twoAdmins === 2, `got ${r.twoAdmins}`);
     check(
       "control: demoting one of two admins SUCCEEDS — the trigger is not a blanket refusal",
-      !demoteError,
-      demoteError?.message,
+      r.demoteTwoError === null,
+      r.demoteTwoError ?? undefined,
     );
-    check("control: one admin is left", (await adminCount()) === 1);
-
-    // --- DENY: the last admin cannot be demoted ------------------------------
-    const { error: lastDemote } = await admin
-      .from("profiles")
-      .update({ role: "staff" })
-      .eq("id", adminProfileId);
+    check("control: one admin is left", r.oneLeft === 1, `got ${r.oneLeft}`);
     check(
       "demoting the LAST admin is REFUSED",
-      Boolean(lastDemote),
-      lastDemote ? "" : "the update was accepted — the barn would have zero admins",
+      Boolean(r.lastDemote),
+      r.lastDemote ? "" : "the update was accepted — the barn would have zero admins",
     );
     check(
       "the refusal is the 23514 check violation, not an incidental failure",
-      lastDemote?.code === "23514",
-      `got ${lastDemote?.code}: ${lastDemote?.message}`,
+      r.lastDemote?.code === "23514",
+      `got ${r.lastDemote?.code}: ${r.lastDemote?.message}`,
     );
-
-    // --- DENY: the last admin cannot be deleted ------------------------------
-    // A separate path with its own branch in the trigger. Deleting the row
-    // leaves zero admins just as surely as demoting it.
-    const { error: lastDelete } = await admin
-      .from("profiles")
-      .delete()
-      .eq("id", adminProfileId);
     check(
       "deleting the LAST admin is REFUSED",
-      Boolean(lastDelete),
-      lastDelete ? "" : "the delete was accepted — the barn would have zero admins",
+      Boolean(r.lastDelete),
+      r.lastDelete ? "" : "the delete was accepted — the barn would have zero admins",
     );
     check(
       "that refusal is 23514 too",
-      lastDelete?.code === "23514",
-      `got ${lastDelete?.code}: ${lastDelete?.message}`,
+      r.lastDelete?.code === "23514",
+      `got ${r.lastDelete?.code}: ${r.lastDelete?.message}`,
     );
-
-    // NOTE — the legitimate hand-over (promote a successor, THEN step down) is
-    // NOT exercised here, deliberately. Doing it would demote the admin fixture
-    // itself, and every restore statement afterwards runs on that same session,
-    // which by then is no longer an admin: the privileged-columns trigger would
-    // refuse to put it back and the fixtures would be left broken for the next
-    // run. It is also the same fact as control 2 above — with two admins in
-    // place, a demotion is allowed. Proven, not skipped.
-
-    // --- Restore the fixtures exactly as they were --------------------------
-    // Both refusals above changed nothing, so only the promote/demote pair has
-    // to be undone — and it already was. This re-asserts it rather than
-    // trusting it, because a suite that leaves the database drifted fails the
-    // NEXT run, in a section that has nothing to do with the cause.
-    const restoredAdmins = await adminCount();
-    const { data: restoredStaff } = await admin
-      .from("profiles")
-      .select("role")
-      .eq("id", staffProfileId)
-      .single();
+    // The one that makes all of the above safe to run against a live barn.
     check(
-      "the fixtures are restored — one admin, staff is staff again",
-      restoredAdmins === 1 && restoredStaff?.role === "staff",
-      `admins=${restoredAdmins}, staff role=${restoredStaff?.role}`,
+      "the ROLLBACK left every real account exactly as it was",
+      same,
+      `${before.filter((x) => x.role === "admin").length} admin(s) before, ` +
+        `${after.filter((x) => x.role === "admin").length} after`,
     );
   }
 
