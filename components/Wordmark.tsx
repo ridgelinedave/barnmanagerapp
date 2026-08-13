@@ -19,7 +19,7 @@ export function Wordmark({
 }: {
   size?: "sm" | "md" | "lg";
   /** `muted` for a signature at the edge; `accent` when it is the subject. */
-  tone?: "muted" | "accent" | "ink";
+  tone?: "muted" | "accent" | "ink" | "onDeep";
 }) {
   const sizes = {
     sm: "text-[0.75rem] tracking-[0.34em]",
@@ -31,6 +31,10 @@ export function Wordmark({
     muted: "text-muted",
     accent: "text-accent-text",
     ink: "text-ink",
+    // For the oxblood surfaces — the sign-in screen and the splash. `muted`
+    // is #5D5F6B, which is 2.5:1 on #4A002A and unreadable; this screen's own
+    // quiet text is white/60, which measures 6.1:1 on the same field.
+    onDeep: "text-white/60",
   } as const;
 
   return (
@@ -46,11 +50,22 @@ export function Wordmark({
  * Deliberately small and quiet. A barn's members should feel they are in their
  * barn's app; this is the maker's mark on the underside, not a banner.
  */
-export function PoweredByMonarch({ className = "" }: { className?: string }) {
+export function PoweredByMonarch({
+  className = "",
+  tone = "muted",
+}: {
+  className?: string;
+  /** `onDeep` for the oxblood sign-in / splash field; `muted` on paper. */
+  tone?: "muted" | "onDeep";
+}) {
   return (
-    <p className={`flex items-center justify-center gap-1.5 text-caption text-muted ${className}`}>
+    <p
+      className={`flex items-center justify-center gap-1.5 text-caption ${
+        tone === "onDeep" ? "text-white/60" : "text-muted"
+      } ${className}`}
+    >
       <span>Powered by</span>
-      <Wordmark size="sm" tone="muted" />
+      <Wordmark size="sm" tone={tone} />
     </p>
   );
 }

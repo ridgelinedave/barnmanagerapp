@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { Icon } from "@/components/ui/Icon";
+import { PoweredByMonarch } from "@/components/Wordmark";
 import { createClient } from "@/lib/supabase/client";
 import { supabaseConfigured } from "@/lib/env";
 import { barn } from "@/config/barn";
@@ -216,6 +217,12 @@ export function SignInForm() {
             Forgot my password
           </span>
         </a>
+
+        {/* The product signature, same treatment as the More screen: Cinzel,
+            quiet, at the edge. `onDeep` rather than the paper `muted` — that
+            token is 2.5:1 on this oxblood field and would be unreadable. The
+            crest above stays the hero; this is the maker's mark. */}
+        <PoweredByMonarch tone="onDeep" className="mt-5" />
       </div>
     </div>
   );
