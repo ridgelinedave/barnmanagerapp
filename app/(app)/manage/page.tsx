@@ -1,5 +1,4 @@
 import { TabPage } from "@/components/TabPage";
-import { StubScreen } from "@/components/StubScreen";
 import { SectionHeader } from "@/components/ui/primitives";
 import { ListRow } from "@/components/ui/ListRow";
 import { Icon, type IconName } from "@/components/ui/Icon";
@@ -100,7 +99,12 @@ const FAMILIES: Entry[] = [
 ];
 
 /**
- * Team sits on its own, below the flagged groups.
+ * Team & access leads the index.
+ *
+ * It was last, below the flagged groups. Wrong order: who can get in and what
+ * they can do is the thing Belle reaches for when someone joins, someone
+ * leaves, or someone cannot see what they should — and all three are urgent in
+ * a way that "the repeating lesson pattern" is not.
  *
  * It has no feature flag because it manages the Phase 0 identity tables, which
  * have been live since the first migration — there is no switch to be off. It
@@ -112,7 +116,7 @@ const TEAM: Entry[] = [
   {
     href: "/manage/team",
     title: "Team",
-    meta: "Roles and permissions, families and riders, levels",
+    meta: "People, invites, roles, families",
     icon: "grid",
   },
 ];
@@ -145,18 +149,15 @@ function Group({ title, entries }: { title: string; entries: Entry[] }) {
 export default async function ManagePage() {
   await requireTab("/manage");
 
+  // No "still to come" stub here any more. It claimed invites were unbuilt
+  // months after they shipped — a screen that lies about the product is worse
+  // than one that says nothing, and Belle has no use for a roadmap on her index.
   return (
     <TabPage title="Manage">
+      <Group title="Team & access" entries={TEAM} />
       <Group title="Running the day" entries={TODAY} />
       <Group title="Records" entries={RECORDS} />
       <Group title="Families" entries={FAMILIES} />
-      <Group title="The barn" entries={TEAM} />
-
-      <StubScreen
-        heading="More management tools"
-        phase="Phases 2–3"
-        detail="Sending someone an invite to sign in, QuickBooks sync and the show tools are still to come."
-      />
     </TabPage>
   );
 }

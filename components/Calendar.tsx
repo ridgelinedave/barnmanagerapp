@@ -254,7 +254,11 @@ export function Calendar({
                           ? "bg-accent font-bold text-accent-on"
                           : cell.inMonth
                             ? "text-ink"
-                            : "text-muted/50"
+                            : // NOT muted/50 — that measured 2.18:1 and a date
+                              // you cannot read is a date you cannot tap with
+                              // confidence. Full `muted` is 6.34:1 and still
+                              // clearly recedes behind `ink`.
+                              "text-muted"
                       }`}
                     >
                       {Number(cell.iso.slice(8, 10))}

@@ -47,19 +47,24 @@ export function NotificationBell() {
   const label = unread > 0 ? `Notifications, ${unread} unread` : "Notifications";
 
   /*
-   * The bell sits in the charcoal header, so it is white-on-dark; the badge is
-   * gold carrying ink rather than a red dot, because unread mail is not an
-   * error — red in this system means something is wrong.
+   * The bell sits in the oxblood header, so it is white-on-deep (15.85:1); the
+   * badge is gold carrying ink (7.92:1) rather than a red dot, because unread
+   * mail is not an error — red in this system means something is wrong.
+   *
+   * Both were broken while the header was white: the icon kept `text-white/85`
+   * from the charcoal era and disappeared into the bar, and the badge was
+   * `bg-accent` under `text-ink` — dark on dark. Fixed with the header, not
+   * around it.
    */
   return (
     <a
       href="/notifications"
       aria-label={label}
-      className="relative -mr-1.5 inline-flex size-11 shrink-0 items-center justify-center rounded-chip text-white/85"
+      className="relative -mr-1.5 inline-flex size-11 shrink-0 items-center justify-center rounded-chip text-white"
     >
       <Icon name="bell" className="size-6" />
       {unread > 0 && (
-        <span className="absolute right-0.5 top-1 min-w-5 rounded-chip bg-accent px-1 text-center font-display text-caption font-bold leading-5 text-ink">
+        <span className="absolute right-0.5 top-1 min-w-5 rounded-chip bg-gold px-1 text-center font-display text-caption font-bold leading-5 text-ink">
           {unread > 99 ? "99+" : unread}
         </span>
       )}

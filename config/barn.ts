@@ -177,12 +177,23 @@ export const barn = {
 
     /**
      * TEXT gold — links, chip labels, the active nav label on white.
-     * 5.65:1 on white, 5.46:1 on soft. Clears the AA floor with room.
+     * 6.67:1 on white and 5.45:1 on the gold-tinted chip. Darkened from
+     * #776628, which cleared white but only managed 4.62:1 on that chip.
      */
-    goldDeep: "#776628",
+    goldDeep: "#6E5A20",
 
-    /** The page. Paper white, not a tinted near-white. */
+    /** White. CARDS are this; the page behind them is `page` below. */
     paper: "#FFFFFF",
+
+    /**
+     * The page ground — Belle’s blush. White cards float on it; on a white
+     * page a white card could only be found by its hairline.
+     * 13.8:1 carrying oxblood, 5.51:1 carrying muted.
+     */
+    page: "#F6EDEF",
+
+    /** The staff-only chip ground. 5.45:1 carrying goldDeep. */
+    goldTint: "#F0E7DA",
 
     /** Sunk tiles and read-only rows. 16.49:1 carrying ink. */
     soft: "#FAFAF9",
@@ -234,8 +245,8 @@ export const barn = {
      */
     muted: "#5D5F6B",
 
-    /** The hairline that does all the separating now that cards are retired. */
-    line: "#E7E6E2",
+    /** The hairline. Warmed to sit on the blush rather than fight it. */
+    line: "#ECE2E4",
 
     /** Tinted grounds for chips and callouts. All carry their own deep tone. */
     goldSoft: "#F8F2DC",

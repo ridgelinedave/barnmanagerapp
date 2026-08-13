@@ -44,7 +44,13 @@
 
   --brand-gold: #dabc51;
   --brand-gold-press: #c9aa3f;
-  --brand-gold-deep: #776628;
+  /*
+   * Text gold. Darkened from #776628, which was 5.65:1 on white but only
+   * 4.62:1 once it sat on the gold-tinted "Staff only" chip — passing by
+   * 0.12 is not passing, it is one tint tweak away from failing. Now 6.67:1
+   * on white and 5.45:1 on the chip.
+   */
+  --brand-gold-deep: #6e5a20;
   --brand-paper: #ffffff;
   --brand-soft: #fafaf9;
   --brand-ink: #16192b;
@@ -53,7 +59,16 @@
   --brand-forest: #2f4a34;
   --brand-danger: #9b2c1f;
   --brand-muted: #5d5f6b;
-  --brand-line: #e7e6e2;
+  /*
+   * The page is no longer white. Belle's blush tint carries the warmth so
+   * white CARDS have something to float on — on a white page a white card can
+   * only be found by its hairline, which is why the app read as flat.
+   */
+  --brand-page: #f6edef;
+  /* Warmed to sit on the blush rather than fight it (was #e7e6e2, cool grey). */
+  --brand-line: #ece2e4;
+  /* The staff-only chip ground — gold's tint, distinct from the blush. */
+  --brand-gold-tint: #f0e7da;
   --brand-gold-soft: #f8f2dc;
   --brand-forest-soft: #e9efe9;
   --brand-danger-soft: #f7e7e4;
@@ -80,9 +95,10 @@
   --color-gold: var(--brand-gold);
   /* The pressed surface under a gold button. NEVER text: 2.26:1 on white. */
   --color-gold-press: var(--brand-gold-press);
-  /* Text gold — links, chip labels. 5.65:1 on white. */
+  /* Text gold — links, chip labels. 6.67:1 on white, 5.45:1 on the gold chip. */
   --color-gold-deep: var(--brand-gold-deep);
   --color-gold-soft: var(--brand-gold-soft);
+  --color-gold-tint: var(--brand-gold-tint);
   --color-forest: var(--brand-forest);
   --color-forest-soft: var(--brand-forest-soft);
   --color-danger: var(--brand-danger);
@@ -90,12 +106,13 @@
 
   /* --- Semantic surfaces ------------------------------------------------ */
   /*
-   * The page and a panel on it are the SAME white. Separation is a hairline,
-   * not a box — editorial rows over boxed cards. `ground` and `surface` are
-   * kept as distinct names so a future dark theme can pull them apart without
-   * touching a single component.
+   * The page and a panel on it are now DIFFERENT: blush ground, white surface.
+   * They were the same white, separated by a hairline — which was honest but
+   * read as flat, and gave the barn's colour nowhere to live outside the
+   * accents. Keeping the two names distinct is what made this a token change
+   * rather than a sweep through every component.
    */
-  --color-ground: var(--brand-paper);
+  --color-ground: var(--brand-page);
   --color-surface: var(--brand-paper);
   /* A tile sunk into a panel — read-only rows, quiet blocks. */
   --color-sunk: var(--brand-soft);
@@ -188,6 +205,12 @@
   --shadow-sheet: 0 -10px 40px rgb(28 27 24 / 0.22);
   --shadow-chrome: 0 1px 0 rgb(28 27 24 / 0.08);
   /* The lip that makes a button feel pressable rather than printed on. */
+  /*
+   * A card lifting off the blush. Tinted with the oxblood rather than black —
+   * a neutral shadow over a warm ground is the thing that goes muddy, and this
+   * is barely there by design: it separates, it does not decorate.
+   */
+  --shadow-card: 0 2px 6px rgb(74 0 42 / 0.05);
   --shadow-press: inset 0 -2px 0 rgb(0 0 0 / 0.12);
   --shadow-press-active: inset 0 -1px 0 rgb(0 0 0 / 0.12);
 }
@@ -198,7 +221,7 @@ html {
 }
 
 body {
-  background: var(--brand-paper);
+  background: var(--brand-page);
   color: var(--brand-ink);
   -webkit-text-size-adjust: 100%;
   /* Barlow's default figures are proportional; tabular keeps columns of times

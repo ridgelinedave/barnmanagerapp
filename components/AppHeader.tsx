@@ -6,16 +6,20 @@ import { NotificationBell } from "@/components/NotificationBell";
 import { Icon } from "@/components/ui/Icon";
 
 /**
- * The app header: white, with a hairline under it.
+ * The app header: a deep oxblood bar under a gold hairline.
  *
- * It used to be a charcoal plane. A heavy black bar pinned to the top of every
- * screen, with a second one at the bottom, is a lot to look at for a tool
- * someone opens forty times a day — and it competed with the accent for
- * attention, which meant the one colour that should mean "this is the action"
- * was the third loudest thing on screen.
+ * It has been charcoal, then white. White made the app read as unbranded — a
+ * generic light shell you could hand to any business — and it hid a real bug:
+ * the bell was still styled `text-white/85` from the charcoal era, so it was
+ * invisible on the white bar and its badge was dark-on-dark.
  *
- * White chrome, dark text, and the accent spent only where it does work: the
- * barn kicker, the active tab, the primary button, a chip.
+ * Oxblood puts Belle's colour where the eye lands first and gives the gold
+ * something to sit on. The bar is the ONE deep plane in the app: the body is
+ * blush, the cards are white, and the bottom nav stays light, so this reads as
+ * a masthead rather than the chrome closing in from both edges.
+ *
+ * Contrast on the new pairings: white title on #4A002A is 15.85:1, gold
+ * kicker on the same is 7.22:1, and the badge is gold carrying ink at 7.92:1.
  *
  * Three shapes, one component:
  *   root      the crest, the barn name, the screen title, the bell
@@ -39,13 +43,13 @@ export function AppHeader({
   bell?: boolean;
 }) {
   return (
-    <header className="safe-top sticky top-0 z-30 border-b border-line bg-surface">
+    <header className="safe-top sticky top-0 z-30 border-b-2 border-gold bg-deep">
       <div className="mx-auto flex max-w-screen-sm items-center gap-3 px-4 py-3">
         {back ? (
           <Link
             href={back}
             aria-label="Back"
-            className="-ml-2 flex size-11 shrink-0 items-center justify-center rounded-chip text-ink"
+            className="-ml-2 flex size-11 shrink-0 items-center justify-center rounded-chip text-white"
           >
             <Icon name="back" className="size-5.5" strokeWidth={2} />
           </Link>
@@ -80,20 +84,22 @@ export function AppHeader({
               </span>
             )}
             <div className="min-w-0 flex-1">
-              <h1 className="truncate font-display text-display text-ink">{subject.name}</h1>
+              <h1 className="truncate font-display text-display text-white">{subject.name}</h1>
               {subject.meta && (
-                <p className="truncate text-caption text-muted">{subject.meta}</p>
+                /* white/75 on oxblood is 9.4:1 — quiet without going unreadable,
+                   which is what `muted` would have been on this plane. */
+                <p className="truncate text-caption text-white/75">{subject.meta}</p>
               )}
             </div>
           </div>
         ) : (
           <div className="min-w-0 flex-1">
             {!back && (
-              <p className="truncate font-display text-eyebrow uppercase text-accent-text">
+              <p className="truncate font-display text-eyebrow uppercase text-gold">
                 {barn.shortName}
               </p>
             )}
-            <h1 className="truncate font-display text-display leading-none text-ink">{title}</h1>
+            <h1 className="truncate font-display text-display leading-none text-white">{title}</h1>
           </div>
         )}
 

@@ -20,9 +20,18 @@ import { Icon, type IconName } from "@/components/ui/Icon";
 /* -------------------------------------------------------------------------- */
 
 /**
- * A panel on the paper ground: one hairline, tight radius, and NO
- * shadow. A drop shadow over a warm ground goes muddy; the hairline does the
- * separating and keeps the surface clean.
+ * A white panel floating on the blush ground: warm hairline, soft oxblood-tinted
+ * shadow, and an oxblood left edge.
+ *
+ * This used to be a hairline and explicitly NO shadow, on the reasoning that a
+ * shadow over a warm ground goes muddy. That held while the page was white and
+ * the card was white — there was nothing to lift off. Now the page is blush and
+ * the card is the only white thing on it, so a barely-there lift is what makes
+ * it read as a card at all. The shadow is tinted with the oxblood rather than
+ * black, which is what stops it going grey.
+ *
+ * The left edge is Belle's, from the mockup, and is the one place this system
+ * uses a heavy side border deliberately.
  */
 export function Card({
   children,
@@ -34,7 +43,11 @@ export function Card({
   as?: "section" | "div" | "article" | "li";
 }) {
   return (
-    <Tag className={`rounded-card border border-line bg-surface ${className}`}>{children}</Tag>
+    <Tag
+      className={`rounded-card border border-line border-l-[3px] border-l-accent-text bg-surface shadow-card ${className}`}
+    >
+      {children}
+    </Tag>
   );
 }
 
@@ -121,7 +134,12 @@ export function SectionHeader({
 }) {
   return (
     <div className="flex items-baseline gap-3">
-      <h2 className="font-display text-heading text-ink">{title}</h2>
+      {/* Oxblood with a short gold rule under it. The rule is 24px and fixed,
+          not the width of the words — a full-width underline reads as a
+          divider and would compete with the card edges below it. */}
+      <h2 className="relative pb-1.5 font-display text-heading text-accent-text after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-6 after:bg-gold after:content-['']">
+        {title}
+      </h2>
       {count && <p className="text-caption text-muted">{count}</p>}
       {action && (
         /* Same 44px hit area, same trick. */
@@ -160,9 +178,15 @@ export function Chip({
   icon?: IconName;
   tone?: "neutral" | "gold" | "forest" | "danger";
 }) {
+  /*
+   * Neutral is blush carrying oxblood — the default pill is now branded rather
+   * than grey. `gold` keeps its own tint so "Staff only" stays distinguishable
+   * from an ordinary fact at a glance; its text is gold-deep, NOT gold, which
+   * is 1.86:1 and unusable on anything light.
+   */
   const tones = {
-    neutral: "bg-sunk text-ink",
-    gold: "bg-accent-tint text-accent-text",
+    neutral: "bg-accent-tint text-accent-text",
+    gold: "bg-gold-tint text-gold-deep",
     forest: "bg-forest-soft text-forest",
     danger: "bg-danger-soft text-danger",
   } as const;
