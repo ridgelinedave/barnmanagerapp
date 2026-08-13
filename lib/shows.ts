@@ -2,7 +2,9 @@ import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
 import { currentRole } from "@/lib/guard";
+import { getViewer } from "@/lib/session";
 import { supabaseConfigured } from "@/lib/env";
+import { safeFileName } from "@/lib/documents";
 import { barnToday } from "@/lib/dates";
 import { barn } from "@/config/barn";
 import type { Show, ShowEntry, ShowResult } from "@/lib/types";
@@ -25,6 +27,8 @@ export type ShowDetail = {
   show: Show;
   entries: (ShowEntry & { riderName: string; horseName: string | null })[];
   results: (ShowResult & { riderName: string })[];
+  /** Signed, short-lived. Null when there is no banner or no link could be minted. */
+  bannerUrl: string | null;
 };
 
 /** A card in the carousel / a row in the next-up list. */
@@ -32,13 +36,90 @@ export type ShowSummary = {
   show: Show;
   /** Entries the CALLER can see — for a parent that is only their own riders. */
   riderCount: number;
-  /** True when the caller has a rider entered. Drives "My rides" vs "Register". */
+  /** True when the caller has a rider entered. Drives "My rides". */
   mine: boolean;
   rideTimesPosted: boolean;
   /** Drives the Results sub-tab. See splitShows for why it is not "is it past". */
   hasResults: boolean;
   dateLabel: string;
+  /** Signed, short-lived. Null when there is no banner. */
+  bannerUrl: string | null;
 };
+
+/* -------------------------------------------------------------------------- */
+/* Banners                                                                     */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * THE BANNER BUCKET IS PRIVATE, so `image_path` is an object name and never a
+ * URL — a stored URL goes stale the moment the bucket or CDN changes, and a
+ * public bucket would leave a staff-only show's banner reachable by anyone who
+ * guessed the path (migration 0021's header says exactly this).
+ *
+ * Every link handed to a screen is therefore signed per request with the
+ * CALLER'S OWN session, which means Storage RLS decides whether it can be
+ * minted at all. A family who may not read a staff-only show gets no link
+ * rather than a broken image — and they never see the card either, because the
+ * row was already filtered by the same visibility rule. Same shape as the
+ * documents vault (lib/documents.ts).
+ */
+export const SHOWS_BUCKET = "shows";
+
+/** Long enough to look at the page, short enough to be worthless if shared. */
+const BANNER_TTL_SECONDS = 60 * 30;
+
+/**
+ * `<show_id>/<filename>` — the path convention the storage policies parse.
+ *
+ * The show id is the FIRST path segment because that is what
+ * `show_banner_is_readable()` splits on to decide who may read the object. The
+ * filename is scrubbed through the documents helper for the same reason it is
+ * there: a name containing `../` or a slash would move the object into another
+ * show's folder, and the folder IS the access rule.
+ */
+export function showBannerPath(showId: string, fileName: string): string {
+  return `${showId}/${safeFileName(fileName)}`;
+}
+
+/** Signed URLs for a batch of object names, keyed by path. Missing = no link. */
+async function signBanners(paths: string[]): Promise<Map<string, string>> {
+  if (paths.length === 0) return new Map();
+
+  const supabase = await createClient();
+  const { data } = await supabase.storage
+    .from(SHOWS_BUCKET)
+    .createSignedUrls(paths, BANNER_TTL_SECONDS);
+
+  // A path the caller may not read comes back with an error and no signedUrl;
+  // it simply does not enter the map, and the card falls back to the gradient.
+  const signed = new Map<string, string>();
+  for (const row of data ?? []) {
+    if (row.path && row.signedUrl) signed.set(row.path, row.signedUrl);
+  }
+  return signed;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Who may edit                                                                */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Does this viewer get the management controls?
+ *
+ * MIRRORS `has_permission('manage_shows')`, which is what migration 0021's
+ * write policies actually check — admin implicitly, staff by the grantable
+ * flag (SPEC §4). This is for DECIDING WHAT TO RENDER and nothing else: the
+ * database refuses the write whatever this returns, and every action re-checks
+ * server-side before it touches a table. Hiding a button is not a security
+ * boundary and must never be mistaken for one.
+ */
+export async function canManageShows(): Promise<boolean> {
+  const state = await getViewer();
+  if (state.status !== "viewer") return false;
+
+  const { role, profile } = state.viewer;
+  return role === "admin" || Boolean(profile?.manage_shows);
+}
 
 /**
  * "Aug 22 – 24" when a show sits inside one month, "Aug 30 – Sep 1" when it
@@ -91,6 +172,11 @@ export async function listShows(): Promise<ShowSummary[]> {
 
   const withResults = new Set((scored ?? []).map((r) => r.show_id));
 
+  // One signing round trip for the whole carousel rather than one per card.
+  const bannerUrls = await signBanners(
+    (shows as Show[]).map((s) => s.image_path).filter((p): p is string => Boolean(p)),
+  );
+
   // Distinct riders per show. A rider entered on two horses is one rider going.
   const riders = new Map<string, Set<string>>();
   const timed = new Set<string>();
@@ -113,6 +199,7 @@ export async function listShows(): Promise<ShowSummary[]> {
       rideTimesPosted: timed.has(show.id),
       hasResults: withResults.has(show.id),
       dateLabel: showDateLabel(show.start_date, show.end_date),
+      bannerUrl: show.image_path ? (bannerUrls.get(show.image_path) ?? null) : null,
     };
   });
 }
@@ -176,8 +263,12 @@ export async function loadShow(id: string): Promise<ShowDetail | null> {
   const riderName = new Map((riders ?? []).map((r) => [r.id, r.name]));
   const horseName = new Map((horses ?? []).map((h) => [h.id, h.name]));
 
+  const banner = (show as Show).image_path;
+  const bannerUrl = banner ? ((await signBanners([banner])).get(banner) ?? null) : null;
+
   return {
     show: show as Show,
+    bannerUrl,
     entries: (entries ?? []).map((e) => ({
       ...(e as ShowEntry),
       riderName: riderName.get(e.rider_id) ?? "Rider",

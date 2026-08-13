@@ -42,16 +42,26 @@ const EMPTY: Record<Tab, { title: string; body: string }> = {
   },
 };
 
-/** The banner. A tinted plane when a show has no image — never a broken frame. */
+/**
+ * The banner. A tinted plane when a show has no image — never a broken frame.
+ *
+ * IT RENDERS `bannerUrl`, NOT `image_path`. The column holds an object name
+ * inside a PRIVATE bucket (`<show_id>/<filename>`), which is not a URL and
+ * never was — putting it in a `src` produced a request to /<uuid>/<file> on
+ * this origin and a broken image on every show with a banner. lib/shows.ts
+ * mints a short-lived signed link per request instead, so Storage RLS decides
+ * whether the link exists at all. A caller who may not read it gets the
+ * gradient, which is a fallback rather than a failure.
+ */
 function Banner({ summary }: { summary: ShowSummary }) {
-  const { show } = summary;
+  const { show, bannerUrl } = summary;
   return (
     <div className="relative h-[7.5rem] w-full overflow-hidden bg-accent-text">
-      {show.image_path ? (
+      {bannerUrl ? (
         /* Signed, per-request storage URL — next/image would proxy a one-time
            link it cannot cache. Same reason as the horse profile photo. */
         /* eslint-disable-next-line @next/next/no-img-element */
-        <img src={show.image_path} alt="" className="size-full object-cover" />
+        <img src={bannerUrl} alt="" className="size-full object-cover" />
       ) : (
         /* Two oxbloods on the diagonal. Deliberately abstract: a stock horse
            photo on every card would say less than the show's own name. */
@@ -125,13 +135,31 @@ function NextUpRow({ summary, isBarn }: { summary: ShowSummary; isBarn: boolean 
         <span className="block font-display text-heading leading-tight text-ink">{show.name}</span>
         <span className="mt-0.5 block text-caption text-muted">{meta}</span>
       </span>
-      {/* Not a button — the whole row is the link. A pill inside a link that
-          looked pressable would be a second target doing the same thing.
-          The barn never sees "My rides" or "Register": Belle has no rider and
-          does not register herself, she opens the roster. */}
-      <span className="shrink-0 rounded-chip bg-accent-tint px-2.5 py-1 font-display text-eyebrow uppercase text-accent-text">
-        {isBarn ? "Roster" : mine ? "My rides" : "Register"}
-      </span>
+      {/*
+       * Not a button — the whole row is the link. A pill inside a link that
+       * looked pressable would be a second target doing the same thing. The
+       * barn never sees "My rides": Belle has no rider, she opens the roster.
+       *
+       * "REGISTER" IS GONE, and it was the only thing on this screen promising
+       * something the app cannot do. Families are read-only here — the barn
+       * enters riders — so a pill styled exactly like the tappable "My rides"
+       * one, saying Register, was an invitation to a self-service flow that
+       * does not exist. It is a quiet line of text now, in the muted tone, so
+       * it reads as an instruction rather than a control.
+       */}
+      {isBarn ? (
+        <span className="shrink-0 rounded-chip bg-accent-tint px-2.5 py-1 font-display text-eyebrow uppercase text-accent-text">
+          Roster
+        </span>
+      ) : mine ? (
+        <span className="shrink-0 rounded-chip bg-accent-tint px-2.5 py-1 font-display text-eyebrow uppercase text-accent-text">
+          My rides
+        </span>
+      ) : (
+        <span className="max-w-24 shrink-0 text-right text-caption leading-tight text-muted">
+          Contact the barn to enter
+        </span>
+      )}
     </Link>
   );
 }

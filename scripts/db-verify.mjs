@@ -298,17 +298,38 @@ console.log("\nTriggers");
 // here, at the catalog, as well as behaviourally in the policy suite.
 console.log("\nStorage");
 {
-  const { rows: buckets } = await client.query(
-    `select id, public from storage.buckets where id = 'documents'`,
-  );
+  /*
+   * Every private bucket the app depends on, and the migration that creates it.
+   *
+   * This was hardcoded to `documents`, which meant the `shows` banner bucket
+   * (0021) went unchecked for as long as nothing rendered a banner. The moment
+   * the app started signing URLs out of it, an unapplied 0021 or a bucket
+   * flipped public in the dashboard would have been a silent hole rather than a
+   * red gate — a public bucket serves a staff-only show's banner to anyone with
+   * the URL, with no policy evaluated at all.
+   */
+  const BUCKETS = [
+    { id: "documents", migration: "0012" },
+    { id: "shows", migration: "0021" },
+  ];
 
-  if (buckets.length === 0) {
-    flag("the `documents` bucket does not exist — apply migration 0012.");
-  } else {
-    const isPublic = buckets[0].public;
-    console.log(`  [${isPublic ? "!" : "x"}] bucket documents — ${isPublic ? "PUBLIC" : "private"}`);
+  for (const bucket of BUCKETS) {
+    const { rows } = await client.query(
+      `select id, public from storage.buckets where id = $1`,
+      [bucket.id],
+    );
+
+    if (rows.length === 0) {
+      flag(`the \`${bucket.id}\` bucket does not exist — apply migration ${bucket.migration}.`);
+      continue;
+    }
+
+    const isPublic = rows[0].public;
+    console.log(
+      `  [${isPublic ? "!" : "x"}] bucket ${bucket.id} — ${isPublic ? "PUBLIC" : "private"}`,
+    );
     if (isPublic) {
-      flag("the `documents` bucket is PUBLIC — every file in it is readable by URL.");
+      flag(`the \`${bucket.id}\` bucket is PUBLIC — every file in it is readable by URL.`);
     }
   }
 
@@ -321,29 +342,36 @@ console.log("\nStorage");
   if (!rls[0]?.enabled) flag("storage.objects has RLS DISABLED — every object is readable.");
   else console.log("  [x] storage.objects RLS on");
 
-  const { rows: policies } = await client.query(
-    `select policyname, cmd, roles::text, qual, with_check
-       from pg_policies
-      where schemaname = 'storage' and tablename = 'objects'
-        and policyname like 'documents:%'
-      order by cmd, policyname`,
-  );
-  for (const row of policies) {
-    console.log(`  ${row.cmd.padEnd(6)} ${row.roles.padEnd(17)} ${row.policyname}`);
-    if (!row.roles.includes("authenticated")) {
-      flag(`storage policy "${row.policyname}" is not scoped to authenticated.`);
+  for (const bucket of BUCKETS) {
+    const { rows: policies } = await client.query(
+      `select policyname, cmd, roles::text, qual, with_check
+         from pg_policies
+        where schemaname = 'storage' and tablename = 'objects'
+          and policyname like $1
+        order by cmd, policyname`,
+      [`${bucket.id}:%`],
+    );
+
+    for (const row of policies) {
+      console.log(`  ${row.cmd.padEnd(6)} ${row.roles.padEnd(17)} ${row.policyname}`);
+      if (!row.roles.includes("authenticated")) {
+        flag(`storage policy "${row.policyname}" is not scoped to authenticated.`);
+      }
+      // A policy that forgot its bucket predicate would apply to every other
+      // bucket in the project.
+      const body = `${row.qual ?? ""} ${row.with_check ?? ""}`;
+      if (!body.includes(`'${bucket.id}'`)) {
+        flag(`storage policy "${row.policyname}" does not pin bucket_id = '${bucket.id}'.`);
+      }
     }
-    // A documents policy that forgot its bucket predicate would apply to every
-    // other bucket in the project.
-    const body = `${row.qual ?? ""} ${row.with_check ?? ""}`;
-    if (!body.includes("'documents'")) {
-      flag(`storage policy "${row.policyname}" does not pin bucket_id = 'documents'.`);
+
+    if (policies.length < 4) {
+      flag(
+        `only ${policies.length} ${bucket.id} policies found — expected 4 (select/insert/update/delete).`,
+      );
+    } else {
+      console.log(`  — ${policies.length} ${bucket.id} policies`);
     }
-  }
-  if (policies.length < 4) {
-    flag(`only ${policies.length} documents policies found — expected 4 (select/insert/update/delete).`);
-  } else {
-    console.log(`  — ${policies.length} documents policies`);
   }
 }
 
