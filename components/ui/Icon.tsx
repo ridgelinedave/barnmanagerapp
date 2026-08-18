@@ -33,9 +33,14 @@ export type IconName =
   | "people"
   | "more"
   | "eye"
-  | "eyeOff";
+  | "eyeOff"
+  | "ribbon";
 
 const PATHS: Record<IconName, string> = {
+  /** A placing rosette. Same path as the Lessons tab glyph in lib/nav.ts, so
+      the tab and the row that leads to shows are visibly the same idea. */
+  ribbon:
+    "M12 3a5.25 5.25 0 1 0 0 10.5A5.25 5.25 0 0 0 12 3Zm-3.2 9.6L6.5 21l5.5-2.75L17.5 21l-2.3-8.4",
   chevron: "m9 6 6 6-6 6",
   /** The trailing mark on a primary button. */
   arrow: "M4 12h15m0 0-5.5-5.5M19 12l-5.5 5.5",

@@ -38,7 +38,7 @@ function revalidate() {
   revalidatePath("/manage/team");
   // A role change rewrites someone's whole tab bar, and a rider or level edit
   // shows up on the schedule and the backfill picker.
-  revalidatePath("/manage");
+  revalidatePath("/manage/team");
   revalidatePath("/schedule");
 }
 

@@ -140,7 +140,7 @@ export default async function ManageTimesheetsPage({
   const employees = people.filter((p) => p.role === "staff" || byProfile.has(p.id));
 
   return (
-    <TabPage title="Clock-ins" back="/manage">
+    <TabPage title="Clock-ins" back="/barn">
       {/* The daily question, above the fortnightly one. */}
       <section className="flex flex-col gap-3">
         <SectionHeader

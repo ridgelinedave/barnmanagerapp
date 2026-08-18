@@ -85,7 +85,7 @@ function ShowCard({ summary }: { summary: ShowSummary }) {
   const { show, dateLabel } = summary;
   return (
     <Link
-      href={`/shows/${show.id}`}
+      href={`/lessons/shows/${show.id}`}
       /* 15.5rem, and shrink-0 so the row scrolls instead of squashing. The
          next card peeking past the edge is what tells a thumb to swipe. */
       className="flex w-62 shrink-0 flex-col overflow-hidden rounded-card border border-line border-l-[3px] border-l-accent-text bg-surface shadow-card"
@@ -127,7 +127,7 @@ function NextUpRow({ summary, isBarn }: { summary: ShowSummary; isBarn: boolean 
 
   return (
     <Link
-      href={`/shows/${show.id}`}
+      href={`/lessons/shows/${show.id}`}
       className="flex min-h-14 items-center gap-3 rounded-card border border-line bg-surface p-3"
     >
       <DateBlock iso={show.start_date} />

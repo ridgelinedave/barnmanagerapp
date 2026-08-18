@@ -12,7 +12,7 @@ import {
   uploadShowBanner,
   removeShowBanner,
   type ShowState,
-} from "@/app/(app)/shows/actions";
+} from "@/app/(app)/lessons/shows/actions";
 import type { Show, ShowEntry, ShowResult } from "@/lib/types";
 
 /**

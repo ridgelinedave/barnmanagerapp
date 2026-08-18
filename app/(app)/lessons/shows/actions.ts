@@ -49,8 +49,8 @@ async function requireShowManager() {
 }
 
 function revalidate(showId?: string) {
-  revalidatePath("/shows");
-  if (showId) revalidatePath(`/shows/${showId}`);
+  revalidatePath("/lessons/shows");
+  if (showId) revalidatePath(`/lessons/shows/${showId}`);
 }
 
 /** True for a Postgres unique-violation, whatever the driver wrapped it in. */

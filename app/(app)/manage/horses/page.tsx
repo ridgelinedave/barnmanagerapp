@@ -34,7 +34,7 @@ export default async function ManageHorsesPage() {
     familyId ? (families.get(familyId) ?? "Owned") : "Barn horse";
 
   return (
-    <TabPage title="Horses" back="/manage">
+    <TabPage title="Horses" back="/barn">
       <section className="flex flex-col gap-3">
         <SectionHeader
           title="In work"

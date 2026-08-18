@@ -33,7 +33,7 @@ export default async function ManageCarePage() {
   const soon = due.filter((d) => (d.event.due_next ?? "") >= today);
 
   return (
-    <TabPage title="Care due" back="/manage">
+    <TabPage title="Care due" back="/barn">
       <p className="text-caption text-muted">
         Everything falling due in the next {CARE_DUE_SOON_DAYS} days, soonest first.
       </p>

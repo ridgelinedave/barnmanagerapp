@@ -31,7 +31,7 @@ export default async function LessonTemplatesPage() {
   }));
 
   return (
-    <TabPage title="Weekly schedule" back="/manage">
+    <TabPage title="Weekly schedule" back="/lessons">
       <p className="text-caption text-muted">
         Build the repeating week once. Generate the calendar from the Schedule tab, then edit
         only the days that differ.

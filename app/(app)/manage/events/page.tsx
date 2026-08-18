@@ -45,7 +45,7 @@ export default async function ManageEventsPage() {
   const { upcoming, past } = partitionEvents(await listAllEvents());
 
   return (
-    <TabPage title="Calendar" back="/manage">
+    <TabPage title="Calendar" back="/barn">
       <section className="flex flex-col gap-3">
         <SectionHeader title="Coming up" count={`${upcoming.length}`} />
 

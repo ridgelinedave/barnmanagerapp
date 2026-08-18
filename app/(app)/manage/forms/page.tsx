@@ -50,7 +50,7 @@ export default async function ManageFormsPage() {
   const templates = progress.map((entry) => entry.template);
 
   return (
-    <TabPage title="Forms" back="/manage">
+    <TabPage title="Forms" back="/barn">
       {/* ------------------------------------------------------------------ */}
       {/* Needs signature — the reason anyone opens this screen               */}
       {/* ------------------------------------------------------------------ */}

@@ -1,132 +1,109 @@
 import { TabPage } from "@/components/TabPage";
-import { StubScreen } from "@/components/StubScreen";
-import { ParentLessonCard } from "@/components/ParentLessonCard";
-import { BackfillOfferCard } from "@/components/BackfillOfferCard";
 import { EmptyState, SectionHeader } from "@/components/ui/primitives";
-import { requireTab } from "@/lib/guard";
-import {
-  listUpcomingInstances,
-  listLessonRidersForInstances,
-  listVisibleRiders,
-  listOffers,
-} from "@/lib/lessons";
-import { listAssignableProfiles, nameMap } from "@/lib/tasks";
-import { addBarnDays, barnToday, isInsideBackfillCutoff } from "@/lib/dates";
-import { barn, featureEnabled } from "@/config/barn";
+import { ListRow } from "@/components/ui/ListRow";
+import { Icon, type IconName } from "@/components/ui/Icon";
+import { currentRole } from "@/lib/guard";
+import { featureEnabled, type BarnFeatureFlag } from "@/config/barn";
+import type { Role } from "@/lib/types";
 
 export const metadata = { title: "Lessons" };
 
+/**
+ * Lessons — everything to do with teaching and competing.
+ *
+ * This tab used to BE the family's lesson list. Making it a section costs a
+ * family one tap to reach their own lessons, which is a real cost and worth
+ * naming: it buys one bar for every role, and it gives shows and makeups a
+ * home that is not a fourth tab. The lessons themselves are the first row, and
+ * the time-sensitive thing — an open makeup offer — is still pushed to Home,
+ * so nothing important now depends on someone navigating here.
+ *
+ * ACADEMY comes later and will slot in as a fourth row.
+ */
+type Entry = {
+  flag?: BarnFeatureFlag;
+  href: string;
+  title: string;
+  meta: string;
+  icon: IconName;
+  /** Who sees the row. Mirrors the guard on the screen it points at. */
+  roles: Role[];
+};
+
+const ALL: Role[] = ["parent", "staff", "admin"];
+
+const ENTRIES: Entry[] = [
+  // The family's own lessons. First, because for a parent this tab is still
+  // mostly "when does my kid ride".
+  {
+    flag: "lessons",
+    href: "/lessons/mine",
+    title: "My lessons",
+    meta: "Your riders' next four weeks, and cancelling a spot",
+    icon: "calendar",
+    roles: ["parent"],
+  },
+  // The barn's side of the same subject: who rides when, and the repeating
+  // pattern the schedule is generated from.
+  {
+    flag: "lessons",
+    href: "/manage/lesson-templates",
+    title: "Students",
+    meta: "The weekly lesson pattern and who rides in it",
+    icon: "people",
+    roles: ["admin"],
+  },
+  {
+    flag: "shows",
+    href: "/lessons/shows",
+    title: "Show information",
+    meta: "Where the barn is competing, entries, ride times and results",
+    icon: "ribbon",
+    roles: ALL,
+  },
+  {
+    flag: "lessons",
+    href: "/lessons/makeups",
+    title: "Makeups",
+    meta: "Open spots when someone cancels",
+    icon: "clock",
+    roles: ["parent"],
+  },
+];
+
 export default async function LessonsPage() {
-  await requireTab("/lessons");
+  // No requireTab: Lessons is a tab for every role. The rows are filtered
+  // below, and every screen they point at guards itself.
+  const role = await currentRole();
 
-  if (!featureEnabled("lessons")) {
-    return (
-      <TabPage title="Lessons">
-        <StubScreen
-          heading="Upcoming lessons"
-          phase="Phase 1"
-          detail="Your riders' lessons, cancelling a spot, and the barn calendar."
-        />
-      </TabPage>
-    );
-  }
-
-  const from = barnToday();
-  const through = addBarnDays(from, 28);
-
-  // RLS returns only instances one of this family's riders is in.
-  const instances = await listUpcomingInstances(from, through);
-  const bookings = await listLessonRidersForInstances(instances.map((i) => i.id));
-  const [riders, people] = await Promise.all([listVisibleRiders(), listAssignableProfiles()]);
-
-  const riderNames = new Map(riders.map((r) => [r.id, r.name]));
-  const instructorNames = nameMap(people);
-  const instanceById = new Map(instances.map((i) => [i.id, i]));
-
-  // One card per booking, ordered by when the lesson actually happens.
-  const cards = bookings
-    .map((booking) => ({ booking, instance: instanceById.get(booking.instance_id) }))
-    .filter((entry): entry is { booking: (typeof bookings)[number]; instance: NonNullable<typeof entry.instance> } =>
-      Boolean(entry.instance),
-    )
-    .sort((a, b) =>
-      a.instance.date === b.instance.date
-        ? a.instance.start_time.localeCompare(b.instance.start_time)
-        : a.instance.date.localeCompare(b.instance.date),
-    );
-
-  const upcoming = cards.filter(({ booking }) => booking.status !== "cancelled");
-  const cancelled = cards.filter(({ booking }) => booking.status === "cancelled");
-
-  // Outstanding offers first — they are time-sensitive and someone else may be
-  // about to take the seat. Recently-answered ones ride along so the outcome
-  // stays on screen instead of the card vanishing; see listOffers().
-  const offers = await listOffers({ outstandingOnly: true, recentlyAnsweredMinutes: 10 });
-  const offerCards = offers.map((offer) => {
-    const instance = instanceById.get(offer.instance_id) ?? null;
-    return {
-      offer,
-      // A cancelled lesson is not worth offering; a resolved offer keeps its
-      // card even when the lesson is no longer readable.
-      instance: instance && instance.status === "scheduled" ? instance : null,
-    };
-  });
+  const live = ENTRIES.filter(
+    (entry) => entry.roles.includes(role) && (!entry.flag || featureEnabled(entry.flag)),
+  );
 
   return (
     <TabPage title="Lessons">
-      {offerCards.map(({ offer, instance }) => (
-        <BackfillOfferCard
-          key={offer.id}
-          offerId={offer.id}
-          status={offer.status}
-          instance={instance}
-          riderName={riderNames.get(offer.rider_id) ?? "Your rider"}
-          instructorName={
-            instance?.instructor_id ? instructorNames.get(instance.instructor_id) : undefined
-          }
-        />
-      ))}
-
-      <SectionHeader
-        title="Next 4 weeks"
-        count={upcoming.length > 0 ? `${upcoming.length} booked` : undefined}
-      />
-
-      {upcoming.length === 0 ? (
+      {live.length === 0 ? (
         <EmptyState
-          title="Nothing booked right now"
-          body="Booked lessons appear here."
+          title="Nothing here yet"
+          body="Lessons, shows and makeups will appear here."
         />
       ) : (
-        upcoming.map(({ booking, instance }) => (
-          <ParentLessonCard
-            key={booking.id}
-            instance={instance}
-            booking={booking}
-            riderName={riderNames.get(booking.rider_id) ?? "Your rider"}
-            instructorName={
-              instance.instructor_id ? instructorNames.get(instance.instructor_id) : undefined
-            }
-            insideCutoff={isInsideBackfillCutoff(instance.date, instance.start_time)}
-            cutoffHours={barn.backfillCutoffMinutes / 60}
-          />
-        ))
-      )}
-
-      {cancelled.length > 0 && (
-        <>
-          <SectionHeader title="Cancelled" count={`${cancelled.length}`} />
-          {cancelled.map(({ booking, instance }) => (
-            <ParentLessonCard
-              key={booking.id}
-              instance={instance}
-              booking={booking}
-              riderName={riderNames.get(booking.rider_id) ?? "Your rider"}
-              insideCutoff={false}
-              cutoffHours={barn.backfillCutoffMinutes / 60}
+        <section className="flex flex-col gap-3">
+          <SectionHeader title="Lessons & shows" />
+          {live.map((entry) => (
+            <ListRow
+              key={entry.href}
+              href={entry.href}
+              title={entry.title}
+              meta={entry.meta}
+              leading={
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-control bg-sunk text-accent-text">
+                  <Icon name={entry.icon} className="size-5" />
+                </span>
+              }
             />
           ))}
-        </>
+        </section>
       )}
     </TabPage>
   );

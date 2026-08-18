@@ -72,7 +72,7 @@ export default async function ManageTeamPage() {
   const openInvites = invites.filter((invite) => inviteStatus(invite) !== "accepted");
 
   return (
-    <TabPage title="Team" back="/manage">
+    <TabPage title="Team" back="/more">
       {/* ------------------------------------------------------------------ */}
       {/* A — People                                                          */}
       {/* ------------------------------------------------------------------ */}
