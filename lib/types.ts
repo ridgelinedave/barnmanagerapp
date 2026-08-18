@@ -553,3 +553,106 @@ export type ShowResult = {
   score: number | null;
   class: string;
 };
+
+/* -------------------------------------------------------------------------- */
+/* Barn ops (migration 0022)                                                   */
+/* -------------------------------------------------------------------------- */
+
+export const SUPPLY_SCOPES = ["barn", "boarder"] as const;
+export type SupplyScope = (typeof SUPPLY_SCOPES)[number];
+
+export const SUPPLY_STATUSES = ["needed", "ordered", "received"] as const;
+export type SupplyStatus = (typeof SUPPLY_STATUSES)[number];
+
+export const SUPPLY_STATUS_LABELS: Record<SupplyStatus, string> = {
+  needed: "Needed",
+  ordered: "Ordered",
+  received: "Received",
+};
+
+export type SupplyItem = {
+  id: string;
+  created_at: string;
+  name: string;
+  category: string;
+  scope: SupplyScope;
+  quantity: number | null;
+  unit: string;
+  reorder_threshold: number | null;
+  status: SupplyStatus;
+  notes: string;
+  requested_by: string | null;
+  family_id: string | null;
+  horse_id: string | null;
+};
+
+export type WaterSource = {
+  id: string;
+  created_at: string;
+  name: string;
+  location: string;
+  last_checked_at: string | null;
+  reminder_interval_days: number;
+  notes: string;
+};
+
+/** One rule row: "under 40F, put a heavy on". Authored and read by one screen. */
+export type BlanketRule = {
+  min_f: number | null;
+  max_f: number | null;
+  layer: string;
+};
+
+export type BlanketPlan = {
+  id: string;
+  created_at: string;
+  horse_id: string;
+  blanket_rules: BlanketRule[];
+  fly_mask: boolean;
+  fly_sheet: boolean;
+  fly_spray: boolean;
+  notes: string;
+};
+
+export const TURNOUT_PATTERNS = ["am", "pm", "daily", "none"] as const;
+export type TurnoutPattern = (typeof TURNOUT_PATTERNS)[number];
+
+export const TURNOUT_PATTERN_LABELS: Record<TurnoutPattern, string> = {
+  am: "Mornings",
+  pm: "Afternoons",
+  daily: "All day",
+  none: "Staying in",
+};
+
+export type TurnoutPlan = {
+  id: string;
+  created_at: string;
+  horse_id: string;
+  paddock: string;
+  turnout_group: string;
+  pattern: TurnoutPattern;
+  notes: string;
+};
+
+export const MAINTENANCE_PRIORITIES = ["low", "normal", "high"] as const;
+export type MaintenancePriority = (typeof MAINTENANCE_PRIORITIES)[number];
+
+export const MAINTENANCE_STATUSES = ["open", "in_progress", "done"] as const;
+export type MaintenanceStatus = (typeof MAINTENANCE_STATUSES)[number];
+
+export const MAINTENANCE_STATUS_LABELS: Record<MaintenanceStatus, string> = {
+  open: "Open",
+  in_progress: "In progress",
+  done: "Done",
+};
+
+export type MaintenanceRequest = {
+  id: string;
+  created_at: string;
+  title: string;
+  description: string;
+  priority: MaintenancePriority;
+  status: MaintenanceStatus;
+  assignee_id: string | null;
+  raised_by: string | null;
+};

@@ -79,6 +79,12 @@ const EXPECTED_TABLES = [
   "shows",
   "show_entries",
   "show_results",
+  // Phase 2 — barn ops (0022).
+  "supply_items",
+  "water_sources",
+  "blanket_plans",
+  "turnout_plans",
+  "maintenance_requests",
 ];
 
 /**
@@ -94,10 +100,9 @@ const EXPECTED_TABLES = [
  * just noise.
  */
 const PENDING_TABLES = {
-  // Empty: 0021 was audited and applied on 2026-08-13, so shows/show_entries/
-  // show_results moved up into EXPECTED_TABLES and are now checked as strictly
-  // as any other. Keep the mechanism — the next audited-pending migration
-  // needs it.
+  // Empty: 0022 was audited and applied on 2026-08-17, so the five barn-ops
+  // tables moved up into EXPECTED_TABLES and are now checked as strictly as
+  // any other. Keep the mechanism — the next audited-pending migration needs it.
 };
 const EXPECTED_FUNCTIONS = [
   "current_role",
@@ -122,6 +127,12 @@ const EXPECTED_FUNCTIONS = [
   "ensure_family_onboarding",
   // Phase 2 slice 5.
   "ical_token_guard",
+  // 0022 — barn ops. Three guards, one family-scope helper, one enqueue.
+  "family_owns_supply_item",
+  "supply_items_guard_insert",
+  "maintenance_guard_insert",
+  "water_sources_guard_update",
+  "enqueue_boarder_supply_notices",
 ];
 
 let problems = 0;

@@ -79,6 +79,10 @@ async function removeDemoData() {
   await del("events", "title");
   // show_entries and show_results cascade from shows.
   await del("shows", "name");
+  await del("supply_items", "name");
+  await del("water_sources", "name");
+  await del("maintenance_requests", "title");
+  // blanket_plans and turnout_plans cascade from horses.
   // care_events, feed_plans and training_logs cascade from horses;
   // submissions from templates.
   await del("form_templates", "name");
@@ -768,6 +772,165 @@ async function main() {
 
     console.log(
       `  shows         ${showIdByName.size} with ${entryCount} entries, ${resultCount} results`,
+    );
+  }
+
+
+  // --- barn ops (0022) --------------------------------------------------------
+  // Enough to make the five Barn screens read as lived-in: something below its
+  // reorder line, a trough nobody has touched, a horse with no plan.
+  //
+  // Written through the service role, so the insert guards see auth.uid() as
+  // null and return early — requested_by and raised_by stay null, which is
+  // correct for rows nobody actually typed.
+  let barnOpsSkipped = false;
+
+  const SUPPLIES = [
+    // scope=barn. One of these is deliberately at its threshold so the
+    // "running low" flag has something to catch.
+    { name: `${DEMO_TAG} Shavings`, category: "Bedding", scope: "barn", quantity: 4, unit: "bales", reorder_threshold: 6, status: "needed", notes: "Down to the last pallet." },
+    { name: `${DEMO_TAG} Timothy hay`, category: "Forage", scope: "barn", quantity: 40, unit: "bales", reorder_threshold: 15, status: "received", notes: "" },
+    { name: `${DEMO_TAG} Fly spray`, category: "Grooming", scope: "barn", quantity: 2, unit: "bottles", reorder_threshold: 3, status: "ordered", notes: "Ordered Tuesday." },
+    { name: `${DEMO_TAG} Shavings fork`, category: "Tools", scope: "barn", quantity: null, unit: "", reorder_threshold: null, status: "needed", notes: "The blue one snapped." },
+  ];
+
+  const BOARDER_SUPPLIES = [
+    { name: `${DEMO_TAG} Senior feed`, category: "Feed", quantity: 1, unit: "bag", notes: "Down to the last scoop." },
+    { name: `${DEMO_TAG} Joint supplement`, category: "Supplements", quantity: null, unit: "", notes: "Two weeks left in the tub." },
+  ];
+
+  let supplyCount = 0;
+  for (const item of SUPPLIES) {
+    const { data: existing } = await supabase
+      .from("supply_items")
+      .select("id")
+      .eq("name", item.name)
+      .maybeSingle();
+    if (existing) continue;
+    const { error } = await supabase.from("supply_items").insert(item);
+    if (error) {
+      if (/does not exist|schema cache/i.test(error.message)) { barnOpsSkipped = true; break; }
+      fail(`Could not create supply item ${item.name}`, error);
+    }
+    supplyCount++;
+  }
+
+  if (barnOpsSkipped) {
+    console.log("  barn ops      skipped — migration 0022 not applied yet");
+  } else {
+    // Boarder items hang off a real demo family, and optionally their horse.
+    const boarderFamilyId = familyIdByName.get(`${DEMO_TAG} Whitfield`) ?? null;
+    for (const [index, item] of BOARDER_SUPPLIES.entries()) {
+      if (!boarderFamilyId) break;
+      const { data: existing } = await supabase
+        .from("supply_items")
+        .select("id")
+        .eq("name", item.name)
+        .maybeSingle();
+      if (existing) continue;
+      const horse = horseIds[index % horseIds.length];
+      const { error } = await supabase.from("supply_items").insert({
+        ...item,
+        scope: "boarder",
+        status: "needed",
+        reorder_threshold: null,
+        family_id: boarderFamilyId,
+        horse_id: horse?.id ?? null,
+      });
+      if (error) fail(`Could not create boarder supply ${item.name}`, error);
+      supplyCount++;
+    }
+
+    // --- water sources. One has never been checked, which counts as overdue.
+    const daysAgo = (n) => new Date(Date.now() - n * 86400000).toISOString();
+    const WATER = [
+      { name: `${DEMO_TAG} Big field trough`, location: "North pasture", last_checked_at: daysAgo(4), reminder_interval_days: 2, notes: "Float sticks in the cold." },
+      { name: `${DEMO_TAG} Barn aisle buckets`, location: "Main barn", last_checked_at: daysAgo(0), reminder_interval_days: 1, notes: "" },
+      { name: `${DEMO_TAG} Back paddock tub`, location: "Back paddock", last_checked_at: null, reminder_interval_days: 3, notes: "New tub, not on the round yet." },
+    ];
+
+    let waterCount = 0;
+    for (const source of WATER) {
+      const { data: existing } = await supabase
+        .from("water_sources")
+        .select("id")
+        .eq("name", source.name)
+        .maybeSingle();
+      if (existing) continue;
+      const { error } = await supabase.from("water_sources").insert(source);
+      if (error) fail(`Could not create water source ${source.name}`, error);
+      waterCount++;
+    }
+
+    // --- blanket and turnout plans on the first two horses only, so the
+    // "no plan yet" half of both boards has something in it too.
+    let planCount = 0;
+    const BLANKETS = [
+      {
+        blanket_rules: [
+          { min_f: null, max_f: 35, layer: "Heavy blanket" },
+          { min_f: 35, max_f: 50, layer: "Medium blanket" },
+          { min_f: 50, max_f: null, layer: "Nothing" },
+        ],
+        fly_mask: true, fly_sheet: false, fly_spray: true,
+        notes: "Rubs at the shoulder — check under the blanket.",
+      },
+      {
+        blanket_rules: [
+          { min_f: null, max_f: 40, layer: "Medium blanket" },
+          { min_f: 40, max_f: null, layer: "Sheet only if wet" },
+        ],
+        fly_mask: true, fly_sheet: true, fly_spray: false,
+        notes: "",
+      },
+    ];
+    const TURNOUTS = [
+      { paddock: "North pasture", turnout_group: "Geldings", pattern: "daily", notes: "" },
+      { paddock: "Small paddock", turnout_group: "On his own", pattern: "am", notes: "Comes in before the afternoon heat." },
+    ];
+
+    for (const [index, plan] of BLANKETS.entries()) {
+      const horse = horseIds[index];
+      if (!horse) break;
+      const { error } = await supabase
+        .from("blanket_plans")
+        .upsert({ horse_id: horse.id, ...plan }, { onConflict: "horse_id" });
+      if (error) fail("Could not create a blanket plan", error);
+      planCount++;
+    }
+    for (const [index, plan] of TURNOUTS.entries()) {
+      const horse = horseIds[index];
+      if (!horse) break;
+      const { error } = await supabase
+        .from("turnout_plans")
+        .upsert({ horse_id: horse.id, ...plan }, { onConflict: "horse_id" });
+      if (error) fail("Could not create a turnout plan", error);
+      planCount++;
+    }
+
+    // --- maintenance. One urgent and open, one already being worked on.
+    const MAINTENANCE = [
+      { title: `${DEMO_TAG} Arena gate latch broken`, description: "Latch does not catch — gate swings open in the wind.", priority: "high", status: "open" },
+      { title: `${DEMO_TAG} Wash stall light out`, description: "Bulb or ballast, not sure which.", priority: "normal", status: "in_progress" },
+    ];
+
+    let maintCount = 0;
+    for (const request of MAINTENANCE) {
+      const { data: existing } = await supabase
+        .from("maintenance_requests")
+        .select("id")
+        .eq("title", request.title)
+        .maybeSingle();
+      if (existing) continue;
+      // status is pinned to 'open' by the guard for a signed-in caller; the
+      // service role skips the guard, so the in-progress one lands as written.
+      const { error } = await supabase.from("maintenance_requests").insert(request);
+      if (error) fail(`Could not create maintenance request ${request.title}`, error);
+      maintCount++;
+    }
+
+    console.log(
+      `  barn ops      ${supplyCount} supplies, ${waterCount} troughs, ${planCount} plans, ${maintCount} requests`,
     );
   }
 

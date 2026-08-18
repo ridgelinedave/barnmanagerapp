@@ -23,11 +23,10 @@ export const metadata = { title: "Barn" };
  * line of text each is the identical-card-grid the design system exists to
  * avoid, and rows scan faster with a thumb.
  *
- * SUPPLY LIST, WATER TROUGHS, BLANKETING and TEAM CHAT are deliberately
- * absent. Migration 0022 is written but unapplied and unaudited, so the tables
- * behind three of them do not exist yet; a row that opens a stub is worse than
- * no row, and this screen has just been rebuilt on the promise that what is
- * listed is what works. The GROUPS below are the shape they will slot into.
+ * Supply list, water troughs, blanketing and turnout landed with migration
+ * 0022 and are listed below. TEAM CHAT is still deliberately absent: it has no
+ * tables and no screen, and a row that opens a stub is worse than no row —
+ * this index is built on the promise that what is listed is what works.
  */
 type Entry = {
   /** Omitted for screens over always-present tables with no switch. */
@@ -135,6 +134,46 @@ const HORSES: Entry[] = [
  * operations, so they are here rather than stranded — flagged for David, and
  * cheap to move if he wants them elsewhere.
  */
+const OPERATIONS: Entry[] = [
+  {
+    href: "/barn/supplies",
+    title: "Supply list",
+    meta: "What is running out, for the barn and for boarders",
+    icon: "bucket",
+    // The one barn-ops row a family sees: they get their OWN boarder items,
+    // never Crouse stock. Enforced by policy, mirrored here.
+    roles: ["parent", "staff", "admin"],
+  },
+  {
+    href: "/barn/water",
+    title: "Water troughs",
+    meta: "When each was last checked, and what is due",
+    icon: "bucket",
+    roles: BARN_SIDE,
+  },
+  {
+    href: "/barn/blanketing",
+    title: "Blanketing & fly care",
+    meta: "What goes on tonight, by horse",
+    icon: "horse",
+    roles: ["parent", "staff", "admin"],
+  },
+  {
+    href: "/barn/turnout",
+    title: "Turnout",
+    meta: "Who goes out where, and with whom",
+    icon: "pin",
+    roles: ["parent", "staff", "admin"],
+  },
+  {
+    href: "/barn/maintenance",
+    title: "Maintenance",
+    meta: "Broken things, and what is being done about them",
+    icon: "alert",
+    roles: BARN_SIDE,
+  },
+];
+
 const RECORDS: Entry[] = [
   {
     flag: "announcements",
@@ -198,6 +237,7 @@ export default async function BarnPage() {
   const groups = [
     { title: "Today", entries: TODAY },
     { title: "Horses", entries: HORSES },
+    { title: "Running the barn", entries: OPERATIONS },
     { title: "Records", entries: RECORDS },
   ];
 
