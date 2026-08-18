@@ -5073,6 +5073,449 @@ async function main() {
   }
 
   // ===========================================================================
+  // BARN OPS (migration 0022) — supplies, water, blanketing, turnout, maintenance
+  //
+  // Gated on the TABLES EXISTING rather than on a feature flag, so this runs by
+  // itself the moment 0022 is applied and stays quiet before that.
+  //
+  // EVERY ROW HERE IS THIS SECTION'S OWN, created through the admin/staff
+  // client under RLS — no service role, and no rolled-back transaction, because
+  // nothing here touches a row anyone else depends on. The cleanup at the end
+  // asserts THIS SECTION'S rows are gone, never that a table is empty: the
+  // demo seed puts real supplies and troughs in these tables, and an
+  // empty-table assertion would only be satisfiable by deleting them.
+  //
+  // THE OWNS-VS-RIDES LINE IS THE POINT of the blanket/turnout cases. The
+  // fixture `owned` horse belongs to PARENT's family; the `ridden` horse is
+  // ridden by parent's rider but OWNED BY PARENT2's family. So parent reading
+  // `owned` must succeed and parent reading `ridden` must fail — same boundary
+  // care_events draws, and the reason those policies use family_owns_horse
+  // rather than family_rides_horse.
+  // ===========================================================================
+  {
+    const probe = await admin.from("supply_items").select("id").limit(1);
+    const haveBarnOps = !/does not exist|schema cache/i.test(probe.error?.message ?? "");
+
+    if (!haveBarnOps) {
+      console.log("\n\n═══ barn ops — SKIPPED ═══");
+      console.log("  Migration 0022 is not applied yet. Apply");
+      console.log("  supabase/migrations/20260817000100_barn_ops.sql and re-run.");
+      skipped += 1;
+    } else {
+      console.log("\n\n═══ barn ops — supplies, water, plans, maintenance ═══\n");
+
+      const parentFamily = fixtures.users.parent.familyId;
+      const parent2Family = fixtures.users.parent2?.familyId ?? null;
+      const ownedHorse = fixtures.horses?.owned?.id ?? null;
+      const riddenHorse = fixtures.horses?.ridden?.id ?? null;
+
+      const TAG = "[policytest]";
+      const mine = { supplies: [], water: [], maintenance: [] };
+
+      /* --- supply_items ---------------------------------------------------- */
+
+      // CONTROL FIRST: the write has to be possible at all, or every deny
+      // below passes for the wrong reason.
+      const { data: boarderItem, error: boarderErr } = await staff
+        .from("supply_items")
+        .insert({
+          name: `${TAG} boarder feed`,
+          scope: "boarder",
+          family_id: parentFamily,
+          status: "needed",
+        })
+        .select("id")
+        .single();
+      check(
+        "control: staff CAN add a boarder supply item",
+        !boarderErr && Boolean(boarderItem?.id),
+        boarderErr?.message,
+      );
+      if (boarderItem?.id) mine.supplies.push(boarderItem.id);
+
+      const { data: barnItem, error: barnErr } = await staff
+        .from("supply_items")
+        .insert({ name: `${TAG} barn stock`, scope: "barn", status: "needed" })
+        .select("id")
+        .single();
+      check(
+        "control: staff CAN add a barn-scoped supply item",
+        !barnErr && Boolean(barnItem?.id),
+        barnErr?.message,
+      );
+      if (barnItem?.id) mine.supplies.push(barnItem.id);
+
+      const parentSupplies = await visibleIds(parent, "supply_items");
+      check(
+        "control: the addressed family CAN read their own boarder item",
+        parentSupplies.ids.includes(boarderItem?.id),
+        parentSupplies.error ?? "not visible to the family it is for",
+      );
+      check(
+        "a parent CANNOT read a barn-scoped supply item",
+        !parentSupplies.ids.includes(barnItem?.id),
+        "Crouse stock was visible to a family",
+      );
+
+      if (parent2) {
+        const other = await visibleIds(parent2, "supply_items");
+        check(
+          "a parent CANNOT read another family's boarder item",
+          !other.ids.includes(boarderItem?.id),
+          "one family saw another family's supply request",
+        );
+      }
+
+      const adminSupplies = await visibleIds(admin, "supply_items");
+      check(
+        "control: admin reads both scopes",
+        adminSupplies.ids.includes(boarderItem?.id) && adminSupplies.ids.includes(barnItem?.id),
+        "admin could not see both items",
+      );
+
+      /* --- water_sources --------------------------------------------------- */
+
+      const { data: trough, error: troughErr } = await admin
+        .from("water_sources")
+        .insert({ name: `${TAG} trough`, location: "Test field", reminder_interval_days: 2 })
+        .select("id")
+        .single();
+      check(
+        "control: admin CAN add a water source",
+        !troughErr && Boolean(trough?.id),
+        troughErr?.message,
+      );
+      if (trough?.id) mine.water.push(trough.id);
+
+      const staffWater = await visibleIds(staff, "water_sources");
+      check(
+        "control: staff CAN read water sources",
+        staffWater.ids.includes(trough?.id),
+        staffWater.error ?? "staff could not see the trough",
+      );
+
+      const { error: checkedErr, data: checkedRows } = await staff
+        .from("water_sources")
+        .update({ last_checked_at: new Date().toISOString() })
+        .eq("id", trough?.id ?? "00000000-0000-0000-0000-000000000000")
+        .select("id");
+      check(
+        "control: staff CAN record a check",
+        !checkedErr && (checkedRows?.length ?? 0) === 1,
+        checkedErr?.message ?? "the update matched no rows",
+      );
+
+      const parentWater = await visibleIds(parent, "water_sources");
+      check(
+        "a parent sees 0 water sources",
+        parentWater.ids.length === 0,
+        `saw ${parentWater.ids.length}`,
+      );
+
+      // The COLUMN guard, not the row policy: staff may touch the row, but
+      // only one column of it.
+      for (const [label, patch] of [
+        ["rename it", { name: `${TAG} renamed` }],
+        ["move it", { location: "Somewhere else" }],
+        ["widen its interval", { reminder_interval_days: 99 }],
+      ]) {
+        const { error } = await staff
+          .from("water_sources")
+          .update(patch)
+          .eq("id", trough?.id ?? "00000000-0000-0000-0000-000000000000")
+          .select("id");
+        check(
+          `staff CANNOT ${label} — the column guard refuses it`,
+          error?.code === "42501",
+          error ? `got ${error.code}: ${error.message}` : "the write was accepted",
+        );
+      }
+
+      const { error: adminIntervalErr } = await admin
+        .from("water_sources")
+        .update({ reminder_interval_days: 5 })
+        .eq("id", trough?.id ?? "00000000-0000-0000-0000-000000000000")
+        .select("id");
+      check(
+        "control: admin CAN change the interval — the guard is not a blanket refusal",
+        !adminIntervalErr,
+        adminIntervalErr?.message,
+      );
+
+      /* --- blanket_plans and turnout_plans --------------------------------- */
+
+      if (ownedHorse && riddenHorse && parent2Family) {
+        // Plans on BOTH horses, so each family has one of their own to read
+        // and one they must not.
+        const { error: bpErr } = await admin
+          .from("blanket_plans")
+          .upsert(
+            { horse_id: ownedHorse, blanket_rules: [], notes: `${TAG} owned` },
+            { onConflict: "horse_id" },
+          );
+        check("control: admin CAN write a blanket plan", !bpErr, bpErr?.message);
+
+        await admin
+          .from("blanket_plans")
+          .upsert(
+            { horse_id: riddenHorse, blanket_rules: [], notes: `${TAG} ridden` },
+            { onConflict: "horse_id" },
+          );
+        await admin
+          .from("turnout_plans")
+          .upsert(
+            { horse_id: ownedHorse, paddock: `${TAG} owned` },
+            { onConflict: "horse_id" },
+          );
+        await admin
+          .from("turnout_plans")
+          .upsert(
+            { horse_id: riddenHorse, paddock: `${TAG} ridden` },
+            { onConflict: "horse_id" },
+          );
+
+        const { data: pBlanket } = await parent
+          .from("blanket_plans")
+          .select("horse_id")
+          .eq("horse_id", ownedHorse);
+        check(
+          "control: the OWNING family CAN read their horse's blanket plan",
+          (pBlanket?.length ?? 0) === 1,
+          `saw ${pBlanket?.length ?? 0}`,
+        );
+
+        const { data: pRidden } = await parent
+          .from("blanket_plans")
+          .select("horse_id")
+          .eq("horse_id", riddenHorse);
+        check(
+          "a family that only RIDES a horse CANNOT read its blanket plan",
+          (pRidden?.length ?? 0) === 0,
+          `saw ${pRidden?.length ?? 0} — owns-vs-rides line crossed`,
+        );
+
+        const { data: pTurnout } = await parent
+          .from("turnout_plans")
+          .select("horse_id")
+          .eq("horse_id", ownedHorse);
+        check(
+          "control: the OWNING family CAN read their horse's turnout",
+          (pTurnout?.length ?? 0) === 1,
+          `saw ${pTurnout?.length ?? 0}`,
+        );
+
+        const { data: pTurnoutRidden } = await parent
+          .from("turnout_plans")
+          .select("horse_id")
+          .eq("horse_id", riddenHorse);
+        check(
+          "a family that only RIDES a horse CANNOT read its turnout",
+          (pTurnoutRidden?.length ?? 0) === 0,
+          `saw ${pTurnoutRidden?.length ?? 0} — owns-vs-rides line crossed`,
+        );
+
+        check(
+          "a parent CANNOT write a blanket plan, even for their own horse",
+          await writeRefused(
+            parent
+              .from("blanket_plans")
+              .update({ notes: "parent edit" })
+              .eq("horse_id", ownedHorse)
+              .select("id"),
+          ),
+        );
+        check(
+          "a parent CANNOT write a turnout plan, even for their own horse",
+          await writeRefused(
+            parent
+              .from("turnout_plans")
+              .update({ paddock: "parent edit" })
+              .eq("horse_id", ownedHorse)
+              .select("id"),
+          ),
+        );
+      }
+
+      /* --- maintenance_requests -------------------------------------------- */
+
+      const { data: raised, error: raisedErr } = await staff
+        .from("maintenance_requests")
+        .insert({ title: `${TAG} broken gate`, priority: "normal" })
+        .select("id, status")
+        .single();
+      check(
+        "control: staff CAN raise a maintenance request",
+        !raisedErr && Boolean(raised?.id),
+        raisedErr?.message,
+      );
+      if (raised?.id) mine.maintenance.push(raised.id);
+
+      // The guard, not the policy: creating one already-resolved would slip
+      // past the update gate entirely.
+      const { data: sneaky } = await staff
+        .from("maintenance_requests")
+        .insert({ title: `${TAG} sneaky`, status: "done" })
+        .select("id, status")
+        .single();
+      if (sneaky?.id) mine.maintenance.push(sneaky.id);
+      check(
+        "a staff insert claiming status=done still lands as open",
+        sneaky?.status === "open",
+        `landed as ${sneaky?.status}`,
+      );
+
+      // Phase 0 Staff carries manage_horses = false, which is what makes this
+      // a real deny rather than a tautology.
+      check(
+        "staff without manage_horses CANNOT resolve a request",
+        await writeRefused(
+          staff
+            .from("maintenance_requests")
+            .update({ status: "done" })
+            .eq("id", raised?.id ?? "00000000-0000-0000-0000-000000000000")
+            .select("id"),
+        ),
+      );
+
+      const { data: resolved, error: resolveErr } = await admin
+        .from("maintenance_requests")
+        .update({ status: "done" })
+        .eq("id", raised?.id ?? "00000000-0000-0000-0000-000000000000")
+        .select("id, status");
+      check(
+        "control: admin CAN resolve a request",
+        !resolveErr && resolved?.[0]?.status === "done",
+        resolveErr?.message ?? `status is ${resolved?.[0]?.status}`,
+      );
+
+      /* --- enqueue_boarder_supply_notices() -------------------------------- */
+
+      // The first call may also drain notices for demo boarder items, so this
+      // asserts "at least one, and MINE is among them" rather than an exact
+      // count — a count would be a hostage to whatever else is seeded.
+      const { data: firstRun, error: firstErr } = await admin.rpc(
+        "enqueue_boarder_supply_notices",
+      );
+      check(
+        "control: the barn CAN send boarder supply notices",
+        !firstErr && (firstRun ?? 0) >= 1,
+        firstErr?.message ?? `created ${firstRun}`,
+      );
+
+      const { data: notices } = await parent
+        .from("notifications")
+        .select("id, link_path")
+        .eq("type", "supply_boarder")
+        .like("link_path", `%${boarderItem?.id}%`);
+      check(
+        "the addressed family actually received the notice",
+        (notices?.length ?? 0) === 1,
+        `found ${notices?.length ?? 0}`,
+      );
+
+      const { data: secondRun } = await admin.rpc("enqueue_boarder_supply_notices");
+      check(
+        "running it again creates 0 — idempotent per item per profile",
+        secondRun === 0,
+        `created ${secondRun}`,
+      );
+
+      // Everything boarder-scoped is drained by now, so a fresh BARN item is
+      // the only thing that could produce a notice. It must not.
+      const { data: extraBarn } = await staff
+        .from("supply_items")
+        .insert({ name: `${TAG} barn stock 2`, scope: "barn", status: "needed" })
+        .select("id")
+        .single();
+      if (extraBarn?.id) mine.supplies.push(extraBarn.id);
+      const { data: barnRun } = await admin.rpc("enqueue_boarder_supply_notices");
+      check(
+        "a barn-scoped item notifies nobody",
+        barnRun === 0,
+        `created ${barnRun} for barn stock`,
+      );
+
+      const { error: parentRpcErr } = await parent.rpc("enqueue_boarder_supply_notices");
+      check(
+        "a parent CANNOT send supply notices",
+        parentRpcErr?.code === "42501",
+        parentRpcErr ? `got ${parentRpcErr.code}` : "the call was accepted",
+      );
+
+      /* --- clean up THIS SECTION'S rows only -------------------------------- */
+
+      // Keyed to the ids this section created, never "delete everything in the
+      // table" — the demo seed's supplies and troughs live here too.
+      // NOTIFICATIONS HAVE NO DELETE POLICY — for anyone, by design: the feed
+      // is append-only from a client's point of view (migration 0004). So a
+      // .delete() through the anon client here is a SILENT NO-OP, and this
+      // section would leave one dangling notice on the fixture parent per run.
+      // Cleanup therefore goes over the direct connection, the same documented
+      // escape the at-least-one-admin section uses. It removes only the notices
+      // whose link carries THIS section's item ids — never the type as a whole,
+      // which would take the demo seed's notice with it.
+      {
+        const db = new pg.Client({
+          connectionString: DB_URL,
+          ssl: { rejectUnauthorized: false },
+          connectionTimeoutMillis: 15000,
+        });
+        await db.connect();
+        for (const itemId of mine.supplies) {
+          await db.query(
+            "delete from public.notifications where type = 'supply_boarder' and link_path like $1",
+            [`%${itemId}%`],
+          );
+        }
+        await db.end();
+      }
+      if (mine.supplies.length) {
+        await admin.from("supply_items").delete().in("id", mine.supplies);
+      }
+      if (mine.water.length) {
+        await admin.from("water_sources").delete().in("id", mine.water);
+      }
+      if (mine.maintenance.length) {
+        await admin.from("maintenance_requests").delete().in("id", mine.maintenance);
+      }
+      if (ownedHorse && riddenHorse) {
+        // The plans are upserts on a UNIQUE horse_id, so they are removed by
+        // horse rather than by id. Only the two fixture horses are touched.
+        await admin.from("blanket_plans").delete().in("horse_id", [ownedHorse, riddenHorse]);
+        await admin.from("turnout_plans").delete().in("horse_id", [ownedHorse, riddenHorse]);
+      }
+
+      const left = await visibleIds(admin, "supply_items");
+      const stillMine = left.ids.filter((id) => mine.supplies.includes(id));
+      check(
+        "this section's rows are cleaned up",
+        stillMine.length === 0,
+        `${stillMine.length} of this section's supply rows left behind`,
+      );
+
+      // The notice too, because the delete above cannot go through RLS and a
+      // no-op there would be invisible without this.
+      {
+        const db = new pg.Client({
+          connectionString: DB_URL,
+          ssl: { rejectUnauthorized: false },
+          connectionTimeoutMillis: 15000,
+        });
+        await db.connect();
+        const { rows: strays } = await db.query(
+          "select count(*)::int as n from public.notifications where type = 'supply_boarder' and body like '[policytest]%'",
+        );
+        await db.end();
+        check(
+          "this section's notification is cleaned up too",
+          strays[0].n === 0,
+          `${strays[0].n} test notice(s) left on a real account`,
+        );
+      }
+    }
+  }
+
+  // ===========================================================================
   // STANDING GUARD — function exposure
   //
   // Data-driven from the migrations, so it covers functions added later without

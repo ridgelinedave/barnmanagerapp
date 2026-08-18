@@ -819,7 +819,24 @@ async function main() {
     console.log("  barn ops      skipped — migration 0022 not applied yet");
   } else {
     // Boarder items hang off a real demo family, and optionally their horse.
-    const boarderFamilyId = familyIdByName.get(`${DEMO_TAG} Whitfield`) ?? null;
+    //
+    // EXCEPT THE FIRST ONE, which is deliberately addressed to a family that
+    // has an actual PARENT LOGIN. The demo families have no auth users, so a
+    // boarder item pointed at one is correct but invisible: enqueue finds no
+    // recipient and nothing ever arrives to look at. Reviewing the feature
+    // end to end needs at least one item somebody can actually sign in and
+    // see, so the first is aimed at whichever family really has a parent.
+    const demoFamilyId = familyIdByName.get(`${DEMO_TAG} Whitfield`) ?? null;
+
+    const { data: realParent } = await supabase
+      .from("profiles")
+      .select("family_id")
+      .eq("role", "parent")
+      .not("family_id", "is", null)
+      .limit(1)
+      .maybeSingle();
+    const notifiableFamilyId = realParent?.family_id ?? demoFamilyId;
+    const boarderFamilyId = demoFamilyId;
     for (const [index, item] of BOARDER_SUPPLIES.entries()) {
       if (!boarderFamilyId) break;
       const { data: existing } = await supabase
@@ -834,8 +851,11 @@ async function main() {
         scope: "boarder",
         status: "needed",
         reorder_threshold: null,
-        family_id: boarderFamilyId,
-        horse_id: horse?.id ?? null,
+        family_id: index === 0 ? notifiableFamilyId : boarderFamilyId,
+        // Only attach a horse when the item stays with a demo family — the
+        // fixture family does not own the demo horses, and a horse from
+        // another household on their row would read as a mistake.
+        horse_id: index === 0 ? null : (horse?.id ?? null),
       });
       if (error) fail(`Could not create boarder supply ${item.name}`, error);
       supplyCount++;
@@ -929,8 +949,19 @@ async function main() {
       maintCount++;
     }
 
+    // Send the notices the app would have sent. The server action does this
+    // on insert; the seed writes rows directly, so without this the boarder
+    // items exist and the bell stays empty. Idempotent, so re-seeding cannot
+    // double-notify.
+    const { data: notified, error: notifyError } = await supabase.rpc(
+      "enqueue_boarder_supply_notices",
+    );
+    if (notifyError) {
+      console.log(`  barn ops      notices not sent — ${notifyError.message}`);
+    }
+
     console.log(
-      `  barn ops      ${supplyCount} supplies, ${waterCount} troughs, ${planCount} plans, ${maintCount} requests`,
+      `  barn ops      ${supplyCount} supplies, ${waterCount} troughs, ${planCount} plans, ${maintCount} requests, ${notified ?? 0} notices`,
     );
   }
 
