@@ -248,6 +248,17 @@ body {
   border-radius: 2px;
 }
 
+/*
+ * On the deep plane (the AppHeader and the sidebar masthead) an accent ring is
+ * an oxblood line on oxblood — #6E1A3D on #4A002A is about 1.5:1 and invisible,
+ * so a keyboard user tabbing to the bell or the back arrow lost their place.
+ * The gold hairline the plane already carries is 7.22:1 there. Mark the plane
+ * with data-plane="deep" rather than relying on a colour utility class.
+ */
+[data-plane="deep"] :focus-visible {
+  outline-color: var(--brand-gold);
+}
+
 /* Headings take the condensed face by default so no screen has to remember. */
 h1,
 h2,

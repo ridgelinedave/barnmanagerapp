@@ -4,6 +4,7 @@ import Link from "next/link";
 import { barn } from "@/config/barn";
 import { NotificationBell } from "@/components/NotificationBell";
 import { Icon } from "@/components/ui/Icon";
+import { BUCKET_FRAME, DEFAULT_LAYOUT, type LayoutBucket } from "@/components/layout-buckets";
 
 /**
  * The app header: a deep oxblood bar under a gold hairline.
@@ -26,6 +27,12 @@ import { Icon } from "@/components/ui/Icon";
  *   back      a back arrow and a title, for a screen you drilled into
  *   subject   back arrow, a photo, a name and two lines of fact — the horse
  *             profile, where the animal deserves to be the header
+ *
+ * ON THE DESKTOP SHELL this is the top bar of the content area, right of the
+ * sidebar. The crest moves to the sidebar's masthead, so it is not printed
+ * twice side by side; the bell stays here, top right, where it is on a phone.
+ * The row follows the screen's layout bucket so the title sits over the
+ * column it titles.
  */
 export function AppHeader({
   title,
@@ -33,6 +40,7 @@ export function AppHeader({
   action,
   subject,
   bell = true,
+  layout = DEFAULT_LAYOUT,
 }: {
   title: string;
   /** href to return to. Present = drilled-in screen. */
@@ -41,10 +49,15 @@ export function AppHeader({
   action?: ReactNode;
   subject?: { name: string; meta?: string; photoUrl?: string | null };
   bell?: boolean;
+  /** The screen's desktop bucket; the row is capped to match. */
+  layout?: LayoutBucket;
 }) {
   return (
-    <header className="safe-top sticky top-0 z-30 border-b-2 border-gold bg-deep">
-      <div className="mx-auto flex max-w-screen-sm items-center gap-3 px-4 py-3">
+    <header data-plane="deep" className="safe-top sticky top-0 z-30 border-b-2 border-gold bg-deep">
+      {/* lg:min-h-18 pins the bar to one height on the desktop shell (72px +
+          the 2px hairline), the tallest of the three shapes, so it lines up
+          with the sidebar's masthead beside it whichever shape a screen uses. */}
+      <div className={`mx-auto flex ${BUCKET_FRAME[layout]} items-center gap-3 py-3 lg:min-h-18`}>
         {back ? (
           <Link
             href={back}
@@ -60,7 +73,7 @@ export function AppHeader({
             width={36}
             height={36}
             priority
-            className="size-9 shrink-0"
+            className="size-9 shrink-0 lg:hidden"
           />
         )}
 

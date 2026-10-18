@@ -141,7 +141,73 @@ production release.
 - Anything about the running production deployment (its URL, its env vars,
   whether it was serving while the Supabase project was paused).
 - Any layout above 390px. Every UI measurement in the commits above was taken
-  at 390 and 320 only.
+  at 390 and 320 only. (The desktop shell below is the first thing measured
+  wider.)
+
+---
+
+## Desktop shell — one app, two shells (2026-10-18, on `phase-2`, not on `main`)
+
+**No SQL. No new table, policy, function or migration; no feature flag
+touched.** Presentation only, to DESIGN-MASTER §14b. Not merged: David reviews
+it on a laptop first.
+
+**What it is.** From Tailwind's `lg` breakpoint (1024px) the app swaps the
+five-tab bar for a persistent sidebar; below it, nothing changes. Both chromes
+are rendered and CSS picks one, so the right shell is on the first paint with
+no flash and the hidden one is out of the accessibility tree and tab order.
+
+**Where things are.**
+
+| File | What |
+|---|---|
+| `lib/nav.ts` | The destination lists that used to live inside the Barn, Lessons and More pages; `visibleEntries()`; `sidebarFor()`, which DERIVES the sidebar from the tabs and those lists through `roleCanAccess`; `currentHref()` (longest match wins, so exactly one link is current). `ROLE_PATHS` and `roleCanAccess` unchanged. |
+| `components/Sidebar.tsx` | Draws the model. Decides nothing. |
+| `components/layout-buckets.ts` | `reading` (default, the 640px column at every width) / `split` / `wide`. Below `lg` every bucket is byte-identical to the old column. |
+| `components/TabPage.tsx` | `layout` and `detail` props. No screen sets them yet. |
+| `components/AppHeader.tsx` | Follows the bucket; crest hidden at `lg` (it is in the sidebar masthead); pinned to 74px at `lg` so it lines up with the masthead. |
+| `components/AppLoading.tsx` | Skeleton uses the default bucket; cold-load launch screen covers the whole window at `lg`. |
+| `components/TabBar.tsx` | `lg:hidden`. |
+| `app/(app)/layout.tsx` | Renders the sidebar; `lg:pl-64`. |
+| `app/(app)/{barn,lessons,more}/page.tsx` | Read their rows from `lib/nav.ts`. Output unchanged. |
+| `app/globals.css` | Focus ring is gold on the deep plane (`data-plane="deep"`); it was an invisible oxblood-on-oxblood ring on the header. |
+| `tests/nav.test.mjs` | `npm run test:nav`, wired into `verify`. 115 assertions. |
+
+**The R1 proof** (`test:nav`, 115 passed / 0 failed). For every role, with all
+flags on and all off: every rendered link is accepted by `roleCanAccess`; no
+destination the gate denies is rendered; no registry entry names a role the
+gate refuses; every href has a `page.tsx`; every `/manage` screen is in the
+admin sidebar and none is offered to staff or parents; on every page exactly
+its own link is current. Two mutations confirmed the test bites: listing
+`/manage/team` for every role failed 1 assertion; additionally stripping the
+gate out of `sidebarFor` failed 11.
+
+**Measured, this session** (dev server, dev-role preview cookie, no sign-in):
+
+- **320 and 390 — unchanged.** A layout fingerprint (every rendered element's
+  rect, in order, outside the sidebar) was taken on the original code and on
+  this one: admin on /home /schedule /barn /lessons /more /manage/team
+  /barn/water, parent on /home /barn /lessons /more. **22 of 22 identical.**
+  No sideways scroll anywhere.
+- **768 and 1023** — still the mobile shell: tab bar visible, sidebar not in the
+  tab order, content the same centred 640px column.
+- **1024, 1280, 1440** — desktop shell: one visible `nav[aria-label=Main]`,
+  exactly one `aria-current`, sidebar 256px, content column 640px starting at
+  or right of it, header row aligned with the column, sidebar masthead and
+  header both 74px, every sidebar row ≥ 44px, no sideways scroll.
+- **Keyboard** — Tab reaches the sidebar first, `:focus-visible` ring shows,
+  Enter navigates and `aria-current` moves; the sidebar element survives the
+  navigation (same DOM node), so it does not re-render between screens.
+
+**Not measured:** WebKit/iPad Safari, an actual laptop screen, the
+`split` and `wide` buckets (no screen uses them yet), the subject-header
+shape at desktop width (needs a horse record, which the dev preview cannot
+read), and the full-window cold-load launch screen at `lg` (written, not
+observed).
+
+Gate: verify green (0 errors, 6 baseline warnings; pdf 12, ical 30, invites
+27, age 36, month 48, nav 115), db:gate 628 passed / 0 failed / 0 skipped
+twice, advisor clean across 8 lints.
 
 ---
 

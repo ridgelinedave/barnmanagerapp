@@ -21,6 +21,9 @@ import type { Role } from "@/lib/types";
  * distinction is carried by colour, weight and the pill together.
  *
  * Max 5 tabs; every target is 56px tall and a full fifth of the width.
+ *
+ * MOBILE SHELL ONLY. From the `lg` breakpoint the desktop sidebar takes over
+ * (components/Sidebar.tsx) and this bar is not rendered visibly at all.
  */
 export function TabBar({ role }: { role: Role }) {
   const pathname = usePathname();
@@ -29,7 +32,7 @@ export function TabBar({ role }: { role: Role }) {
   return (
     <nav
       aria-label="Main"
-      className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface"
+      className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface lg:hidden"
     >
       <ul className="mx-auto flex max-w-screen-sm">
         {tabs.map((tab) => {

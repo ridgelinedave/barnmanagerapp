@@ -184,13 +184,22 @@ correct and wanted here. Bottom sheets become modals or drawers. Hover,
 **So "cards, never tables" is a MOBILE rule, not a global one.** A table on the
 desktop shell is right; a table on the mobile shell is still wrong.
 
+**Where it lives.** The shell switches at Tailwind's `lg` (1024px), in CSS, in
+`app/(app)/layout.tsx`. A screen picks its desktop width with one prop,
+`<TabPage layout="reading" | "split" | "wide">`; the default is `reading`, which
+is the 640px column at every width (`components/layout-buckets.ts`). Every
+landing-page row and every sidebar link comes from the destination lists in
+`lib/nav.ts` — add or move a screen there, never in a page or in
+`components/Sidebar.tsx`, and `npm run test:nav` proves the sidebar still
+agrees with `roleCanAccess`.
+
 **Measurement.** Every layout claim in this repo to date was measured at 390px
 and 320px only. Any desktop layout not yet measured must be described as
 unverified.
 
 **Colour.** Belle's oxblood is the accent and the entire white-label mechanism,
 in four tokens (`fill` / `on` / `tint` / `text`) — see `config/barn.ts`. Gold is
-decorative only: `#C2AE6D` is 2.19:1 as text and 2.19:1 carrying ink, so it is
+decorative only: `#C2AE6D` is 2.19:1 as text and 2.19:1 carrying white, so it is
 never a text colour and never an accent token. There is no cream and no cobalt
 in this app. Accessibility outranks the design system.
 
@@ -211,6 +220,7 @@ in this app. Accessibility outranks the design system.
 | `npm run test:pdf` | Signed-form PDF rendering tests |
 | `npm run test:ical` | iCal feed tests |
 | `npm run test:invites` | Invite token and claim tests |
+| `npm run test:nav` | The sidebar and the navigation gate agree, for every role (in `verify`) |
 | `npm run demo:seed` | Walkthrough data (`-- --clean` to remove) |
 | `npm run brand:assets` | Regenerate icons and splash from the real logo |
 

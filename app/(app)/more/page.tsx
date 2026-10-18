@@ -10,7 +10,12 @@ import { Icon, type IconName } from "@/components/ui/Icon";
 import { currentRole } from "@/lib/guard";
 import { getViewer } from "@/lib/session";
 import { myCalendarToken } from "@/lib/events";
-import { TABS_BY_ROLE } from "@/lib/nav";
+import {
+  SETTINGS_ADMIN_GROUP,
+  SETTINGS_YOURS_GROUP,
+  TABS_BY_ROLE,
+  visibleEntries,
+} from "@/lib/nav";
 import { barn, featureEnabled } from "@/config/barn";
 
 export const metadata = { title: "Settings" };
@@ -81,11 +86,12 @@ export default async function MorePage() {
   // lives on that screen. Staff and admin have it in the bottom bar already.
   const hasScheduleTab = TABS_BY_ROLE[role].some((tab) => tab.href === "/schedule");
 
-  const hasLinks =
-    !hasScheduleTab ||
-    (featureEnabled("clockIn") && role !== "parent") ||
-    featureEnabled("horses") ||
-    (featureEnabled("forms") && role === "parent");
+  // The rows live in lib/nav.ts, because the desktop sidebar is derived from
+  // the same lists. Edit them there.
+  const adminRows = visibleEntries(SETTINGS_ADMIN_GROUP, role, featureEnabled);
+  const yourRows = visibleEntries(SETTINGS_YOURS_GROUP, role, featureEnabled);
+
+  const hasLinks = !hasScheduleTab || yourRows.length > 0;
 
   return (
     <TabPage title="Settings">
@@ -114,29 +120,18 @@ export default async function MorePage() {
        * things that are urgent when they come up, and none of them were
        * findable from a screen called More.
        */}
-      {role === "admin" && (
+      {adminRows.length > 0 && (
         <section className="flex flex-col gap-3">
-          <SectionHeader title="Barn admin" />
-          <Row
-            href="/manage/team"
-            title="Team & access"
-            meta="Invite someone, set roles and permissions, families and riders"
-            icon="people"
-          />
-          {featureEnabled("clockIn") && (
-            <Row
-              href="/manage/timesheets"
-              title="Clock-ins & timesheets"
-              meta="Who's on the clock right now, hours and approvals"
-              icon="clock"
-            />
-          )}
+          <SectionHeader title={SETTINGS_ADMIN_GROUP.title} />
+          {adminRows.map((entry) => (
+            <Row key={entry.href} href={entry.href} title={entry.title} meta={entry.meta} icon={entry.icon} />
+          ))}
         </section>
       )}
 
       {hasLinks && (
         <section className="flex flex-col gap-3">
-          <SectionHeader title="Your things" />
+          <SectionHeader title={SETTINGS_YOURS_GROUP.title} />
           {!hasScheduleTab && (
             <Row
               href="/schedule?view=month"
@@ -145,34 +140,9 @@ export default async function MorePage() {
               icon="calendar"
             />
           )}
-          {featureEnabled("clockIn") && role !== "parent" && (
-            <Row
-              href="/more/timesheet"
-              title="My timesheet"
-              meta="Your punches and approved hours"
-              icon="clock"
-            />
-          )}
-          {featureEnabled("horses") && (
-            <Row
-              href="/more/horses"
-              title={role === "parent" ? "Your horses" : "Horse directory"}
-              meta={
-                role === "parent"
-                  ? "Your horse's record and feed chart"
-                  : "Every horse at the barn, and what they're fed"
-              }
-              icon="horse"
-            />
-          )}
-          {featureEnabled("forms") && role === "parent" && (
-            <Row
-              href="/more/forms"
-              title="Forms"
-              meta="Barn paperwork — fill in and sign on your phone"
-              icon="document"
-            />
-          )}
+          {yourRows.map((entry) => (
+            <Row key={entry.href} href={entry.href} title={entry.title} meta={entry.meta} icon={entry.icon} />
+          ))}
         </section>
       )}
 

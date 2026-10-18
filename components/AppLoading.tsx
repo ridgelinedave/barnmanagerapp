@@ -4,6 +4,7 @@ import { useState } from "react";
 import { LaunchScreen } from "@/components/LaunchScreen";
 import { SkeletonRow } from "@/components/ui/Skeleton";
 import { hasBooted } from "@/lib/boot";
+import { BUCKET_FRAME, DEFAULT_LAYOUT, bucketMainClass } from "@/components/layout-buckets";
 
 /**
  * What fills the screen while a page is still coming.
@@ -31,17 +32,30 @@ import { hasBooted } from "@/lib/boot";
 export function AppLoading() {
   const [cold] = useState(() => !hasBooted());
 
-  if (cold) return <LaunchScreen />;
+  // On the desktop shell the sidebar is already painted beside this fallback,
+  // so a cold load would show the crest in a panel next to live navigation.
+  // From `lg` the launch field covers the whole window instead, continuous
+  // with sign-in exactly as it is on a phone. Below `lg` nothing changes.
+  if (cold)
+    return (
+      <div className="lg:fixed lg:inset-0 lg:z-50">
+        <LaunchScreen />
+      </div>
+    );
 
+  // The skeleton is drawn in the DEFAULT bucket: this one fallback stands in
+  // for every screen and cannot know which it is waiting for. A screen that is
+  // promoted to `split` or `wide` should get its own loading.tsx in the same
+  // bucket, or its content will jump sideways when it lands.
   return (
     <>
       {/* The masthead's own height, in its own colour, so the oxblood bar does
           not blink out and back in between screens. */}
       <div aria-hidden="true" className="safe-top sticky top-0 z-30 border-b-2 border-gold bg-deep">
-        <div className="mx-auto flex h-[3.75rem] max-w-screen-sm items-center px-4" />
+        <div className={`mx-auto flex h-[3.75rem] ${BUCKET_FRAME[DEFAULT_LAYOUT]} items-center lg:h-18`} />
       </div>
 
-      <main className="mx-auto w-full max-w-screen-sm flex-1 px-4 pb-28 pt-5">
+      <main className={bucketMainClass(DEFAULT_LAYOUT)}>
         <span className="sr-only" role="status">
           Loading
         </span>

@@ -1,10 +1,11 @@
 import { TabPage } from "@/components/TabPage";
 import { SectionHeader } from "@/components/ui/primitives";
 import { ListRow } from "@/components/ui/ListRow";
-import { Icon, type IconName } from "@/components/ui/Icon";
+import { Icon } from "@/components/ui/Icon";
 import { EmptyState } from "@/components/ui/primitives";
 import { currentRole } from "@/lib/guard";
-import { featureEnabled, type BarnFeatureFlag } from "@/config/barn";
+import { featureEnabled } from "@/config/barn";
+import { BARN_GROUPS, visibleEntries, type DestinationGroup } from "@/lib/nav";
 import type { Role } from "@/lib/types";
 
 export const metadata = { title: "Barn" };
@@ -27,191 +28,19 @@ export const metadata = { title: "Barn" };
  * 0022 and are listed below. TEAM CHAT is still deliberately absent: it has no
  * tables and no screen, and a row that opens a stub is worse than no row —
  * this index is built on the promise that what is listed is what works.
- */
-type Entry = {
-  /** Omitted for screens over always-present tables with no switch. */
-  flag?: BarnFeatureFlag;
-  href: string;
-  title: string;
-  meta: string;
-  icon: IconName;
-  /** Who sees the row. Mirrors the guard on the screen it points at. */
-  roles: Role[];
-};
-
-const BARN_SIDE: Role[] = ["staff", "admin"];
-const ADMIN: Role[] = ["admin"];
-
-/**
- * The day. What someone opens the app standing in the aisle to do.
- */
-const TODAY: Entry[] = [
-  {
-    flag: "tasks",
-    href: "/tasks/feed",
-    title: "Feed board",
-    meta: "Tonight's feed, by horse",
-    icon: "horse",
-    roles: BARN_SIDE,
-  },
-  {
-    flag: "tasks",
-    href: "/tasks",
-    title: "Task list",
-    meta: "Today's jobs and who is doing them",
-    icon: "list",
-    roles: ["staff"],
-  },
-  {
-    flag: "tasks",
-    href: "/manage/tasks",
-    title: "Task list",
-    meta: "Templates, today's jobs, and who's doing what",
-    icon: "list",
-    roles: ADMIN,
-  },
-  {
-    flag: "clockIn",
-    href: "/clock",
-    title: "Clock in",
-    meta: "Start and end your shift",
-    icon: "clock",
-    roles: ["staff"],
-  },
-  {
-    flag: "clockIn",
-    href: "/manage/timesheets",
-    title: "Clock-ins & timesheets",
-    meta: "Who's on the clock, hours, corrections and export",
-    icon: "clock",
-    roles: ADMIN,
-  },
-];
-
-/**
- * The horses. Records rather than jobs.
  *
- * Horses points at two different screens on purpose: the barn's full record,
- * and the family's own horses. Same subject, different scope — and the scope
- * is enforced by RLS on both, not by which row someone tapped.
+ * The rows themselves live in lib/nav.ts (BARN_GROUPS), because the desktop
+ * sidebar is derived from the same list. Edit them there.
  */
-const HORSES: Entry[] = [
-  {
-    flag: "horses",
-    href: "/manage/horses",
-    title: "Horses",
-    meta: "Records, who rides what, and feed charts",
-    icon: "horse",
-    // ADMIN, not BARN_SIDE. The screen lives under /manage, which is
-    // admin-gated, so listing it for staff would have shown them a row that
-    // redirected to Home when tapped. Staff never had a horses screen; this
-    // restructure is not the place to give them one.
-    roles: ADMIN,
-  },
-  {
-    flag: "horses",
-    href: "/more/horses",
-    title: "My horses",
-    meta: "Your horse's record, feed chart and care history",
-    icon: "horse",
-    roles: ["parent"],
-  },
-  {
-    flag: "care",
-    href: "/manage/care",
-    title: "Care due",
-    meta: "Vaccines, Coggins, worming and farrier dates coming up",
-    icon: "alert",
-    roles: ADMIN,
-  },
-];
-
-/**
- * Barn-wide records that are neither a job nor a horse.
- *
- * Announcements, events and forms were on the old Manage index and the brief
- * for this restructure did not name a new home for them. They are barn
- * operations, so they are here rather than stranded — flagged for David, and
- * cheap to move if he wants them elsewhere.
- */
-const OPERATIONS: Entry[] = [
-  {
-    href: "/barn/supplies",
-    title: "Supply list",
-    meta: "What is running out, for the barn and for boarders",
-    icon: "bucket",
-    // The one barn-ops row a family sees: they get their OWN boarder items,
-    // never Crouse stock. Enforced by policy, mirrored here.
-    roles: ["parent", "staff", "admin"],
-  },
-  {
-    href: "/barn/water",
-    title: "Water troughs",
-    meta: "When each was last checked, and what is due",
-    icon: "bucket",
-    roles: BARN_SIDE,
-  },
-  {
-    href: "/barn/blanketing",
-    title: "Blanketing & fly care",
-    meta: "What goes on tonight, by horse",
-    icon: "horse",
-    roles: ["parent", "staff", "admin"],
-  },
-  {
-    href: "/barn/turnout",
-    title: "Turnout",
-    meta: "Who goes out where, and with whom",
-    icon: "pin",
-    roles: ["parent", "staff", "admin"],
-  },
-  {
-    href: "/barn/maintenance",
-    title: "Maintenance",
-    meta: "Broken things, and what is being done about them",
-    icon: "alert",
-    roles: BARN_SIDE,
-  },
-];
-
-const RECORDS: Entry[] = [
-  {
-    flag: "announcements",
-    href: "/manage/announcements",
-    title: "Announcements",
-    meta: "Post barn news to families and staff",
-    icon: "bell",
-    roles: ADMIN,
-  },
-  {
-    flag: "events",
-    href: "/manage/events",
-    title: "Barn events",
-    meta: "Clinics, farrier and vet days, closures",
-    icon: "pin",
-    roles: ADMIN,
-  },
-  {
-    flag: "forms",
-    href: "/manage/forms",
-    title: "Forms",
-    meta: "Who has signed their paperwork, and who hasn't",
-    icon: "document",
-    roles: ADMIN,
-  },
-];
-
-function Group({ title, entries, role }: { title: string; entries: Entry[]; role: Role }) {
-  const live = entries.filter(
-    (entry) => entry.roles.includes(role) && (!entry.flag || featureEnabled(entry.flag)),
-  );
+function Group({ group, role }: { group: DestinationGroup; role: Role }) {
+  const live = visibleEntries(group, role, featureEnabled);
   // A group whose whole contents are switched off, or belong to another role,
   // does not render at all — no empty heading.
   if (live.length === 0) return null;
 
   return (
     <section className="flex flex-col gap-3">
-      <SectionHeader title={title} />
+      <SectionHeader title={group.title} />
       {live.map((entry) => (
         <ListRow
           key={entry.href}
@@ -234,23 +63,14 @@ export default async function BarnPage() {
   // and every screen a row points at guards itself.
   const role = await currentRole();
 
-  const groups = [
-    { title: "Today", entries: TODAY },
-    { title: "Horses", entries: HORSES },
-    { title: "Running the barn", entries: OPERATIONS },
-    { title: "Records", entries: RECORDS },
-  ];
-
-  const anything = groups.some(({ entries }) =>
-    entries.some((e) => e.roles.includes(role) && (!e.flag || featureEnabled(e.flag))),
+  const anything = BARN_GROUPS.some(
+    (group) => visibleEntries(group, role, featureEnabled).length > 0,
   );
 
   return (
     <TabPage title="Barn">
       {anything ? (
-        groups.map(({ title, entries }) => (
-          <Group key={title} title={title} entries={entries} role={role} />
-        ))
+        BARN_GROUPS.map((group) => <Group key={group.title} group={group} role={role} />)
       ) : (
         <EmptyState
           title="Nothing here yet"

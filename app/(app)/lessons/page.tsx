@@ -1,10 +1,10 @@
 import { TabPage } from "@/components/TabPage";
 import { EmptyState, SectionHeader } from "@/components/ui/primitives";
 import { ListRow } from "@/components/ui/ListRow";
-import { Icon, type IconName } from "@/components/ui/Icon";
+import { Icon } from "@/components/ui/Icon";
 import { currentRole } from "@/lib/guard";
-import { featureEnabled, type BarnFeatureFlag } from "@/config/barn";
-import type { Role } from "@/lib/types";
+import { featureEnabled } from "@/config/barn";
+import { LESSONS_GROUP, visibleEntries } from "@/lib/nav";
 
 export const metadata = { title: "Lessons" };
 
@@ -18,67 +18,17 @@ export const metadata = { title: "Lessons" };
  * the time-sensitive thing — an open makeup offer — is still pushed to Home,
  * so nothing important now depends on someone navigating here.
  *
- * ACADEMY comes later and will slot in as a fourth row.
+ * Learning modules (DESIGN-MASTER §8) come later and will slot in as a row.
+ *
+ * The rows live in lib/nav.ts (LESSONS_GROUP), because the desktop sidebar is
+ * derived from the same list. Edit them there.
  */
-type Entry = {
-  flag?: BarnFeatureFlag;
-  href: string;
-  title: string;
-  meta: string;
-  icon: IconName;
-  /** Who sees the row. Mirrors the guard on the screen it points at. */
-  roles: Role[];
-};
-
-const ALL: Role[] = ["parent", "staff", "admin"];
-
-const ENTRIES: Entry[] = [
-  // The family's own lessons. First, because for a parent this tab is still
-  // mostly "when does my kid ride".
-  {
-    flag: "lessons",
-    href: "/lessons/mine",
-    title: "My lessons",
-    meta: "Your riders' next four weeks, and cancelling a spot",
-    icon: "calendar",
-    roles: ["parent"],
-  },
-  // The barn's side of the same subject: who rides when, and the repeating
-  // pattern the schedule is generated from.
-  {
-    flag: "lessons",
-    href: "/manage/lesson-templates",
-    title: "Students",
-    meta: "The weekly lesson pattern and who rides in it",
-    icon: "people",
-    roles: ["admin"],
-  },
-  {
-    flag: "shows",
-    href: "/lessons/shows",
-    title: "Show information",
-    meta: "Where the barn is competing, entries, ride times and results",
-    icon: "ribbon",
-    roles: ALL,
-  },
-  {
-    flag: "lessons",
-    href: "/lessons/makeups",
-    title: "Makeups",
-    meta: "Open spots when someone cancels",
-    icon: "clock",
-    roles: ["parent"],
-  },
-];
-
 export default async function LessonsPage() {
   // No requireTab: Lessons is a tab for every role. The rows are filtered
   // below, and every screen they point at guards itself.
   const role = await currentRole();
 
-  const live = ENTRIES.filter(
-    (entry) => entry.roles.includes(role) && (!entry.flag || featureEnabled(entry.flag)),
-  );
+  const live = visibleEntries(LESSONS_GROUP, role, featureEnabled);
 
   return (
     <TabPage title="Lessons">
@@ -89,7 +39,7 @@ export default async function LessonsPage() {
         />
       ) : (
         <section className="flex flex-col gap-3">
-          <SectionHeader title="Lessons & shows" />
+          <SectionHeader title={LESSONS_GROUP.title} />
           {live.map((entry) => (
             <ListRow
               key={entry.href}

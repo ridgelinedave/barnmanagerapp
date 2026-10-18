@@ -201,7 +201,9 @@ Each still follows the standing rules: any new SQL printed for audit before appl
 - **Starting state, measured 2026-10-18.** Every route renders through
   `TabPage`, which caps content at `max-w-screen-sm` (640px) and centres it;
   `AppHeader` repeats the cap. On a laptop the app is a phone-width column in a
-  field of white. The cap lives in exactly two files. There are two Tailwind
+  field of white. The cap lives in five files: `TabPage`, `AppHeader`, `TabBar`,
+  `AppLoading` (twice — its skeleton header and main must match the real ones)
+  and `Sheet`. There are two Tailwind
   breakpoint usages in the entire tree, both on one line of `Sheet.tsx`
   (`sm:mx-auto sm:mb-0`), which already half-converts the bottom sheet into a
   centred modal above 640px.
