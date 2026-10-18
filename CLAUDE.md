@@ -4,7 +4,8 @@ Read this before writing anything. These are conventions the build has already
 paid for; several exist because the alternative shipped a bug here.
 
 **Anchor files:** [`SPEC.md`](SPEC.md) (full product spec) ·
-[`PHASE-2-PROGRESS.md`](PHASE-2-PROGRESS.md) (where things stand) ·
+[`design/DESIGN-MASTER.md`](design/DESIGN-MASTER.md) (the design source of truth) ·
+[`PHASE-2-PROGRESS.md`](PHASE-2-PROGRESS.md) (the Phase 2 build record, through `6bb0d0a` — check `git log` for anything later) ·
 [`PHASE-1-PROGRESS.md`](PHASE-1-PROGRESS.md) (the phase before) ·
 [`config/barn.ts`](config/barn.ts) (every barn-specific value) ·
 [`tests/policies.test.mjs`](tests/policies.test.mjs) (the security contract)
@@ -26,10 +27,13 @@ hard-codes a barn fact anywhere else.
 
 ## Branches and deployment
 
-- Work on **feature branches** (`phase-1`, etc.).
-- **`main` is the verified rollback point.** Never merge to it or deploy without
-  David's explicit go-ahead.
-- **Nothing is deployed.** There is no host configured. Do not set one up.
+- Work on **feature branches** (`phase-2`, etc.).
+- **`main` is the deploy trunk.** Vercel builds and deploys it automatically
+  from GitHub (`ridgelinedave/barnmanagerapp`, private). A merge to `main` is a
+  production release and needs David's explicit go-ahead every time — not as a
+  formality, but because the barn is using it.
+- The iCal subscription URL is public and stable. Changing the host breaks
+  every calendar that has subscribed.
 
 ---
 
@@ -159,11 +163,36 @@ backfill was held back for exactly this reason.
 
 ### UI
 
-Mobile-first, one-handed, 380px viewport. **Cards, never tables.** 44px minimum
-touch targets. No horizontal scroll at 320px. One decision per screen. Gold is a
-*surface* colour carrying ink text; `goldDeep` is the *text* colour — the light
-gold fails contrast on white and cream, and accessibility outranks the design
-system.
+**Two shells, one app** (see `design/DESIGN-MASTER.md` §14b, decided
+2026-10-18). Same routes, same server components, same data functions; a
+breakpoint picks the chrome and the column count. Divergence belongs in layout
+components — never in duplicated pages, and never in a second copy of a
+permission check.
+
+**The mobile shell keeps every rule it has earned.** One-handed, 320-390px,
+44px minimum touch targets, no horizontal scroll at 320px, one decision per
+screen, cards rather than tables. None of these are preferences; each came from
+a real failure on a real phone.
+
+**The desktop shell is a different organism, not a stretched phone.** A
+persistent sidebar (no five-destination limit, so `/manage/*` is exposed
+directly rather than buried under More), a top bar, and content laid out as a
+reading column, a two-pane master-detail, or a **wide data table** — tables are
+correct and wanted here. Bottom sheets become modals or drawers. Hover,
+`focus-visible` and keyboard navigation are required, not optional.
+
+**So "cards, never tables" is a MOBILE rule, not a global one.** A table on the
+desktop shell is right; a table on the mobile shell is still wrong.
+
+**Measurement.** Every layout claim in this repo to date was measured at 390px
+and 320px only. Any desktop layout not yet measured must be described as
+unverified.
+
+**Colour.** Belle's oxblood is the accent and the entire white-label mechanism,
+in four tokens (`fill` / `on` / `tint` / `text`) — see `config/barn.ts`. Gold is
+decorative only: `#C2AE6D` is 2.19:1 as text and 2.19:1 carrying ink, so it is
+never a text colour and never an accent token. There is no cream and no cobalt
+in this app. Accessibility outranks the design system.
 
 ---
 
@@ -176,7 +205,12 @@ system.
 | `npm run db:apply -- <file>` | Apply a migration over the pooler |
 | `npm run db:verify` | Introspect the live schema (RLS, policies, grants) |
 | `npm run db:seed` | Test fixtures — resets ledgers and generated notifications |
-| `npm run test:policies` | The RLS suite (281 assertions) |
+| `npm run test:policies` | The RLS suite (628 assertions) |
+| `npm run db:gate` | The green gate: seed → test:policies → test:policies (no re-seed) → db:advisor |
+| `npm run db:advisor` | Supabase Security Advisor lints (splinter) against the live schema |
+| `npm run test:pdf` | Signed-form PDF rendering tests |
+| `npm run test:ical` | iCal feed tests |
+| `npm run test:invites` | Invite token and claim tests |
 | `npm run demo:seed` | Walkthrough data (`-- --clean` to remove) |
 | `npm run brand:assets` | Regenerate icons and splash from the real logo |
 
@@ -194,3 +228,9 @@ notifications only) · SMS and push · the Academy · the boarder persona.
 These need David's accounts and decisions. Seams exist where they will attach
 (`timesheet_approvals.external_ref`, the notification fan-out); leave TODOs
 rather than stubs that look finished.
+
+**Time keeping and payroll.** The barn owner has asked for both. Time keeping
+exists: punches → pairing → pay periods → approval → CSV export in QuickBooks
+TimeActivity shape, with `timesheet_approvals.external_ref` as the sync seam.
+Payroll itself is explicitly out of scope and will always be an export to a
+payroll provider, never computed in this app.

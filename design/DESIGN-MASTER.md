@@ -83,11 +83,35 @@ Current: nothing addable under the Shows tab. Build the hub David + research alr
 
 ---
 
-## 8. CE Academy — BUILD
+## 8. Learning modules — BUILD (product capability, barn-named)
 
-- A section where Belle uploads **videos with text underneath, grouped into modules**, that lesson students watch in-app.
-- No paywall for now. This is the piece that could replace her $129/mo Circle.
-- Naming to explore: "Crouse Equestrian & Academy."
+- **DECIDED (2026-10-18): this is a Monarch product capability, not a Crouse
+  feature.** Every barn gets it. It was previously scoped as "CE Academy",
+  which baked one barn's name into a product surface — the only place in the
+  app that had happened.
+- **What it is:** a barn creates **modules**, each holding an ordered set of
+  **lessons**; each lesson is a video with text notes beneath it. Members watch
+  in-app.
+- **The two brand layers (§16b) apply.** The capability, the player, the module
+  structure and the upload flow are product character and are identical on
+  every barn. The **name is barn skin**: Crouse calls it "CE Academy", another
+  barn calls it "Learning", "The Classroom", "Education". So the label is a
+  configured value (`config/barn.ts` now, the `barns` table after the
+  multi-tenant conversion) and never a hard-coded string in a component, a
+  heading or a route name.
+- **Audience scoping is a design decision, not an afterthought:** who can see a
+  module — everyone, lesson students only, a named level, a named family. This
+  is an RLS question and must be settled as one before a screen is drawn.
+- **No paywall inside the app for now.** For Crouse this replaces a $129/mo
+  Circle subscription, which is the business case.
+- **COMMERCIAL NOTE — the only feature with a per-tenant variable cost.** Video
+  storage and egress are metered, unlike every other table in this app. A barn
+  with a large library and an active membership costs real money every month to
+  serve. So it belongs in a paid tier with a storage cap, and the cap must be
+  visible to the barn before they upload. Decide the tier and the cap before
+  this ships, not after (§15).
+- The old "Crouse Equestrian & Academy" naming question is closed. The product
+  surface is generic; each barn names its own instance.
 
 ---
 
@@ -153,10 +177,45 @@ Each still follows the standing rules: any new SQL printed for audit before appl
 - **Native app** (thin App Store wrapper) later — for rock-solid iPhone push and credibility when selling.
 - **Plan:** web push + SMS now; native app when selling seriously. Needs the email service (Resend) for email mirrors.
 
-### 14b. Desktop / responsive
-- It's **already a browser app** (localhost). "Mobile-only" is the *layout*, not the technology.
-- Add responsive desktop layouts: mobile-first for parents/riders/yard staff; a strong desktop experience for admin/office/billing/reports (where the real power lives, and where Barn Ops is weak).
-- Important for **selling** (prospects evaluate on a laptop). Shared data/logic — this is layout work, not re-architecture.
+### 14b. Desktop / responsive — DECIDED
+
+- **DECIDED (2026-10-18): one app, two shells.** Same routes, same server
+  components, same data functions. A breakpoint picks the chrome (desktop
+  sidebar + top bar vs. mobile AppHeader + five-tab bar) and the column count
+  (reading column vs. two-pane master-detail vs. wide table). Divergence lives
+  in layout components only.
+  REJECTED: separate `/desktop` and `/mobile` route trees. Every feature and
+  every permission gate would be written twice, and two copies of a gate is how
+  one of them stops being updated. A boundary in one place, provably tested, is
+  this app's whole advantage over the incumbent.
+  REJECTED FOR NOW: a native mobile app. That is §14a's "later, when selling
+  seriously."
+- **Deliberate exception — 4 to 6 desktop-first screens.** Designed for the
+  laptop with a simpler mobile view, because they are office work rather than
+  aisle work: timesheet / pay-period approval, team & access, show roster,
+  supply list, calendar. This is what makes it feel like HubSpot without a
+  second codebase.
+- **Sequencing DECIDED: merged with the §12 aesthetic pass.** One screen at a
+  time, both breakpoints in the same visit. A mobile-only polish pass first
+  would mean visiting all ~30 screens twice.
+- **Starting state, measured 2026-10-18.** Every route renders through
+  `TabPage`, which caps content at `max-w-screen-sm` (640px) and centres it;
+  `AppHeader` repeats the cap. On a laptop the app is a phone-width column in a
+  field of white. The cap lives in exactly two files. There are two Tailwind
+  breakpoint usages in the entire tree, both on one line of `Sheet.tsx`
+  (`sm:mx-auto sm:mb-0`), which already half-converts the bottom sheet into a
+  centred modal above 640px.
+- **Work breakdown.** (1) Desktop shell: a sidebar no longer limited to five
+  destinations. (2) A per-screen layout bucket, then promote screens one at a
+  time. (3) Mobile idioms that do not translate: `Sheet` becomes a modal or
+  drawer (~30 call sites), 44px targets become hover / focus / keyboard
+  affordances, tables gain sort and filter. (4) Desktop widths added to the
+  gate. (5) SEPARATELY SCOPED, not part of the layout pass: bulk actions,
+  sortable and filterable tables, print layouts, drag-and-drop calendar. These
+  are new features and are why desktop beats mobile for office work.
+- It was always a browser app; "mobile-only" was the layout, not the
+  technology. The PWA is installable on desktop Chrome and Edge today.
+- Important for **selling** (§15): prospects evaluate on a laptop.
 
 ### 14c. Billing — two separate things, don't conflate
 - **(1) Barns pay us** = the SaaS subscription (see §15).

@@ -1,9 +1,147 @@
 # Phase 2 — progress report
 
 **Branch:** `phase-2` · branched from `phase-1-complete` (`54cdd11`)
-**`main` untouched** at `840dc18` (verified Phase 0 state)
-**Date:** 2026-07-29, updated 2026-07-31 (design pass merged, Team panel added)
-**Nothing is deployed.** All of this runs locally against the live Supabase project.
+**`main` = `phase-2` at `6bb0d0a`** (2026-08-18). `main` is the deploy trunk.
+**Date:** 2026-07-29, updated 2026-07-31 (design pass merged, Team panel added),
+brought current 2026-10-18 through `6bb0d0a` (see "Since 0018" below)
+**Deployed.** Vercel builds `main` from GitHub (`ridgelinedave/barnmanagerapp`,
+private) against the live Supabase project, since 2026-08-18.
+
+---
+
+## Since 0018 — `2a3f284..6bb0d0a`, 2026-08-09 to 2026-08-18
+
+Everything below this section was written on 2026-07-31 and is accurate as
+history, but its counts and its "Headline" are two months old. This section is
+the current state.
+
+**Verified 2026-10-18, this session.** After 61 days untouched the Supabase
+project had been paused by the platform and was restored by David; once it was
+back, with no code change:
+
+- `npm run verify` — green. Typecheck clean, lint 0 errors / 6 pre-existing
+  warnings, build compiled (45 pages), leak check passed, pdf 12, ical 30,
+  invites 27, age 36, month 48.
+- `npm run db:verify` — schema matches the migrations: 33 tables with RLS on,
+  130 policies, 42 SECURITY DEFINER functions all with a pinned search_path,
+  15 guard/fan-out triggers, both Storage buckets (`documents`, `shows`)
+  private.
+- `npm run db:gate` — **628 passed, 0 failed, 0 skipped**, twice with no
+  re-seed. Advisor **clean across 8 lints**.
+
+**Suite count history since 0018:** 567 → 568 (calendar-token assertion
+corrected) → 569 + 1 skipped section (0020 written, unapplied) → 585 (0020
+live) → 589 (0021: the definer sweep picked up two new functions by itself) →
+591 (navigation) → 596 (0022: five new functions) → **628** (`6bb0d0a`: the
+"barn ops — supplies, water, plans, maintenance" section, 32 explicit RLS
+assertions over the five 0022 tables).
+
+### Migrations 0019–0022
+
+| # | File | What | Flag |
+|---|---|---|---|
+| 0019 | `20260731000400_horse_description.sql` | `colour`, `sex`, `height_hands` as real columns on `horses`, with CHECKs | — |
+| 0020 | `20260731000500_training_logs.sql` | `training_logs`, shaped like `care_events`: owns-not-rides visibility, staff insert-only, `logged_by` pinned | — |
+| 0021 | `20260731000600_shows.sql` | `shows`, `show_entries`, `show_results`, the private `shows` banner bucket, two definer helpers | `shows` **on** |
+| 0022 | `20260817000100_barn_ops.sql` | `supply_items`, `water_sources`, `blanket_plans`, `turnout_plans`, `maintenance_requests`, column guards, `enqueue_boarder_supply_notices()` | — |
+
+Migration files on disk: 22, from `20260727000100_core_identity.sql` through
+`20260817000100_barn_ops.sql` (plus the generated `_ALL.generated.sql`).
+
+### The commits, from `git log`
+
+| Commit | Date | Subject |
+|---|---|---|
+| `89429b6` | 2026-08-09 | Visual foundation: retire cream, de-AI the chrome, feed board by horse |
+| `3647088` | 2026-08-09 | Sign-in and splash: the real crest, standing alone |
+| `8fad3c6` | 2026-08-09 | Apply migration 0019: colour, sex and height as real columns |
+| `87c5b15` | 2026-08-10 | Monarch: accent as a theme token, light chrome, Cinzel wordmark |
+| `088282c` | 2026-08-10 | Rider age bands (confirmed), and training_logs — SQL not applied |
+| `c675ca6` | 2026-08-10 | Apply migration 0020: training_logs live |
+| `2237fa7` | 2026-08-11 | Belle's oxblood palette replaces Electric Cobalt |
+| `6a9f2f1` | 2026-08-11 | Calendar: month grid and agenda over lessons, events and care |
+| `0147710` | 2026-08-12 | Forms: template authoring, issue flow, checklist-of-cards |
+| `525f17d` | 2026-08-13 | Sign-in: quiet "Powered by Monarch" signature |
+| `55257e3` | 2026-08-13 | Policy suite: prove the last-admin guard without assuming one admin |
+| `6146560` | 2026-08-13 | Warm the palette app-wide: blush ground, oxblood masthead |
+| `28c7770` | 2026-08-13 | Shows hub: migration 0021, the carousel screen, and demo data |
+| `aa5d45b` | 2026-08-13 | Navigation cleanup and an editorial announcements feed |
+| `b51d317` | 2026-08-13 | Shows management: create/edit, roster, results, banners |
+| `e1e7e8f` | 2026-08-17 | Navigation: one five-tab bar — Home, Schedule, Barn, Lessons, More |
+| `9589266` | 2026-08-18 | Barn ops: supplies, water, blanketing, turnout, maintenance |
+| `6bb0d0a` | 2026-08-18 | Barn ops: encode the RLS scoping, and make the notice demoable |
+
+### What changed, by subject
+
+**Palette — oxblood, and the accent is a theme token.** Cream is gone
+(`89429b6`). The accent became four tokens split by job — `fill`, `on`,
+`tint`, `text` — so a component names `bg-accent text-accent-on` and never a
+colour (`87c5b15`). Belle's oxblood replaced the interim Monarch cobalt
+(`2237fa7`): fill `#6E1A3D`, on `#FFFFFF`, tint `#F1E9E9`, text `#4A002A`.
+Gold `#C2AE6D` is decorative only and deliberately not an accent token. The
+ground warmed to blush `#F6EDEF` with an oxblood masthead (`6146560`). Full
+record: `design/DESIGN-MASTER.md` §16a–16b.
+
+**Monarch.** The product brand, kept in config as its own object separate from
+`barn` — that split is the white-label model (`87c5b15`). Cinzel for the
+wordmark only. "Powered by Monarch" on More and, in an `onDeep` tone, on
+sign-in (`525f17d`).
+
+**Horses.** 0019 made colour, sex and height real columns and deleted the
+regex that mined height out of `notes` (`8fad3c6`). 0020 added training logs to
+both horse profiles (`088282c`, `c675ca6`). The feed board is by horse, not by
+meal (`89429b6`).
+
+**Calendar** (`6a9f2f1`). Month grid and agenda over lessons, events and care,
+no new SQL. Later folded into Schedule as its Month and Agenda views, with
+`/calendar` redirecting (`aa5d45b`). `tests/month.test.mjs`, 48 assertions.
+
+**Forms authoring** (`0147710`). Admin builds, edits and issues forms without
+touching the database; no migration (`form_templates.schema` is jsonb).
+
+**Shows hub and shows management.** 0021 and the Upcoming / Results / Pinned
+hub (`28c7770`); create/edit, roster, results and banners via signed URLs
+(`b51d317`). "Results" means *has results*, not *is in the past*.
+
+**Navigation — one five-tab bar** (`e1e7e8f`). Home, Schedule, Barn, Lessons,
+More — the same five for every role. The Manage tab is gone; `/manage/*` is
+untouched and still admin-gated, because gating is now stated directly in
+`ROLE_PATHS` in `lib/nav.ts` instead of being inferred from the tab list —
+inferring it would have locked Belle out of every management screen. Shows
+moved to `/lessons/shows` (`/shows` 308s). More became Settings, led by Team &
+access. The launch screen only shows on a cold boot; tab switches get
+skeletons (`aa5d45b`).
+
+**Barn ops** (`9589266`, `6bb0d0a`). 0022 and five screens under the Barn tab:
+supplies (Crouse stock and boarder requests, always separated), water troughs,
+blanketing, turnout, maintenance. Adding a boarder supply notifies the family
+from the server action, not a trigger, so a notification failure cannot roll
+back the item. `6bb0d0a` encoded the scoping as 32 policy assertions and
+fixed a cleanup that was a silent no-op on the append-only `notifications`.
+
+**Rider age bands** confirmed by Belle: 6–9, 10–12, 13–17, 18–29, 30–50, 51–80,
+inclusive, clamping to the nearest band (`088282c`). `tests/age.test.mjs`, 36
+assertions.
+
+**Policy suite hardening.** Four assertions that asserted absolute "zero rows"
+were rewritten to assert "none of the ones that are mine" — the shape that
+breaks the moment real or demo data exists (`87c5b15`, `c675ca6`, `2237fa7`,
+`28c7770`). The last-admin section now builds its state inside BEGIN …
+ROLLBACK, so it holds with any number of real admins (`55257e3`).
+
+### Deployment
+
+`main` has deployed to Vercel since 2026-08-18. Nothing in the repo configures
+the host — there is no `vercel.json` and no `.vercel/` — so the deployment's
+settings live in the Vercel dashboard, not here. A merge to `main` is a
+production release.
+
+### Not verified in this session
+
+- Anything about the running production deployment (its URL, its env vars,
+  whether it was serving while the Supabase project was paused).
+- Any layout above 390px. Every UI measurement in the commits above was taken
+  at 390 and 320 only.
 
 ---
 

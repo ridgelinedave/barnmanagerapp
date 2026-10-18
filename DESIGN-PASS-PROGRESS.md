@@ -1,3 +1,9 @@
+> **Note, 2026-10-18 — palette superseded.** The cream / gold / charcoal palette
+> this report documents no longer exists in the app. It was replaced by Belle's
+> oxblood scheme — see `design/DESIGN-MASTER.md` §16a. This report is kept as
+> the record of a branch that merged; read it as history, not as the current
+> design.
+
 # Design pass — progress report
 
 **Branch:** `design-pass` · branched from `phase-2` (`1daed6b`)
