@@ -538,17 +538,54 @@ async function main() {
     }
   }
 
-  // --- clear the time-clock ledger --------------------------------------------
+  // --- clear the FIXTURES' time-clock rows ------------------------------------
   //
   // `punches` has no DELETE policy for any role — that immutability is the
   // point of the table. The seed uses the service role, which is the one thing
   // that legitimately sits outside RLS, so this is the only place fixture
   // punches can be cleared between test runs.
-  for (const table of ["timesheet_approvals", "pay_periods", "punches"]) {
-    const probe = await supabase.from(table).select("id").limit(1);
-    if (probe.error && /schema cache|does not exist/i.test(probe.error.message)) continue;
-    const { error } = await supabase.from(table).delete().not("id", "is", null);
-    if (error) fail(`Could not clear ${table}`, error);
+  //
+  // Every delete here is scoped to the fixture profiles. This database is the
+  // one the barn uses: an unscoped delete would wipe the first real clock-in
+  // on the next gate run, and the service role means nothing would stop it.
+  const fixtureProfileIds = Object.values(created).map((c) => c.profileId);
+  {
+    const probe = await supabase.from("punches").select("id").limit(1);
+    if (!(probe.error && /schema cache|does not exist/i.test(probe.error.message))) {
+      const approvals = await supabase
+        .from("timesheet_approvals")
+        .delete()
+        .in("profile_id", fixtureProfileIds);
+      if (approvals.error) fail("Could not clear fixture timesheet approvals", approvals.error);
+
+      // Pay periods have no owner, so "the suite's" means the spans the time
+      // clock section of tests/policies.test.mjs inserts (the second is a staff
+      // INSERT that must be refused — listed in case a regression lets it in).
+      // A span is only removed when nobody but a fixture has an approval in it,
+      // so a real period that happened to share the dates would survive.
+      for (const [start, end] of [
+        ["2026-01-05", "2026-01-11"],
+        ["2026-02-02", "2026-02-08"],
+      ]) {
+        const { data: period, error } = await supabase
+          .from("pay_periods")
+          .select("id, timesheet_approvals(id)")
+          .eq("start_date", start)
+          .eq("end_date", end)
+          .maybeSingle();
+        if (error) fail(`Could not read the ${start} fixture pay period`, error);
+        if (!period) continue;
+        if (period.timesheet_approvals.length > 0) {
+          console.log(`  pay_periods   KEPT ${start}..${end} — it has non-fixture approvals`);
+          continue;
+        }
+        const del = await supabase.from("pay_periods").delete().eq("id", period.id);
+        if (del.error) fail(`Could not clear the ${start} fixture pay period`, del.error);
+      }
+
+      const punches = await supabase.from("punches").delete().in("profile_id", fixtureProfileIds);
+      if (punches.error) fail("Could not clear fixture punches", punches.error);
+    }
   }
 
   // --- clear generated notifications ------------------------------------------
@@ -557,7 +594,18 @@ async function main() {
   // keeps per-user counts predictable and stops the table growing on every run;
   // only the seeded 'phase0_fixture' rows are meant to persist. Runs
   // unconditionally, so it still tidies up when a later table is missing.
-  for (const type of [
+  //
+  // Two scopes, never the whole type:
+  //   - anything of these types addressed to a fixture profile;
+  //   - anything of these types whose title names a fixture, whoever it went
+  //     to. The suite's fan-outs reach the real admins too (an announcement
+  //     goes to every staff member, a cancellation to every admin), and
+  //     notifications carry no link back to their source, so the fixture's
+  //     name in the title is the only mark they have. Without this, every
+  //     gate run would add test notices to Belle's bell and never take them away.
+  // A real notification about a real rider, horse or announcement matches
+  // neither, and survives.
+  const GENERATED_TYPES = [
     "announcement",
     "lesson_cancelled",
     "backfill_offer",
@@ -567,9 +615,27 @@ async function main() {
     // on the first run after a seed. The idempotency assertion holds on the
     // second run precisely because these are NOT cleared between runs.
     "care_due",
-  ]) {
-    const { error } = await supabase.from("notifications").delete().eq("type", type);
-    if (error) fail(`Could not clear '${type}' notifications`, error);
+  ];
+  const FIXTURE_TITLE_PREFIXES = [
+    "Phase 0 ", // RIDER_NAME, CONTROL_RIDER_NAME
+    "Phase 2 Fixture ", // the four fixture horses
+    "Fan-out test", // the announcement fan-out section of the suite
+  ];
+  {
+    const { error } = await supabase
+      .from("notifications")
+      .delete()
+      .in("type", GENERATED_TYPES)
+      .in("profile_id", fixtureProfileIds);
+    if (error) fail("Could not clear the fixtures' generated notifications", error);
+  }
+  for (const prefix of FIXTURE_TITLE_PREFIXES) {
+    const { error } = await supabase
+      .from("notifications")
+      .delete()
+      .in("type", GENERATED_TYPES)
+      .like("title", `${prefix}%`);
+    if (error) fail(`Could not clear '${prefix}…' notifications`, error);
   }
 
   // --- one notification per fixture user, so the tests can prove isolation -----

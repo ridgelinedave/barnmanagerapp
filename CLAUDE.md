@@ -213,7 +213,7 @@ in this app. Accessibility outranks the design system.
 | `npm run verify` | typecheck → lint → build → service-key leak check |
 | `npm run db:apply -- <file>` | Apply a migration over the pooler |
 | `npm run db:verify` | Introspect the live schema (RLS, policies, grants) |
-| `npm run db:seed` | Test fixtures — resets ledgers and generated notifications |
+| `npm run db:seed` | Test fixtures — resets the fixtures' ledger rows and generated notifications, never anyone else's |
 | `npm run test:policies` | The RLS suite (628 assertions) |
 | `npm run db:gate` | The green gate: seed → test:policies → test:policies (no re-seed) → db:advisor |
 | `npm run db:advisor` | Supabase Security Advisor lints (splinter) against the live schema |
