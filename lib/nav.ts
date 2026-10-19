@@ -134,7 +134,21 @@ export type Destination = {
   roles: Role[];
   /** Omitted for screens over always-present tables with no switch. */
   flag?: BarnFeatureFlag;
+  /**
+   * The title is the BARN's name for this capability, not `title` — e.g.
+   * learning modules are "CE Academy" at Crouse. `title` is the generic
+   * product word used when no label is supplied. Resolved by `labelFor`.
+   */
+  barnLabel?: keyof BarnLabels;
 };
+
+/** Barn-configured names for product capabilities (config/barn.ts). */
+export type BarnLabels = { learning: string };
+
+/** The title a role sees for a destination, with the barn's own names applied. */
+export function labelFor(entry: Destination, labels?: Partial<BarnLabels>): string {
+  return (entry.barnLabel && labels?.[entry.barnLabel]) || entry.title;
+}
 
 export type DestinationGroup = { title: string; entries: Destination[] };
 
@@ -353,6 +367,17 @@ export const LESSONS_GROUP: DestinationGroup = {
       icon: "clock",
       roles: ["parent"],
     },
+    // Learning modules (0023). Every role is SHOWN the row; what each sees
+    // inside is RLS's decision (a family only the modules shared with it).
+    {
+      flag: "learning",
+      href: "/lessons/learn",
+      title: "Learning",
+      barnLabel: "learning",
+      meta: "Video lessons from the barn",
+      icon: "play",
+      roles: ALL,
+    },
   ],
 };
 
@@ -481,6 +506,7 @@ export type SidebarModel = { sections: SidebarSection[]; footer: SidebarLink[] }
 export function sidebarFor(
   role: Role,
   isEnabled: (flag: BarnFeatureFlag) => boolean,
+  labels?: Partial<BarnLabels>,
 ): SidebarModel {
   const seen = new Set<string>();
 
@@ -495,7 +521,7 @@ export function sidebarFor(
     groups.flatMap((group) =>
       visibleEntries(group, role, isEnabled).map((entry) => ({
         href: entry.href,
-        label: entry.title,
+        label: labelFor(entry, labels),
         icon: { kind: "icon" as const, name: entry.icon },
       })),
     );

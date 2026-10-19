@@ -146,6 +146,60 @@ production release.
 
 ---
 
+## Learning modules (migration 0023) — Cloudflare Stream (2026-10-19, `phase-2`)
+
+**SQL history, all audited by David.** 0023 draft 1 (Supabase Storage bucket)
+approved and applied → the new suite section's positive controls caught a
+defect (an INSERT … RETURNING is checked against the SELECT policy, which
+re-read the table and could not see the new row) → amendment approved and
+applied → David's correction: video goes to **Cloudflare Stream only** →
+revision 2 approved and applied. Revision 2 has no bucket; a lesson stores
+`video_provider = 'cloudflare_stream'` + `video_id` (32-hex, CHECKed so a
+path, URL or token cannot be stored). Its CONVERGE block removed draft 1's
+storage policies and helper; the empty `learning` bucket (0 objects) was
+removed through the Storage API because SQL deletion is blocked by
+`protect_buckets_delete`. `db:verify` now fails if a `learning` bucket or
+policy ever reappears.
+
+**App.** `/lessons/learn` (titled by `barn.learning.label`, "CE Academy" for
+Crouse — no barn name in a route), module page (publish / unpublish, reorder
+through `learning_reorder_lessons` with the whole list), lesson page (one
+`VideoPlayer`, notes; empty notes show members nothing and the admin a marked
+placeholder "to be written by {owner}"). Feature flag `learning` on for review;
+modules are drafts until published.
+
+**Privacy path.** `loadModule` reads on the viewer's own session → RLS
+(`learning_audience_allows` / `learning_module_is_readable`) → no row = 404,
+no Cloudflare call → only for a returned row does `lib/video.ts` →
+`lib/stream.ts` (server-only) mint a 2-hour signed token, and the page renders
+the player with it. No route or action accepts a bare video id. `streamPlayback`
+refuses a video Stream does not report as `requireSignedURLs`.
+
+**Credentials.** Only `lib/stream.ts` reads them (`check:leak` source rule);
+none under `NEXT_PUBLIC_`; `tests/stream.test.mjs` (36) proves no thrown error
+or stack carries either value; `check:leak` now loads `.env.local` and found
+neither VALUE in any client-served file; a scan of all 1,846 files under
+`.next` (server and client) found 0.
+
+**Blocked: the upload.** `scripts/learning-stream-seed.mjs` (tus, 50 MiB
+chunks, `requiresignedurls` at creation) got HTTP 403 creating the upload.
+The token verifies as an active account token, but every Stream endpoint,
+reads included, returns Cloudflare error 10002 — the token has no Stream
+permission or the account has no Stream subscription. The empty draft module
+that run created was deleted, and the script now uploads BEFORE writing to
+the database. Not done until the token is fixed: the upload, the seeded
+module, and `scripts/learning-privacy-check.mjs` (control: the admin's real
+page plays — manifest, rendition, segment; denied: bare id, tampered token,
+signed out, a family on a draft).
+
+Gate: verify green (nav 117, stream 36; leak check clean against the real
+values), db:gate 677 / 0 / 0 twice, advisor clean. Measured at 320, 390, 1024,
+1440 on /lessons and /lessons/learn (empty state; the dev preview has no
+session): clean on every audit item; an unknown module id is a 404 with no
+player.
+
+---
+
 ## Aesthetics pass — two registers, and the generated-UI tells removed (2026-10-19, `phase-2`)
 
 **No SQL, no migration, no policy, no flag.** Presentation only.

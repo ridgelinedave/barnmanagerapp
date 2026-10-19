@@ -188,6 +188,70 @@ for (const target of bundleTargets) {
 }
 
 // -----------------------------------------------------------------------------
+// 4. CLOUDFLARE STREAM — the account id and API token stay on the server
+//
+// The same three kinds of check, for the learning-video credentials
+// (DESIGN-MASTER §8). Values are compared, never printed: a finding names the
+// variable and the file, not what it holds.
+// -----------------------------------------------------------------------------
+const CF_NAMES = ["CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_STREAM_TOKEN"];
+const CF_REF = /CLOUDFLARE_(ACCOUNT_ID|STREAM_TOKEN)/;
+/** The one module that may read them, and it must be server-only. */
+const CF_READER = ["lib", "stream.ts"].join(sep);
+
+for (const file of sourceFiles()) {
+  const rel = relative(root, file);
+  const contents = readFileSync(file, "utf8");
+  if (!CF_REF.test(contents)) continue;
+  const reads = /process\.env\.CLOUDFLARE_|streamCredentialsFrom\(\s*process\.env/.test(contents);
+  // lib/stream-core.ts names them in its error text and takes the env as an
+  // argument; it never reads process.env itself.
+  if (rel === ["lib", "stream-core.ts"].join(sep)) {
+    if (/process\.env/.test(contents)) report(`${rel} reads process.env — it must take credentials as arguments.`);
+    continue;
+  }
+  if (rel === CF_READER) {
+    if (!/^import\s+["']server-only["'];?/m.test(contents)) {
+      report(`${rel} reads the Cloudflare credentials but is not \`import "server-only"\`.`);
+    }
+    continue;
+  }
+  if (reads) report(`${rel} reads a Cloudflare credential. Only ${CF_READER} may.`);
+  if (/^\s*["']use client["'];?/m.test(contents)) report(`${rel} is a client component and names a Cloudflare credential.`);
+}
+
+for (const envFile of [".env.example", ".env.local", ".env", ".env.production"]) {
+  const path = join(root, envFile);
+  if (!existsSync(path)) continue;
+  for (const line of readFileSync(path, "utf8").split(/\r?\n/)) {
+    const name = line.trim().split("=")[0]?.trim() ?? "";
+    if (name.startsWith("NEXT_PUBLIC_") && /CLOUDFLARE/i.test(name)) {
+      report(`${envFile} defines ${name} — a Cloudflare credential under NEXT_PUBLIC_ is shipped to every browser.`);
+    }
+  }
+}
+
+const cfValues = CF_NAMES.map((name) => [name, (process.env[name] ?? "").trim()]).filter(
+  ([, value]) => value.length >= 8,
+);
+let cfScanned = 0;
+for (const target of bundleTargets) {
+  for (const file of walk(target, () => true)) {
+    let contents;
+    try {
+      contents = readFileSync(file, "utf8");
+    } catch {
+      continue;
+    }
+    cfScanned++;
+    for (const [name, value] of cfValues) {
+      if (contents.includes(value)) report(`The VALUE of ${name} appears in client-served asset ${relative(root, file)}.`);
+    }
+    if (CF_REF.test(contents)) report(`The name CLOUDFLARE_ACCOUNT_ID/STREAM_TOKEN appears in client-served asset ${relative(root, file)}.`);
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Result
 // -----------------------------------------------------------------------------
 const builtBundleScanned = existsSync(join(root, ".next", "static"));
@@ -205,4 +269,9 @@ console.log(
   builtBundleScanned
     ? `  bundle scan: ${scannedFiles} client-served files under .next/static and public/`
     : "  bundle scan: SKIPPED (no production build found — run `npm run build` first)",
+);
+// Counts and names only — never a value.
+console.log(
+  `  cloudflare: ${cfValues.length} of ${CF_NAMES.length} credential values loaded for comparison; ` +
+    `${cfScanned} client-served files checked for them; only ${CF_READER} may read them`,
 );

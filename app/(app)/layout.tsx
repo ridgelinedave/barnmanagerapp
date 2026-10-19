@@ -6,7 +6,7 @@ import { TabBar } from "@/components/TabBar";
 import { BootMarker } from "@/components/BootMarker";
 import { ViewerProvider } from "@/components/ViewerContext";
 import { Sidebar } from "@/components/Sidebar";
-import { featureEnabled } from "@/config/barn";
+import { barn, featureEnabled } from "@/config/barn";
 import { sidebarFor } from "@/lib/nav";
 
 /**
@@ -54,7 +54,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       >
         Skip to content
       </a>
-      <Sidebar model={sidebarFor(viewer.role, featureEnabled)} account={account} />
+      <Sidebar
+        model={sidebarFor(viewer.role, featureEnabled, { learning: barn.learning.label })}
+        account={account}
+      />
       {/* lg:pl-64 makes room for the fixed sidebar; below lg it is absent. */}
       <div className="flex min-h-dvh flex-col lg:pl-64">
         {/* Mounts once per document, and only in the browser. From its effect

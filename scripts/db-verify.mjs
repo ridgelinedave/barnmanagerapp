@@ -85,6 +85,9 @@ const EXPECTED_TABLES = [
   "blanket_plans",
   "turnout_plans",
   "maintenance_requests",
+  // 0023 — learning modules (a Monarch capability; each barn names it).
+  "learning_modules",
+  "learning_lessons",
 ];
 
 /**
@@ -133,6 +136,11 @@ const EXPECTED_FUNCTIONS = [
   "maintenance_guard_insert",
   "water_sources_guard_update",
   "enqueue_boarder_supply_notices",
+  // 0023 — the module audience rule (over a row's values) and its by-id
+  // wrapper for the lessons policy. The two reorder functions are SECURITY
+  // INVOKER, so they are not definer-checked.
+  "learning_audience_allows",
+  "learning_module_is_readable",
 ];
 
 let problems = 0;
@@ -341,6 +349,23 @@ console.log("\nStorage");
     );
     if (isPublic) {
       flag(`the \`${bucket.id}\` bucket is PUBLIC — every file in it is readable by URL.`);
+    }
+  }
+
+  // Learning video lives in Cloudflare Stream, never in Supabase Storage
+  // (DESIGN-MASTER §8, decided 2026-10-19). A `learning` bucket, or any
+  // storage policy named for it, would mean video drifted back here — where it
+  // bills egress per view and plays as one non-adaptive file.
+  {
+    const { rows: stray } = await client.query(
+      `select (select count(*) from storage.buckets where id = 'learning')::int as buckets,
+              (select count(*) from pg_policies
+                where schemaname = 'storage' and policyname like 'learning:%')::int as policies`,
+    );
+    if (stray[0].buckets > 0 || stray[0].policies > 0) {
+      flag("a `learning` storage bucket or policy exists — learning video belongs in Cloudflare Stream.");
+    } else {
+      console.log("  [x] no `learning` bucket — video is in Cloudflare Stream");
     }
   }
 

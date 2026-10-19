@@ -112,19 +112,30 @@ Current: nothing addable under the Shows tab. Build the hub David + research alr
   serve. So it belongs in a paid tier with a storage cap, and the cap must be
   visible to the barn before they upload. Decide the tier and the cap before
   this ships, not after (§15).
-- **VIDEO HOSTING — a provider seam, not a storage path (2026-10-19).** Each
-  lesson stores a provider and an external id (`video_provider`,
-  `video_ref`), and the app plays it through one resolver and one player
-  component, so changing host is a config change and a two-column update, not
-  a rewrite. Today: Supabase Storage, a private `learning` bucket. Intended
-  destination once an account exists: **Cloudflare Stream — $5 per 1,000
-  minutes stored, $1 per 1,000 minutes delivered, encoding and bandwidth
-  included, no egress fees.** That pricing is per minute of video rather than
-  per byte of egress, which is what makes the per-barn cost above predictable.
-  Supabase limits to settle first: on the Free plan every file is capped at
-  50 MB (the two launch videos are 172 MB and 154 MB), storage at 1 GB and
-  egress at roughly 5 GB a month; uploads above ~6 MB should be resumable
-  (TUS). Migration printed for audit: `supabase/proposed/20261019000100_learning_modules.sql`.
+- **VIDEO HOSTING — CLOUDFLARE STREAM, ONLY (DECIDED 2026-10-19).** This
+  organisation uses Cloudflare exclusively; Stream is the video provider and
+  Supabase Storage is NOT used for video, now or later. Stream includes
+  ingest, encoding, adaptive bitrate and bandwidth with **no egress charge**,
+  at **$5 per 1,000 minutes stored per month and $1 per 1,000 minutes
+  delivered.** Supabase Storage would bill egress on every view of a ~160 MB
+  file and serve one non-adaptive MP4 that stalls on barn wifi. Pricing per
+  minute of video rather than per byte is what makes the per-barn cost above
+  predictable.
+- **The seam.** A lesson stores a provider and an external video id
+  (`video_provider = 'cloudflare_stream'`, `video_id` = the Stream uid). The
+  app plays it through ONE resolver and ONE player component, so a future
+  provider is a new CHECK value and a new resolver branch, not a rewrite.
+- **Playback is private.** A Stream video is publicly playable by default;
+  every video here is created with `requireSignedURLs`. A short-lived token
+  is minted SERVER-SIDE (Stream `POST /stream/{uid}/token`, default 1 h,
+  24 h max) only for a lesson the database has already returned to the
+  viewer under their own RLS session — the unprivileged check gates the
+  privileged action, the same shape as the documents vault.
+- **Upload.** Resumable tus to `POST /accounts/{id}/stream`, 50 MiB chunks,
+  with `requiresignedurls` in `Upload-Metadata` so a video is private from
+  its first byte. (Basic multipart is allowed under 200 MB, but it cannot
+  set signed URLs at creation and does not resume.) Credentials are
+  `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_STREAM_TOKEN`, server-only.
 - **Placement:** the barn owner asked for it under the **Lessons** tab.
 - The old "Crouse Equestrian & Academy" naming question is closed. The product
   surface is generic; each barn names its own instance.

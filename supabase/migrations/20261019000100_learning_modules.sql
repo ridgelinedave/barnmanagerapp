@@ -1,18 +1,28 @@
 -- =============================================================================
--- 0023 — learning modules: learning_modules, learning_lessons, the `learning`
---        video bucket, the visibility helpers and the two reorder functions
+-- 0023 — learning modules: learning_modules, learning_lessons, the audience
+--        rule, and the two reorder functions. Video lives in Cloudflare Stream.
 --
--- PROPOSED — PRINTED FOR AUDIT, NOT APPLIED. It lives in supabase/proposed/
--- rather than supabase/migrations/ because the policy suite's standing guard
--- parses every file in migrations/ and would expect these functions to exist.
--- On approval: move it to supabase/migrations/, `npm run db:apply -- <file>`,
--- regenerate _ALL, move the two tables and the bucket into db-verify's
--- expected lists, add the suite section, run the gate.
+-- REVISION 2 (2026-10-19) — PRINTED FOR AUDIT. Supersedes the first draft that
+-- was approved and applied earlier the same day. That draft stored video in a
+-- Supabase Storage bucket; David's correction: this organisation uses
+-- Cloudflare exclusively and Cloudflare Stream is the video provider. So this
+-- revision:
+--   - stores a PROVIDER and an EXTERNAL VIDEO ID per lesson, never a storage
+--     object path;
+--   - creates NO storage bucket and no storage policies;
+--   - CONVERGES a database that ran the first draft (the block marked
+--     CONVERGE): drops its four `learning` storage policies and its storage
+--     path helper, renames video_ref -> video_id, replaces the provider CHECK.
+--     The empty `learning` bucket itself cannot be removed in SQL — Supabase's
+--     protect_buckets_delete trigger refuses it — so it is removed once,
+--     through the Storage API, after this is applied. It holds 0 objects.
+-- On a fresh database the CONVERGE block is a no-op and the file reads as if
+-- the first draft never existed.
 --
 -- A MONARCH PRODUCT CAPABILITY, NOT A CROUSE FEATURE (DESIGN-MASTER §8). Every
 -- barn gets it and names its own instance — Crouse calls theirs "CE Academy".
--- So nothing here carries a barn's name: not a table, not a column, not the
--- bucket. The label lives in config/barn.ts and nowhere else.
+-- So nothing here carries a barn's name: not a table, not a column. The label
+-- lives in config/barn.ts and nowhere else.
 --
 -- SHAPE. A module holds an ordered list of lessons; a lesson is one video plus
 -- text notes.
@@ -40,15 +50,18 @@
 -- Adding 'students' later is one CHECK value and one helper branch; nothing
 -- here would need to move.
 --
--- DRAFTS. A module is `published = false` until the admin says otherwise, so an
--- upload in progress — or a half-written lesson — never reaches a family.
+-- DRAFTS. A module is `published = false` until the admin says otherwise, so a
+-- half-built module never reaches a family.
 --
--- VIDEO PROVIDER SEAM. A lesson stores (video_provider, video_ref), not a
--- storage path. Today every video is 'supabase' and video_ref is the object
--- name in the private `learning` bucket. The intended home is Cloudflare
--- Stream, where video_ref becomes the Stream video uid. The app resolves a
--- playable URL through ONE function and ONE player component, so moving a
--- lesson is an UPDATE of two columns and moving the barn is a config change.
+-- VIDEO — CLOUDFLARE STREAM, PRIVATE BY CONSTRUCTION. A lesson stores
+-- (video_provider, video_id): the provider is 'cloudflare_stream' and video_id
+-- is the Stream video uid (32 hex). Every video is created with
+-- requireSignedURLs, so the uid alone plays nothing. A playback token is minted
+-- SERVER-SIDE, by the app, only after THIS database has returned the lesson row
+-- to the viewer under their own RLS session — i.e. after
+-- learning_module_is_readable() said yes. The database decides; then the
+-- privileged step (the Stream API call with the account token) runs. No token
+-- path exists in SQL, and no Cloudflare credential is stored here.
 --
 -- ORDERING CANNOT GO AMBIGUOUS. position is UNIQUE per parent, DEFERRABLE so a
 -- whole-list rewrite can pass through duplicate values mid-statement, and the
@@ -74,8 +87,7 @@ create table if not exists public.learning_modules (
   published         boolean not null default false,
   audience          text not null default 'all' check (audience in ('all', 'level')),
   -- on delete restrict: deleting a level that a module is aimed at must be a
-  -- conscious act, not a silent widening (with set null the module would fall
-  -- back to... nothing sensible) or a silent loss (cascade).
+  -- conscious act, not a silent widening or a silent loss.
   audience_level_id uuid references public.levels (id) on delete restrict,
   constraint learning_modules_level_matches_audience check (
     (audience = 'level') = (audience_level_id is not null)
@@ -102,20 +114,14 @@ create table if not exists public.learning_lessons (
   -- The barn owner writes these herself. Empty until she does.
   notes            text not null default '',
   position         integer not null check (position >= 0),
-  -- The provider seam. 'supabase': video_ref is an object name in the private
-  -- `learning` bucket, and it MUST start with this lesson's module id — that
-  -- first path segment is what the storage read policy checks, so a lesson
-  -- cannot point at a file under a module the reader is not allowed to see.
-  -- 'cloudflare_stream': video_ref is the Stream video uid.
-  video_provider   text not null default 'supabase'
-                   check (video_provider in ('supabase', 'cloudflare_stream')),
-  video_ref        text,
+  -- The provider seam. The CHECKs are added below, by name, so this file can
+  -- also replace the first draft's on a database that ran it.
+  video_provider   text not null default 'cloudflare_stream',
+  -- The provider's own id for the video — for Stream, the video uid. Never a
+  -- URL (a URL is minted per viewer, with a token) and never a storage path.
+  -- Null while a lesson exists before its video is attached.
+  video_id         text,
   duration_seconds integer check (duration_seconds is null or duration_seconds > 0),
-  constraint learning_lessons_supabase_ref_in_module check (
-    video_provider <> 'supabase'
-    or video_ref is null
-    or video_ref like module_id::text || '/%'
-  ),
   constraint learning_lessons_position_unique unique (module_id, position) deferrable initially immediate
 );
 
@@ -124,23 +130,130 @@ alter table public.learning_lessons enable row level security;
 create index if not exists learning_lessons_module_idx on public.learning_lessons (module_id, position);
 
 comment on table public.learning_lessons is
-  'One video plus notes, in a fixed position inside a module. Readable exactly when the module is.';
+  'One video plus notes, in a fixed position inside a module. Readable exactly when the module is. video_id is an external provider id; playback is minted server-side.';
+
+-- -----------------------------------------------------------------------------
+-- CONVERGE — a database that ran the first draft of this migration.
+-- Every statement is a no-op on a fresh database.
+-- -----------------------------------------------------------------------------
+
+-- The first draft's storage policies, and the path helper they called. Policies
+-- go first: the function cannot be dropped while a policy depends on it.
+drop policy if exists "learning: read (module-scoped)" on storage.objects;
+drop policy if exists "learning: admin insert" on storage.objects;
+drop policy if exists "learning: admin update" on storage.objects;
+drop policy if exists "learning: admin delete" on storage.objects;
+drop function if exists public.learning_object_is_readable(text);
+
+-- video_ref -> video_id. No IF EXISTS form of RENAME COLUMN, hence the check.
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+     where table_schema = 'public' and table_name = 'learning_lessons' and column_name = 'video_ref'
+  ) and not exists (
+    select 1 from information_schema.columns
+     where table_schema = 'public' and table_name = 'learning_lessons' and column_name = 'video_id'
+  ) then
+    alter table public.learning_lessons rename column video_ref to video_id;
+  end if;
+end;
+$$;
+
+-- The first draft allowed 'supabase' and tied a ref to a storage folder.
+alter table public.learning_lessons drop constraint if exists learning_lessons_supabase_ref_in_module;
+alter table public.learning_lessons drop constraint if exists learning_lessons_video_provider_check;
+alter table public.learning_lessons alter column video_provider set default 'cloudflare_stream';
+
+-- -----------------------------------------------------------------------------
+-- The provider CHECKs, by name, so re-running replaces rather than duplicates.
+--
+-- One provider today. Adding another is a new value here and a new branch in
+-- the app's one playback resolver — the table does not change shape.
+-- -----------------------------------------------------------------------------
+alter table public.learning_lessons drop constraint if exists learning_lessons_provider_known;
+alter table public.learning_lessons add constraint learning_lessons_provider_known
+  check (video_provider in ('cloudflare_stream'));
+
+-- A Stream uid is 32 lowercase hex. Checked so a pasted URL, an iframe snippet
+-- or a token can never be stored where the id belongs.
+alter table public.learning_lessons drop constraint if exists learning_lessons_stream_id_shape;
+alter table public.learning_lessons add constraint learning_lessons_stream_id_shape
+  check (video_provider <> 'cloudflare_stream' or video_id is null or video_id ~ '^[0-9a-f]{32}$');
 
 -- =============================================================================
--- public.learning_module_is_readable(module uuid)
+-- public.learning_audience_allows(is_published, for_audience, for_level)
 --
--- The ONE place the audience rule lives. Lessons and storage both defer to it,
--- so the three can never disagree about who sees a module.
+-- THE ONE place the audience rule lives, written over a module's own column
+-- VALUES rather than by looking the module up.
 --
 --   admin   every module, drafts included
 --   staff   every published module
 --   parent  published, and audience 'all' — or audience 'level' with an ACTIVE
 --           rider of their own family at that level
 --
--- SECURITY DEFINER so the lesson and storage policies can ask about a module
--- without depending on the caller's RLS view of learning_modules or riders —
--- the cross-table policy shape that recurses. It answers only about the
--- caller: the level branch reads current_family(), never an argument.
+-- WHY IT TAKES VALUES. The modules SELECT policy must judge a row from the row.
+-- An INSERT ... RETURNING (every supabase-js insert with .select()) checks the
+-- SELECT policy against the NEW row, and a function in the same statement
+-- cannot see a row the statement is still inserting — the first draft looked
+-- the module up by id here and every admin insert was refused. Only OTHER
+-- tables' policies look a module up by id (learning_module_is_readable).
+--
+-- SECURITY DEFINER so the level branch reads riders without depending on the
+-- caller's RLS view of them. It answers only about the caller: the family
+-- comes from current_family(), never from an argument.
+-- =============================================================================
+create or replace function public.learning_audience_allows(
+  is_published boolean,
+  for_audience text,
+  for_level uuid
+)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select public."current_role"() = 'admin'
+      or (
+        coalesce(is_published, false)
+        and (
+          public."current_role"() = 'staff'
+          or (
+            public."current_role"() = 'parent'
+            and (
+              for_audience = 'all'
+              or (
+                for_audience = 'level'
+                and exists (
+                  select 1
+                    from public.riders r
+                   where r.family_id = public.current_family()
+                     and r.active
+                     and r.level_id = for_level
+                )
+              )
+            )
+          )
+        )
+      );
+$$;
+
+comment on function public.learning_audience_allows(boolean, text, uuid) is
+  'The learning-module audience rule over a module''s own values. The modules SELECT policy uses it directly; learning_module_is_readable wraps it for other tables.';
+
+-- Born open (0015): all three revoked, then authenticated granted back because
+-- RLS policies call it as the querying user.
+revoke all on function public.learning_audience_allows(boolean, text, uuid) from public, anon, authenticated;
+grant execute on function public.learning_audience_allows(boolean, text, uuid) to authenticated;
+
+-- =============================================================================
+-- public.learning_module_is_readable(module uuid)
+--
+-- The same rule, by module id — for the lessons policy, which is on another
+-- table and so can look the module up safely. False when the module does not
+-- exist. This is the check that gates a playback token: the app mints one only
+-- for a lesson row this policy let the viewer read.
 -- =============================================================================
 create or replace function public.learning_module_is_readable(module uuid)
 returns boolean
@@ -149,73 +262,21 @@ stable
 security definer
 set search_path = ''
 as $$
-  select exists (
-    select 1
-      from public.learning_modules m
-     where m.id = module
-       and (
-         public."current_role"() = 'admin'
-         or (
-           m.published
-           and (
-             public."current_role"() = 'staff'
-             or (
-               public."current_role"() = 'parent'
-               and (
-                 m.audience = 'all'
-                 or (
-                   m.audience = 'level'
-                   and exists (
-                     select 1
-                       from public.riders r
-                      where r.family_id = public.current_family()
-                        and r.active
-                        and r.level_id = m.audience_level_id
-                   )
-                 )
-               )
-             )
-           )
-         )
-       )
+  select coalesce(
+    (
+      select public.learning_audience_allows(m.published, m.audience, m.audience_level_id)
+        from public.learning_modules m
+       where m.id = module
+    ),
+    false
   );
 $$;
 
 comment on function public.learning_module_is_readable(uuid) is
   'True when the caller may see the module: admin always; staff when published; parents when published and in its audience.';
 
--- Born open (0015): all three revoked, then authenticated granted back because
--- RLS policies call it as the querying user.
 revoke all on function public.learning_module_is_readable(uuid) from public, anon, authenticated;
 grant execute on function public.learning_module_is_readable(uuid) to authenticated;
-
--- =============================================================================
--- public.learning_object_is_readable(object_name text)
---
--- The bucket equivalent. Object names are '<module_id>/<lesson_id>/<file>'.
--- The uuid is regex-checked BEFORE the cast, as show_banner_is_readable does:
--- a malformed path must be a "no", not an error raised inside a policy.
--- =============================================================================
-create or replace function public.learning_object_is_readable(object_name text)
-returns boolean
-language sql
-stable
-security definer
-set search_path = ''
-as $$
-  select case
-    when split_part(object_name, '/', 1) ~
-         '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
-    then public.learning_module_is_readable(split_part(object_name, '/', 1)::uuid)
-    else false
-  end;
-$$;
-
-comment on function public.learning_object_is_readable(text) is
-  'True when the caller may read a learning video object, judged by the module id in its first path segment.';
-
-revoke all on function public.learning_object_is_readable(text) from public, anon, authenticated;
-grant execute on function public.learning_object_is_readable(text) to authenticated;
 
 -- =============================================================================
 -- Reordering — the only way positions change after insert.
@@ -316,12 +377,12 @@ revoke all on function public.learning_reorder_modules(uuid[]) from public, anon
 grant execute on function public.learning_reorder_modules(uuid[]) to authenticated;
 
 -- =============================================================================
--- Policies — learning_modules. Read: the helper. Write: admin only.
+-- Policies — learning_modules. Read: the row's own values. Write: admin only.
 -- =============================================================================
 drop policy if exists "learning_modules: read (audience-scoped)" on public.learning_modules;
 create policy "learning_modules: read (audience-scoped)"
   on public.learning_modules for select to authenticated
-  using ((select public.learning_module_is_readable(id)));
+  using (public.learning_audience_allows(published, audience, audience_level_id));
 
 drop policy if exists "learning_modules: admin insert" on public.learning_modules;
 create policy "learning_modules: admin insert"
@@ -363,58 +424,6 @@ create policy "learning_lessons: admin delete"
   on public.learning_lessons for delete to authenticated
   using ((select public."current_role"()) = 'admin');
 
--- =============================================================================
--- Storage — the `learning` bucket. Private, re-asserted on every re-run.
---
--- Members read what their module visibility allows (signed URLs, short-lived);
--- only the admin writes. Every policy pins bucket_id = 'learning': a policy
--- that forgot the bucket would widen access to every other bucket.
---
--- allowed_mime_types is set so the bucket refuses anything that is not a
--- video. file_size_limit is deliberately NOT set here — see the size flag in
--- the printout; it cannot exceed the project-wide limit, and that limit is a
--- dashboard/plan decision, not a migration's.
--- =============================================================================
-insert into storage.buckets (id, name, public, allowed_mime_types)
-values ('learning', 'learning', false, array['video/mp4', 'video/quicktime', 'video/webm'])
-on conflict (id) do update
-  set public = false,
-      allowed_mime_types = excluded.allowed_mime_types;
-
-drop policy if exists "learning: read (module-scoped)" on storage.objects;
-create policy "learning: read (module-scoped)"
-  on storage.objects for select to authenticated
-  using (
-    bucket_id = 'learning'
-    and (select public.learning_object_is_readable(name))
-  );
-
-drop policy if exists "learning: admin insert" on storage.objects;
-create policy "learning: admin insert"
-  on storage.objects for insert to authenticated
-  with check (
-    bucket_id = 'learning'
-    and (select public."current_role"()) = 'admin'
-  );
-
-drop policy if exists "learning: admin update" on storage.objects;
-create policy "learning: admin update"
-  on storage.objects for update to authenticated
-  using (
-    bucket_id = 'learning'
-    and (select public."current_role"()) = 'admin'
-  )
-  with check (
-    bucket_id = 'learning'
-    and (select public."current_role"()) = 'admin'
-  );
-
-drop policy if exists "learning: admin delete" on storage.objects;
-create policy "learning: admin delete"
-  on storage.objects for delete to authenticated
-  using (
-    bucket_id = 'learning'
-    and (select public."current_role"()) = 'admin'
-  );
+-- No storage bucket and no storage.objects policy: video is not in Supabase.
 
 commit;

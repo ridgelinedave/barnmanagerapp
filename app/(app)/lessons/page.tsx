@@ -3,8 +3,8 @@ import { EmptyState, SectionHeader } from "@/components/ui/primitives";
 import { ListRow } from "@/components/ui/ListRow";
 import { Icon } from "@/components/ui/Icon";
 import { currentRole } from "@/lib/guard";
-import { featureEnabled } from "@/config/barn";
-import { LESSONS_GROUP, visibleEntries } from "@/lib/nav";
+import { barn, featureEnabled } from "@/config/barn";
+import { LESSONS_GROUP, labelFor, visibleEntries } from "@/lib/nav";
 
 export const metadata = { title: "Lessons" };
 
@@ -44,7 +44,7 @@ export default async function LessonsPage() {
             <ListRow
               key={entry.href}
               href={entry.href}
-              title={entry.title}
+              title={labelFor(entry, { learning: barn.learning.label })}
               meta={entry.meta}
               leading={
                 <span className="flex size-10 shrink-0 items-center justify-center rounded-control bg-sunk text-muted lg:size-7 lg:bg-transparent">

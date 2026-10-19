@@ -5516,6 +5516,326 @@ async function main() {
   }
 
   // ===========================================================================
+  // LEARNING MODULES (0023) — audience, drafts, writes, ordering, Stream ids
+  //
+  // Video is in Cloudflare Stream, not Supabase Storage; there is no bucket to
+  // test (db-verify asserts there is none). The Stream side of privacy is
+  // proven behaviourally against the real videos, not here.
+  //
+  // Gated on the TABLE existing, like every section after a migration.
+  // Fixture fact this leans on: both fixture families have one active rider,
+  // both at the same level (seed: trainingLevel). So a module aimed at THAT
+  // level must reach both parents, and one aimed at any other level must reach
+  // neither — with staff and admin as the controls that it exists at all.
+  //
+  // Order-independence: every row this section makes carries the TAG and a
+  // position far above anything real (900000+), and is deleted at the end. It
+  // never calls learning_reorder_modules with a complete list, because that
+  // would renumber the barn's real modules; it proves only its refusals.
+  // ===========================================================================
+  {
+    const probe = await admin.from("learning_modules").select("id").limit(1);
+    const haveLearning = !/does not exist|schema cache/i.test(probe.error?.message ?? "");
+
+    if (!haveLearning) {
+      console.log("\n\n═══ learning modules — SKIPPED ═══");
+      console.log("  Migration 0023 is not applied yet.");
+      skipped += 1;
+    } else {
+      console.log("\n\n═══ learning modules — audience, drafts, writes, ordering, Stream ids ═══\n");
+
+      const TAG = "[policytest]";
+      const base = 900000 + Math.floor(Math.random() * 10000) * 10;
+      const made = [];
+
+      const { data: riderRow } = await admin.from("riders").select("level_id").eq("id", riderId).single();
+      const theirLevel = riderRow?.level_id ?? null;
+      const { data: levelRows } = await admin.from("levels").select("id");
+      const otherLevel = (levelRows ?? []).map((l) => l.id).find((id) => id !== theirLevel) ?? null;
+
+      check(
+        "control: the fixture rider has a level, and another level exists",
+        Boolean(theirLevel) && Boolean(otherLevel),
+        `rider level ${theirLevel}, other ${otherLevel}`,
+      );
+
+      const createModule = async (fields) => {
+        const { data, error } = await admin
+          .from("learning_modules")
+          .insert({ title: `${TAG} module`, ...fields })
+          .select("id")
+          .single();
+        if (data?.id) made.push(data.id);
+        return { id: data?.id ?? null, error };
+      };
+
+      /* --- drafts ---------------------------------------------------------- */
+
+      const draft = await createModule({ position: base, audience: "all", published: false });
+      check("control: admin CAN create a draft module", Boolean(draft.id), draft.error?.message);
+      check(
+        "control: admin CAN read the draft",
+        (await visibleIds(admin, "learning_modules")).ids.includes(draft.id),
+      );
+      check(
+        "staff CANNOT read an unpublished module",
+        !(await visibleIds(staff, "learning_modules")).ids.includes(draft.id),
+        "a draft reached staff",
+      );
+      check(
+        "a parent CANNOT read an unpublished module",
+        !(await visibleIds(parent, "learning_modules")).ids.includes(draft.id),
+        "a draft reached a family",
+      );
+
+      /* --- audience: everyone --------------------------------------------- */
+
+      const everyone = await createModule({ position: base + 1, audience: "all", published: true });
+      check("control: admin CAN create a published module", Boolean(everyone.id), everyone.error?.message);
+      check(
+        "staff CAN read a published module",
+        (await visibleIds(staff, "learning_modules")).ids.includes(everyone.id),
+      );
+      check(
+        "a parent CAN read a published 'all' module",
+        (await visibleIds(parent, "learning_modules")).ids.includes(everyone.id),
+      );
+
+      /* --- audience: a named level ---------------------------------------- */
+
+      const mineLevel = await createModule({
+        position: base + 2,
+        audience: "level",
+        audience_level_id: theirLevel,
+        published: true,
+      });
+      const otherLevelModule = await createModule({
+        position: base + 3,
+        audience: "level",
+        audience_level_id: otherLevel,
+        published: true,
+      });
+      check(
+        "control: admin CAN create both level-scoped modules",
+        Boolean(mineLevel.id) && Boolean(otherLevelModule.id),
+        mineLevel.error?.message ?? otherLevelModule.error?.message,
+      );
+
+      const parentSees = (await visibleIds(parent, "learning_modules")).ids;
+      check(
+        "a parent CAN read a module aimed at their rider's level",
+        parentSees.includes(mineLevel.id),
+      );
+      check(
+        "a parent CANNOT read a module aimed at another level",
+        !parentSees.includes(otherLevelModule.id),
+        "a level-scoped module reached a family with no rider at that level",
+      );
+      if (parent2) {
+        const p2 = (await visibleIds(parent2, "learning_modules")).ids;
+        check("the other family reads the same-level module too", p2.includes(mineLevel.id));
+        check("…and not the other-level one", !p2.includes(otherLevelModule.id));
+      }
+      check(
+        "control: staff CAN read the other-level module (it exists and is published)",
+        (await visibleIds(staff, "learning_modules")).ids.includes(otherLevelModule.id),
+      );
+
+      const { error: badAudience } = await admin
+        .from("learning_modules")
+        .insert({ title: `${TAG} bad`, position: base + 9, audience: "level", published: true });
+      check(
+        "a 'level' module with no level is refused by the CHECK",
+        Boolean(badAudience),
+        "audience=level saved with no level",
+      );
+
+      /* --- lessons follow the module -------------------------------------- */
+
+      const addLesson = async (moduleId, position, extra = {}) => {
+        const { data, error } = await admin
+          .from("learning_lessons")
+          .insert({ module_id: moduleId, title: `${TAG} lesson ${position}`, position, ...extra })
+          .select("id")
+          .single();
+        return { id: data?.id ?? null, error };
+      };
+
+      const openLesson = await addLesson(everyone.id, 0);
+      const hiddenLesson = await addLesson(otherLevelModule.id, 0);
+      const draftLesson = await addLesson(draft.id, 0);
+      check(
+        "control: admin CAN add lessons to all three modules",
+        Boolean(openLesson.id && hiddenLesson.id && draftLesson.id),
+        openLesson.error?.message ?? hiddenLesson.error?.message ?? draftLesson.error?.message,
+      );
+
+      const parentLessons = (await visibleIds(parent, "learning_lessons")).ids;
+      check("a parent CAN read a lesson in a module they can see", parentLessons.includes(openLesson.id));
+      check(
+        "a parent CANNOT read a lesson in another level's module",
+        !parentLessons.includes(hiddenLesson.id),
+      );
+      check("a parent CANNOT read a lesson in a draft module", !parentLessons.includes(draftLesson.id));
+      check(
+        "staff CANNOT read a lesson in a draft module",
+        !(await visibleIds(staff, "learning_lessons")).ids.includes(draftLesson.id),
+      );
+
+      // The provider seam (DESIGN-MASTER §8): a provider and an EXTERNAL id,
+      // Cloudflare Stream only. The CHECKs are what stop a storage path, a
+      // playback URL or a token being stored where the id belongs.
+      const streamRef = await addLesson(everyone.id, 6, {
+        video_provider: "cloudflare_stream",
+        video_id: "0123456789abcdef0123456789abcdef",
+      });
+      check(
+        "control: a Cloudflare Stream lesson saves with its 32-hex video uid",
+        Boolean(streamRef.id),
+        streamRef.error?.message,
+      );
+      for (const [label, extra] of [
+        ["a 'supabase' provider is refused (video is never in Supabase Storage)", { video_provider: "supabase", video_id: null }],
+        ["a storage path in video_id is refused", { video_id: `${everyone.id}/x/video.mp4` }],
+        [
+          "a playback URL in video_id is refused",
+          { video_id: "https://customer-abc.cloudflarestream.com/0123456789abcdef0123456789abcdef/iframe" },
+        ],
+        ["an id of the wrong shape is refused", { video_id: "0123456789ABCDEF" }],
+      ]) {
+        const bad = await addLesson(everyone.id, 7 + Math.floor(Math.random() * 1000), extra);
+        check(label, Boolean(bad.error), "it was saved");
+      }
+
+      /* --- writes are admin-only ------------------------------------------ */
+
+      check(
+        "staff CANNOT create a module",
+        await writeRefused(
+          staff.from("learning_modules").insert({ title: `${TAG} staff`, position: base + 7 }).select("id"),
+        ),
+      );
+      check(
+        "a parent CANNOT create a module",
+        await writeRefused(
+          parent.from("learning_modules").insert({ title: `${TAG} parent`, position: base + 8 }).select("id"),
+        ),
+      );
+      check(
+        "staff CANNOT retitle a published module",
+        await writeRefused(
+          staff.from("learning_modules").update({ title: `${TAG} hijacked` }).eq("id", everyone.id).select("id"),
+        ),
+      );
+      check(
+        "a parent CANNOT add a lesson",
+        await writeRefused(
+          parent
+            .from("learning_lessons")
+            .insert({ module_id: everyone.id, title: `${TAG} parent lesson`, position: 9 })
+            .select("id"),
+        ),
+      );
+      {
+        const { data } = await admin.from("learning_modules").select("title").eq("id", everyone.id).single();
+        check("…and the module is unchanged", data?.title === `${TAG} module`, `title is ${data?.title}`);
+      }
+
+      /* --- ordering: whole-list rewrite, never a swap ---------------------- */
+
+      const second = await addLesson(everyone.id, 1);
+      // Positions 0 (openLesson), 1 (second), 6 (streamRef). New order: second, stream, open.
+      const order = [second.id, streamRef.id, openLesson.id];
+      const { error: reorderErr } = await admin.rpc("learning_reorder_lessons", {
+        module: everyone.id,
+        lesson_ids: order,
+      });
+      check("control: admin CAN reorder a module's lessons", !reorderErr, reorderErr?.message);
+      {
+        const { data } = await admin
+          .from("learning_lessons")
+          .select("id, position")
+          .eq("module_id", everyone.id)
+          .order("position");
+        check(
+          "the new order is exactly the list given, positions 0..n-1",
+          JSON.stringify((data ?? []).map((r) => r.id)) === JSON.stringify(order) &&
+            (data ?? []).every((r, i) => r.position === i),
+          JSON.stringify(data),
+        );
+      }
+
+      const { error: partialErr } = await admin.rpc("learning_reorder_lessons", {
+        module: everyone.id,
+        lesson_ids: [second.id, openLesson.id],
+      });
+      check("an incomplete lesson order is refused", Boolean(partialErr), "a partial list was accepted");
+
+      const { error: dupErr } = await admin.rpc("learning_reorder_lessons", {
+        module: everyone.id,
+        lesson_ids: [second.id, second.id, openLesson.id],
+      });
+      check("a lesson order that repeats an id is refused", Boolean(dupErr), "a duplicate was accepted");
+
+      const { error: parentReorder } = await parent.rpc("learning_reorder_lessons", {
+        module: everyone.id,
+        lesson_ids: order,
+      });
+      check("a parent CANNOT reorder lessons", Boolean(parentReorder), "a parent reordered a module");
+
+      const { error: modulesPartial } = await admin.rpc("learning_reorder_modules", {
+        module_ids: [everyone.id],
+      });
+      check("an incomplete MODULE order is refused", Boolean(modulesPartial), "a partial module list was accepted");
+
+      const { error: staffModules } = await staff.rpc("learning_reorder_modules", { module_ids: [] });
+      check("staff CANNOT reorder modules", Boolean(staffModules), "staff reordered modules");
+
+      /* --- the video id is what gates a playback token -------------------- */
+      //
+      // The app mints a Stream playback token only for a lesson row the viewer
+      // could READ under their own session. So "who can read video_id" IS the
+      // privacy boundary on the database side; the Stream side (signed URLs
+      // required) is proven behaviourally against the real videos, outside
+      // this suite. Here: a parent asking for a hidden lesson's id by its
+      // exact primary key gets no row — not a null, not an error with it in.
+      {
+        const { data: hidden } = await parent
+          .from("learning_lessons")
+          .select("id, video_id")
+          .eq("id", hiddenLesson.id);
+        check(
+          "a parent asking BY ID for another level's lesson gets no row (no id to mint a token for)",
+          (hidden ?? []).length === 0,
+          `${hidden?.length} row(s)`,
+        );
+        const { data: open } = await parent
+          .from("learning_lessons")
+          .select("id, video_id")
+          .eq("id", streamRef.id);
+        check(
+          "control: the same query for a visible lesson returns its video id",
+          open?.[0]?.video_id === "0123456789abcdef0123456789abcdef",
+          JSON.stringify(open),
+        );
+      }
+
+      check(
+        "anon sees no module and no lesson",
+        (await visibleIds(anon, "learning_modules")).ids.length === 0 &&
+          (await visibleIds(anon, "learning_lessons")).ids.length === 0,
+      );
+
+      /* --- clean up: only this section's rows ------------------------------ */
+
+      if (made.length) await admin.from("learning_modules").delete().in("id", made);
+
+      const left = (await visibleIds(admin, "learning_modules")).ids.filter((id) => made.includes(id));
+      check("this section's modules (and their lessons) are cleaned up", left.length === 0, `${left.length} left`);
+    }
+  }
+
+  // ===========================================================================
   // STANDING GUARD — function exposure
   //
   // Data-driven from the migrations, so it covers functions added later without

@@ -152,6 +152,17 @@ em-dashes, which breaks the file. Use the Edit tool. (This happened here — a
 regex renumber through PowerShell corrupted the test suite and had to be
 restored from git.)
 
+### Video
+
+**Learning video lives in Cloudflare Stream, never in Supabase Storage.** A
+lesson stores `video_provider` + `video_id` (the Stream uid), never a path or a
+URL. Every video is uploaded with signed URLs required; a playback token is
+minted server-side (`lib/stream.ts`, `server-only`) only for a lesson row the
+viewer's own RLS session returned — never from a route that takes a bare id.
+`CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_STREAM_TOKEN` are server-only: never
+`NEXT_PUBLIC_`, never logged, never in an error. `check:leak` and
+`test:stream` enforce it; `db:verify` fails if a `learning` bucket appears.
+
 ### Config
 
 **Barn-specific values live only in `/config/barn.ts`.** Never hard-code colours,
@@ -229,6 +240,9 @@ in this app. Accessibility outranks the design system.
 | `npm run test:ical` | iCal feed tests |
 | `npm run test:invites` | Invite token and claim tests |
 | `npm run test:nav` | The sidebar and the navigation gate agree, for every role (in `verify`) |
+| `npm run test:stream` | Cloudflare Stream core: credentials never reach an error, ids are checked (in `verify`) |
+| `node --env-file=.env.local scripts/learning-stream-seed.mjs` | Upload the launch learning videos to Stream (private, tus) and seed their module as a draft |
+| `node --env-file=.env.local scripts/learning-privacy-check.mjs` | Behavioural proof that learning video is private — run against a dev server |
 | `npm run demo:seed` | Walkthrough data (`-- --clean` to remove) |
 | `npm run brand:assets` | Regenerate icons and splash from the real logo |
 

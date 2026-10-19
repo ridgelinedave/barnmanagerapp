@@ -23,6 +23,7 @@ export type BarnFeatureFlag =
   | "lessons"
   | "invites"
   | "shows"
+  | "learning"
   | "invoices"
   | "shop";
 
@@ -91,6 +92,13 @@ export const barn = {
   shortName: "Crouse",
   /** Owner / admin. Displayed in the app shell and used in copy. */
   owner: "Belle Crouse",
+  /**
+   * Learning modules (DESIGN-MASTER §8) are a Monarch capability every barn
+   * gets; each barn NAMES its own instance. This label is the only place the
+   * name lives — never in a component, a heading or a route (the route is
+   * /lessons/learn on every barn).
+   */
+  learning: { label: "CE Academy" },
   /** Free-text service area. Not used for geocoding. */
   area: "Asheville / Candler, NC",
   /** IANA timezone. All timestamptz values render in this zone. */
@@ -379,6 +387,13 @@ export const barn = {
     /* ON for David's review: the hub is built and the demo shows are seeded,
        so it needs to be populated and reachable to be judged. */
     shows: true,
+    /**
+     * Learning modules — migration 0023 audited, applied, policy suite green.
+     * ON on phase-2 for David's review, the same as `shows` was; a module is
+     * still a draft (unpublished, invisible to families) until the admin
+     * publishes it, so turning this on shows a family nothing new by itself.
+     */
+    learning: true,
     invoices: false,
     shop: false,
   } satisfies Record<BarnFeatureFlag, boolean>,
