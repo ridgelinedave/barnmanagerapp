@@ -154,7 +154,22 @@ console.log("\nDENIED — the database says no, so no token is ever minted\n");
   const res = await page(`/lessons/learn/${module.id}/${lesson.id}`, parent.cookie);
   const html = await res.text();
   if (!module.published) {
-    check("…and their lesson page is a 404 with no player and no token in it", res.status === 404 && !iframeSrc(html) && !html.includes("cloudflarestream.com"), `HTTP ${res.status}`);
+    // The STATUS can be 200 here, not 404: the (app) segment has a loading
+    // boundary, so the response starts streaming (status line sent) before
+    // the page calls notFound(), and the not-found UI streams into it. What
+    // privacy needs is the CONTENT: no player, no token, no video id, not even
+    // the lesson's title — only the not-found screen.
+    check(
+      "…and their lesson page holds no player, no token, no video id and no lesson title — only not-found",
+      !iframeSrc(html) &&
+        !html.includes("cloudflarestream.com") &&
+        !/eyJhbGci/.test(html) &&
+        !html.includes(lesson.video_id) &&
+        !html.includes(lesson.title) &&
+        /could not be found|404/.test(html),
+      `HTTP ${res.status}`,
+    );
+    console.log(`    → HTTP ${res.status} (streamed not-found; see comment)`);
   }
 }
 
