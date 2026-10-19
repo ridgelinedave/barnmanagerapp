@@ -52,12 +52,20 @@ const db = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false
 
 const b64 = (s) => Buffer.from(s, "utf8").toString("base64");
 
-/** Only Cloudflare hosts ever receive the Authorization header. */
+/**
+ * Only Cloudflare-owned hosts ever receive the Authorization header. Stream's
+ * tus upload address is on a gateway host (observed:
+ * edge-production.gateway.api.cloudflare.com) and REQUIRES the token — without
+ * it every chunk is a 400 — so the rule is "a cloudflare.com or
+ * cloudflarestream.com host over https", never "any host Stream points at".
+ */
 function authFor(url) {
-  const host = new URL(url).host;
-  return host === "api.cloudflare.com" || host.endsWith(".cloudflarestream.com")
-    ? { Authorization: `Bearer ${creds.apiToken}` }
-    : {};
+  const { host, protocol } = new URL(url);
+  const cloudflare =
+    host === "cloudflare.com" ||
+    host.endsWith(".cloudflare.com") ||
+    host.endsWith(".cloudflarestream.com");
+  return protocol === "https:" && cloudflare ? { Authorization: `Bearer ${creds.apiToken}` } : {};
 }
 
 async function readChunk(path, start, end) {
