@@ -41,8 +41,8 @@ export function ScheduleAdminMenu({ date, dayLabel }: { date: string; dayLabel: 
       <Sheet open={open} onClose={() => setOpen(false)} title="Lesson admin">
         <div className="flex flex-col gap-2">
           <GenerateInstancesButton />
-          <ButtonLink href="/manage/lesson-templates" size="menu" block icon="calendar">
-            Edit the weekly schedule
+          <ButtonLink href="/lessons" size="menu" block icon="calendar">
+            Weekly schedule
           </ButtonLink>
           <SendRemindersButton date={date} dayLabel={dayLabel} />
         </div>

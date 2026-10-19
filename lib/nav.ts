@@ -312,22 +312,33 @@ export const BARN_GROUPS: DestinationGroup[] = [
   BARN_RECORDS,
 ];
 
-/** The Lessons landing page — teaching and competing. */
+/**
+ * The Lessons tab's segments — teaching and competing.
+ *
+ * NO MENU SCREEN (CLAUDE.md, "No menu screens"). Every role has three or fewer
+ * of these, so they are a segmented control at the top of the tab, not rows on
+ * a landing page; `lessonSegments` builds it. The FIRST visible entry is what
+ * /lessons itself shows, which is why two entries share the "/lessons" href:
+ * an admin opens on Students, a family on its own lessons. Staff have no
+ * /lessons view of their own and are sent to Shows.
+ *
+ * The old addresses (/manage/lesson-templates, /lessons/mine, /lessons/makeups)
+ * redirect here. A family's makeup offers now sit at the top of its lessons —
+ * they are about those lessons, and they are also pushed to Home.
+ */
 export const LESSONS_GROUP: DestinationGroup = {
   title: "Lessons and shows",
   entries: [
-    // The family's own lessons. First, because for a parent this tab is still
-    // mostly "when does my kid ride".
     {
       flag: "lessons",
-      href: "/lessons/mine",
+      href: "/lessons",
       title: "My lessons",
       icon: "calendar",
       roles: ["parent"],
     },
     {
       flag: "lessons",
-      href: "/manage/lesson-templates",
+      href: "/lessons",
       title: "Students",
       icon: "people",
       roles: ADMIN,
@@ -338,13 +349,6 @@ export const LESSONS_GROUP: DestinationGroup = {
       title: "Shows",
       icon: "ribbon",
       roles: ALL,
-    },
-    {
-      flag: "lessons",
-      href: "/lessons/makeups",
-      title: "Makeups",
-      icon: "clock",
-      roles: ["parent"],
     },
     // Learning modules (0023). Every role is SHOWN the row; what each sees
     // inside is RLS's decision (a family only the modules shared with it).
@@ -358,6 +362,26 @@ export const LESSONS_GROUP: DestinationGroup = {
     },
   ],
 };
+
+export type Segment = { href: string; label: string; current: boolean };
+
+/**
+ * The Lessons segmented control for one role. `current` is the href of the
+ * screen being rendered — passed in, not read from the URL, because /lessons
+ * shows a different first segment per role.
+ */
+export function lessonSegments(
+  role: Role,
+  isEnabled: (flag: BarnFeatureFlag) => boolean,
+  current: string,
+  labels?: Partial<BarnLabels>,
+): Segment[] {
+  return visibleEntries(LESSONS_GROUP, role, isEnabled).map((entry) => ({
+    href: entry.href,
+    label: labelFor(entry, labels),
+    current: entry.href === current,
+  }));
+}
 
 /**
  * Settings (the More tab) — running the barn's people. Team & access leads:

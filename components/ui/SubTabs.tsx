@@ -30,7 +30,7 @@ export function SubTabs({
               href={item.href}
               aria-current={item.current ? "page" : undefined}
               scroll={false}
-              className={`flex min-h-11 items-center justify-center rounded-control px-3 text-label transition-colors duration-150 lg:min-h-0 lg:rounded-none lg:border-b-2 lg:px-0 lg:pb-2 lg:pt-1 lg:text-table ${
+              className={`flex min-h-11 items-center justify-center whitespace-nowrap rounded-control px-2 text-label transition-colors duration-150 lg:min-h-0 lg:rounded-none lg:border-b-2 lg:px-0 lg:pb-2 lg:pt-1 lg:text-table ${
                 item.current
                   ? "bg-accent font-semibold text-accent-on lg:border-accent lg:bg-transparent lg:text-ink"
                   : "font-medium text-ink lg:border-transparent lg:text-muted lg:hover:text-ink"

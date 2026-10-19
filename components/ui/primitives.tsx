@@ -128,15 +128,18 @@ export function SectionHeader({
   title,
   count,
   action,
+  id,
 }: {
   title: string;
+  /** For a control elsewhere that is labelled by this heading. */
+  id?: string;
   /** A quiet right-hand fact: "4", "2 outstanding". */
   count?: string;
   action?: { href: string; label: string };
 }) {
   return (
     <div className="flex items-baseline gap-3 border-b border-line pb-1.5">
-      <h2 className="font-sans text-micro uppercase text-muted">{title}</h2>
+      <h2 id={id} className="font-sans text-micro uppercase text-muted">{title}</h2>
       {count && <p className="text-micro text-muted tabular-nums">{count}</p>}
       {action && (
         /* 44px hit area on a phone, by padding and a negative margin. */

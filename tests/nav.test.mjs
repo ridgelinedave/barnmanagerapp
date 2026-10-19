@@ -25,7 +25,7 @@
  *
  * Run:  npm run test:nav
  */
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   BARN_GROUPS,
@@ -141,8 +141,15 @@ console.log("\nevery management screen is one click from the admin sidebar\n");
 {
   const admin = new Set(sidebarHrefs(sidebarFor("admin", () => true)));
   const manageDir = join(APP.pathname.replace(/^\/([A-Za-z]:)/, "$1"), "manage");
+  // A page that only redirects is an old address, not a screen — it has no
+  // sidebar row of its own (e.g. /manage/lesson-templates → /lessons).
+  const isRedirectOnly = (file) => {
+    const source = readFileSync(file, "utf8");
+    return /\bredirect\(/.test(source) && !/<TabPage\b/.test(source);
+  };
   const screens = readdirSync(manageDir, { withFileTypes: true })
     .filter((d) => d.isDirectory() && existsSync(join(manageDir, d.name, "page.tsx")))
+    .filter((d) => !isRedirectOnly(join(manageDir, d.name, "page.tsx")))
     .map((d) => `/manage/${d.name}`);
 
   check("control: there are /manage screens to look for", screens.length > 0, `found ${screens.length}`);

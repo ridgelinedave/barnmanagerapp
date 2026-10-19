@@ -200,6 +200,16 @@ tool, not a tutorial. Four rules, enforced on every screen, both shells:
    "Nothing due this week." Not an invitation, not encouragement, not a dash
    and a suggestion. If the add button is on screen, don't mention it.
 
+**No menu screens (standing rule).** A landing page whose only content is links
+to other pages is a wasted screen. If a tab has three or fewer destinations for
+a role, they are a segmented control (`SubTabs`, via `TabPage`'s `tabs`) at the
+top of the tab, and the tab opens on the first one — not cards on a menu
+screen. Old routes keep working (redirect, never 404). Count taps: the thing a
+tab exists for should be no more than two taps from the tab. Lessons follows
+this (`lessonSegments` in lib/nav.ts). Audit 2026-10-19: the Barn tab is still
+a link-only landing page for every role (admin 13 destinations, staff 8,
+parent 4) — flagged, not yet restructured.
+
 **Two shells, one app** (see `design/DESIGN-MASTER.md` §14b, decided
 2026-10-18). Same routes, same server components, same data functions; a
 breakpoint picks the chrome and the column count. Divergence belongs in layout

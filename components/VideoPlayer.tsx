@@ -12,6 +12,12 @@ import type { Playback } from "@/lib/video";
  *
  * A fixed 16:9 frame, so nothing jumps when the player loads. A 1px hairline,
  * no shadow, the small radius — the player is the content, not a card.
+ *
+ * IT ASKS TO AUTOPLAY. Tapping a lesson is the request to watch it, so the
+ * lesson screen should not need a third tap. The browser has the last word:
+ * where its autoplay policy refuses (iOS Safari, for sound), the player shows
+ * its play button instead. The player is above the fold, so it is not
+ * lazy-loaded.
  */
 export function VideoPlayer({ playback, title }: { playback: Playback; title: string }) {
   if (playback.kind === "none") {
@@ -30,12 +36,11 @@ export function VideoPlayer({ playback, title }: { playback: Playback; title: st
     <div className="flex flex-col gap-2">
       <div className="relative aspect-video w-full overflow-hidden rounded-card border border-line bg-ink">
         <iframe
-          src={playback.src}
+          src={`${playback.src}${playback.src.includes("?") ? "&" : "?"}autoplay=true`}
           title={title}
           className="absolute inset-0 size-full border-0"
           allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture"
           allowFullScreen
-          loading="lazy"
           referrerPolicy="strict-origin-when-cross-origin"
         />
       </div>

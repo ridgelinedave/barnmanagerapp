@@ -2,8 +2,9 @@ import { TabPage } from "@/components/TabPage";
 import { StubScreen } from "@/components/StubScreen";
 import { ShowsHub } from "@/components/ShowsHub";
 import { ShowCreateButton } from "@/components/ShowCreateButton";
+import { LessonsSegments } from "@/components/LessonsSegments";
 import { EmptyState } from "@/components/ui/primitives";
-import { currentRole, requireTab } from "@/lib/guard";
+import { requireTab } from "@/lib/guard";
 import { canManageShows, listShows, splitShows } from "@/lib/shows";
 import { barnToday } from "@/lib/dates";
 import { featureEnabled } from "@/config/barn";
@@ -11,17 +12,18 @@ import { featureEnabled } from "@/config/barn";
 export const metadata = { title: "Shows" };
 
 export default async function ShowsPage() {
-  await requireTab("/lessons");
+  const role = await requireTab("/lessons");
+  const tabs = <LessonsSegments role={role} current="/lessons/shows" />;
 
   if (!featureEnabled("shows")) {
     return (
-      <TabPage title="Shows">
+      <TabPage title="Lessons" tabs={tabs}>
         <StubScreen heading="Shows" phase="Phase 2" />
       </TabPage>
     );
   }
 
-  const [all, role, canManage] = await Promise.all([listShows(), currentRole(), canManageShows()]);
+  const [all, canManage] = await Promise.all([listShows(), canManageShows()]);
 
   // The create control sits in the masthead on the empty state too — an empty
   // hub is exactly when someone needs to add the first show, and a screen that
@@ -30,7 +32,7 @@ export default async function ShowsPage() {
 
   if (all.length === 0) {
     return (
-      <TabPage title="Shows" action={action}>
+      <TabPage title="Lessons" action={action} tabs={tabs}>
         <EmptyState title="No shows yet" />
       </TabPage>
     );
@@ -39,7 +41,7 @@ export default async function ShowsPage() {
   const { upcoming, results, pinned } = splitShows(all);
 
   return (
-    <TabPage title="Shows" action={action}>
+    <TabPage title="Lessons" action={action} tabs={tabs}>
       <ShowsHub
         upcoming={upcoming}
         results={results}

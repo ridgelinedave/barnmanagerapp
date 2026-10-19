@@ -18,7 +18,6 @@ async function requireAdmin() {
 function revalidate() {
   revalidatePath("/schedule");
   revalidatePath("/lessons");
-  revalidatePath("/manage/lesson-templates");
 }
 
 /**

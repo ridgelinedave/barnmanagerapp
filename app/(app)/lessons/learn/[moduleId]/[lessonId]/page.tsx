@@ -53,28 +53,29 @@ export default async function LearningLessonPage({
   const duration = formatDuration(lesson.duration_seconds);
 
   return (
-    <TabPage title={lesson.title} back={`/lessons/learn/${module.id}`} layout="wide" density="airy">
+    <TabPage title={lesson.title} back="/lessons/learn" layout="wide" density="airy">
       <div className="flex flex-col gap-7 lg:grid lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start lg:gap-10">
         <div className="flex min-w-0 flex-col gap-5">
           <VideoPlayer playback={playback} title={lesson.title} />
 
           <p className="font-sans text-micro uppercase text-muted">
-            {module.title} · Lesson {index + 1} of {lessons.length}
+            Lesson {index + 1} of {lessons.length}
             {duration ? ` · ${duration}` : ""}
           </p>
 
-          {/* NOTES. The barn owner writes these herself; nothing is generated
-              or pre-filled. Empty notes show members nothing at all, and show
-              the admin a clearly marked place to write them. */}
+          {/* NOTES — ONE section. The barn owner writes these herself; nothing
+              is generated or pre-filled. The admin sees the editor under the
+              one "Notes" heading (the textarea is labelled by it); members see
+              the notes, or nothing at all when there are none. */}
           {isAdmin ? (
-            <section className="flex flex-col gap-3">
-              <SectionHeader title="Notes" />
-              {!lesson.notes.trim() && (
-                <p className="rounded-control border border-dashed border-muted/60 px-3 py-2 text-label text-muted">
-                  No notes yet. Members see nothing here until there are.
-                </p>
-              )}
-              <LearningNotesEditor lessonId={lesson.id} moduleId={module.id} notes={lesson.notes} />
+            <section aria-labelledby={`notes-heading-${lesson.id}`} className="flex flex-col gap-3">
+              <SectionHeader title="Notes" id={`notes-heading-${lesson.id}`} />
+              <LearningNotesEditor
+                lessonId={lesson.id}
+                moduleId={module.id}
+                notes={lesson.notes}
+                labelledBy={`notes-heading-${lesson.id}`}
+              />
             </section>
           ) : (
             lesson.notes.trim() && (
@@ -89,7 +90,7 @@ export default async function LearningLessonPage({
         {/* The module's lessons beside the player on a desk, under it on a
             phone; the current one carries the nav accent and aria-current. */}
         <nav aria-label="Lessons in this module" className="flex flex-col gap-2">
-          <SectionHeader title="In this module" />
+          <SectionHeader title={module.title} />
           <ol className="flex flex-col">
             {lessons.map((item, i) => {
               const current = item.id === lesson.id;

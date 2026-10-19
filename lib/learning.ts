@@ -56,6 +56,37 @@ export async function listModules(): Promise<(LearningModule & { lessonCount: nu
   return (modules as LearningModule[]).map((m) => ({ ...m, lessonCount: counts.get(m.id) ?? 0 }));
 }
 
+/**
+ * Every module this viewer may see, each with its lessons in order — the
+ * Academy screen lists them expanded, so a lesson is one tap away. Two reads,
+ * both on the viewer's session: RLS returns lessons only for readable modules.
+ */
+export async function listModulesWithLessons(): Promise<
+  (LearningModule & { lessons: LearningLesson[] })[]
+> {
+  const supabase = await createClient();
+  const { data: modules } = await supabase
+    .from("learning_modules")
+    .select(MODULE_COLUMNS)
+    .order("position");
+  if (!modules || modules.length === 0) return [];
+
+  const { data: lessons } = await supabase
+    .from("learning_lessons")
+    .select(LESSON_COLUMNS)
+    .in(
+      "module_id",
+      modules.map((m) => m.id),
+    )
+    .order("position");
+
+  const byModule = new Map<string, LearningLesson[]>();
+  for (const lesson of (lessons ?? []) as LearningLesson[]) {
+    byModule.set(lesson.module_id, [...(byModule.get(lesson.module_id) ?? []), lesson]);
+  }
+  return (modules as LearningModule[]).map((m) => ({ ...m, lessons: byModule.get(m.id) ?? [] }));
+}
+
 /** One module and its lessons in order, or null when the viewer may not see it. */
 export async function loadModule(
   moduleId: string,
