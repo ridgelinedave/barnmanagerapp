@@ -33,10 +33,7 @@ export default async function LessonsPage() {
   return (
     <TabPage title="Lessons">
       {live.length === 0 ? (
-        <EmptyState
-          title="Nothing here yet"
-          body="Lessons, shows and makeups will appear here."
-        />
+        <EmptyState title="Nothing here yet" />
       ) : (
         <section className="flex flex-col gap-3">
           <SectionHeader title={LESSONS_GROUP.title} />
@@ -45,7 +42,6 @@ export default async function LessonsPage() {
               key={entry.href}
               href={entry.href}
               title={labelFor(entry, { learning: barn.learning.label })}
-              meta={entry.meta}
               leading={
                 <span className="flex size-10 shrink-0 items-center justify-center rounded-control bg-sunk text-muted lg:size-7 lg:bg-transparent">
                   <Icon name={entry.icon} className="size-5 lg:size-4" />

@@ -36,7 +36,7 @@ export function ShowManageMenu({ show }: { show: Show }) {
         onClick={() => setPanel("menu")}
         aria-haspopup="dialog"
         aria-expanded={panel !== null}
-        aria-label="Manage this show"
+        aria-label="Manage show"
         className="-mr-1 flex size-11 shrink-0 items-center justify-center rounded-control text-white lg:size-9 lg:border lg:border-line lg:text-ink lg:hover:bg-sunk"
       >
         <Icon name="more" className="size-6" strokeWidth={2.5} />

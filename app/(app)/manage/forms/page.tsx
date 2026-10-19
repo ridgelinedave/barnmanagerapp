@@ -51,11 +51,7 @@ export default async function ManageFormsPage({
   if (!featureEnabled("forms")) {
     return (
       <TabPage title="Forms">
-        <StubScreen
-          heading="Forms"
-          phase="Phase 2"
-          detail="Waiver templates, who has signed, and the signed-copy vault."
-        />
+        <StubScreen heading="Forms" phase="Phase 2" />
       </TabPage>
     );
   }
@@ -138,10 +134,10 @@ export default async function ManageFormsPage({
       density="tight"
       action={
         <div className="hidden gap-2 lg:flex">
-          <SheetTrigger label="Set up a family's paperwork" title="Required forms">
+          <SheetTrigger label="Assign forms" title="Required forms">
             <OnboardingPicker families={families} />
           </SheetTrigger>
-          <SheetTrigger label="Build a form" title="New form" variant="primary">
+          <SheetTrigger label="New form" title="New form" variant="primary">
             <FormTemplateEditor />
           </SheetTrigger>
         </div>
@@ -198,10 +194,7 @@ export default async function ManageFormsPage({
         />
 
         {outstanding.length === 0 ? (
-          <EmptyState
-            title="Everyone is up to date"
-            body="Every form the barn has issued has been signed."
-          />
+          <EmptyState title="No unsigned forms" />
         ) : (
           outstanding.map((row) => (
             <Card key={row.submission.id} className="flex flex-col gap-2 p-4">
@@ -252,10 +245,7 @@ export default async function ManageFormsPage({
         <SectionHeader title="Forms" count={`${templates.length}`} />
 
         {templates.length === 0 ? (
-          <EmptyState
-            title="No forms yet"
-            body="Build a waiver or a contact sheet, then issue it to your families."
-          />
+          <EmptyState title="No forms yet" />
         ) : (
           progress.map(({ template, issued, complete: signed }) => {
             const fieldCount = fieldsOf(template.schema).length;
@@ -313,7 +303,7 @@ export default async function ManageFormsPage({
           })
         )}
 
-        <SheetTrigger label="Build a form" title="New form" variant="primary">
+        <SheetTrigger label="New form" title="New form" variant="primary">
           <FormTemplateEditor />
         </SheetTrigger>
 
@@ -321,7 +311,7 @@ export default async function ManageFormsPage({
             hands a family everything marked required in one go, via
             ensure_family_onboarding(); the per-card action issues one chosen
             form to chosen families. Two different jobs, two different buttons. */}
-        <SheetTrigger label="Set up a family's paperwork" title="Required forms">
+        <SheetTrigger label="Assign forms" title="Required forms">
           <OnboardingPicker families={families} />
         </SheetTrigger>
       </section>

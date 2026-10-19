@@ -37,7 +37,7 @@ export function PunchList({
   showNotes?: boolean;
 }) {
   if (punches.length === 0) {
-    return <EmptyState title={emptyLabel} body="Punches appear here as they are made." />;
+    return <EmptyState title={emptyLabel} />;
   }
 
   const rows: Row[] = punches.map((punch) => {

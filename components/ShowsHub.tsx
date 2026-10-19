@@ -27,19 +27,10 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "pinned", label: "Pinned" },
 ];
 
-const EMPTY: Record<Tab, { title: string; body: string }> = {
-  upcoming: {
-    title: "No shows coming up",
-    body: "When the barn adds the next competition it appears here with dates and ride times.",
-  },
-  results: {
-    title: "No results yet",
-    body: "Placings and scores land here once a show has been ridden.",
-  },
-  pinned: {
-    title: "Nothing pinned",
-    body: "The barn pins the show it wants everyone looking at. None is pinned right now.",
-  },
+const EMPTY: Record<Tab, string> = {
+  upcoming: "No shows coming up",
+  results: "No results yet",
+  pinned: "Nothing pinned",
 };
 
 /**
@@ -205,7 +196,7 @@ export function ShowsHub({
       </div>
 
       {shown.length === 0 ? (
-        <EmptyState title={EMPTY[tab].title} body={EMPTY[tab].body} />
+        <EmptyState title={EMPTY[tab]} />
       ) : (
         <>
           {/* The carousel. -mx-4/px-4 lets it bleed to the screen edge while

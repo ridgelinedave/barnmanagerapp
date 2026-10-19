@@ -40,14 +40,14 @@ export function FormIssuer({
   if (active.length === 0) {
     return (
       <p className="text-caption text-muted">
-        No forms are switched on. Create one, or turn one back on, before issuing it.
+        No forms are switched on.
       </p>
     );
   }
 
   return (
     <form action={formAction} className="flex flex-col gap-4">
-      <Field label="Which form" htmlFor={`${id}-template`}>
+      <Field label="Form" htmlFor={`${id}-template`}>
         <Select id={`${id}-template`} name="template_id" defaultValue={defaultTemplateId ?? ""}>
           {active.map((template) => (
             <option key={template.id} value={template.id}>

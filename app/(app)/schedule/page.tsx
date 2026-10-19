@@ -201,14 +201,7 @@ async function DayBody({ date, role }: { date: string; role: Role }) {
       </ChipRow>
 
       {instances.length === 0 ? (
-        <EmptyState
-          title={isToday ? "Nothing on today" : "Nothing on this day"}
-          body={
-            isAdmin
-              ? "Add a one-off below if something has come up, or fill the week from the weekly schedule in the admin menu."
-              : "No lessons are scheduled. Check another day with the arrows above."
-          }
-        />
+        <EmptyState title={isToday ? "No lessons today" : "No lessons this day"} />
       ) : (
         instances.map((instance) => (
           <LessonCard
@@ -280,15 +273,7 @@ export default async function SchedulePage({
   if (!featureEnabled("lessons")) {
     return (
       <TabPage title="Schedule">
-        <StubScreen
-          heading="Day view"
-          phase="Phase 1"
-          detail={
-            role === "admin"
-              ? "The day calendar, slot editing, the weekly template wizard and the backfill flow."
-              : "The day view of lessons and barn events."
-          }
-        />
+        <StubScreen heading="Day view" phase="Phase 1" />
       </TabPage>
     );
   }

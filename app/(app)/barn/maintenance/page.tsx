@@ -36,16 +36,13 @@ export default async function MaintenancePage() {
       title="Maintenance"
       back="/barn"
       action={
-        <SheetTrigger label="Log" title="Log a maintenance request" variant="primary">
+        <SheetTrigger label="Log" title="Maintenance request" variant="primary">
           <MaintenanceAddForm />
         </SheetTrigger>
       }
     >
       {rows.length === 0 ? (
-        <EmptyState
-          title="Nothing broken"
-          body="Log a broken gate, a dead light or a dripping tap and it lands on this board."
-        />
+        <EmptyState title="No open maintenance requests" />
       ) : (
         GROUPS.map(({ status, title }) => {
           const inGroup = rows.filter((r) => r.status === status);
@@ -73,7 +70,7 @@ export default async function MaintenancePage() {
                   {canResolve && row.status !== "done" && (
                     <div className="flex flex-wrap gap-2">
                       {row.status === "open" && (
-                        <MaintenanceStatusButton id={row.id} next="in_progress" label="Start it" />
+                        <MaintenanceStatusButton id={row.id} next="in_progress" label="Start" />
                       )}
                       <MaintenanceStatusButton id={row.id} next="done" label="Mark done" />
                     </div>

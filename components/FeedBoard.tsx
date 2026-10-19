@@ -47,10 +47,7 @@ function HorseAvatar({ entry }: { entry: HorseFeed }) {
 export function FeedBoard({ board }: { board: HorseFeed[] }) {
   if (board.length === 0) {
     return (
-      <EmptyState
-        title="No horses yet"
-        body="Add the first one and its feed chart appears here."
-      />
+      <EmptyState title="No horses yet" />
     );
   }
 

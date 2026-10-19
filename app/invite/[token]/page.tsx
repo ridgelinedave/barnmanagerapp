@@ -7,7 +7,7 @@ import { INVITE_INVALID_MESSAGE } from "@/lib/invites";
 import { PERMISSION_FLAGS, PERMISSION_FLAG_LABELS, type Role } from "@/lib/types";
 import { barn, featureEnabled } from "@/config/barn";
 
-export const metadata = { title: "Your invitation" };
+export const metadata = { title: "Invitation" };
 
 /**
  * The claim screen: /invite/<token>.
@@ -80,7 +80,7 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
     <Shell>
       <div className="flex flex-col gap-2">
         <h1 className="font-display text-display text-ink">
-          You&apos;ve been invited, {invite.full_name.split(" ")[0]}
+          Invitation
         </h1>
         <p className="text-caption text-muted">
           {barn.owner} has set you up at {barn.name} as {ROLE_SENTENCE[invite.role]}.

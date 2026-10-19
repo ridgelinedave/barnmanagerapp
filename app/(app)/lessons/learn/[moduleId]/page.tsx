@@ -56,7 +56,7 @@ export default async function LearningModulePage({
     <TabPage title={module.title} back="/lessons/learn" action={publishToggle} density="tight">
       {isAdmin && !module.published && (
         <Callout icon="eyeOff">
-          A draft. Only you can see it until you publish — then everyone it is shared with can.
+          Draft. Only you can see it until you publish.
         </Callout>
       )}
 
@@ -65,7 +65,7 @@ export default async function LearningModulePage({
       <section className="flex flex-col gap-3">
         <SectionHeader title="Lessons" count={lessons.length ? `${lessons.length}` : undefined} />
         {lessons.length === 0 ? (
-          <EmptyState title="No lessons yet" body="Lessons appear here in the order they are meant to be watched." />
+          <EmptyState title="No lessons yet" />
         ) : (
           <ol className="flex flex-col gap-3 lg:gap-0">
             {lessons.map((lesson, index) => (

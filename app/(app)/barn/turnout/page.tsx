@@ -27,10 +27,7 @@ export default async function TurnoutPage() {
   if (board.length === 0) {
     return (
       <TabPage title="Turnout" back="/barn">
-        <EmptyState
-          title="No horses yet"
-          body="Turnout plans appear here once there are horses on the yard."
-        />
+        <EmptyState title="No horses yet" />
       </TabPage>
     );
   }
@@ -44,10 +41,7 @@ export default async function TurnoutPage() {
         <SectionHeader title="Today" count={`${planned.length} of ${board.length}`} />
 
         {planned.length === 0 ? (
-          <EmptyState
-            title="No turnout set"
-            body="Set where a horse goes out and it appears on this board."
-          />
+          <EmptyState title="No turnout plans yet" />
         ) : (
           planned.map(({ horse, plan }) => (
             <Card key={horse.id} className="flex flex-col gap-2 p-4">
@@ -86,7 +80,7 @@ export default async function TurnoutPage() {
           {missing.map(({ horse }) => (
             <Card key={horse.id} className="flex flex-col gap-2 p-4">
               <h3 className="font-display text-heading leading-snug text-ink">{horse.name}</h3>
-              <p className="text-caption text-muted">Nobody has said where this horse goes out.</p>
+              <p className="text-caption text-muted">No turnout set.</p>
               <SheetTrigger label="Set turnout" title={`${horse.name} — turnout`} variant="primary">
                 <TurnoutPlanForm horseId={horse.id} plan={null} />
               </SheetTrigger>

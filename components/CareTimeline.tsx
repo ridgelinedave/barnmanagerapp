@@ -41,7 +41,7 @@ export function CareTimeline({
   emptyMessage?: string;
 }) {
   if (events.length === 0) {
-    return <EmptyState title={emptyMessage} body="Care appears here as the barn logs it." />;
+    return <EmptyState title={emptyMessage} />;
   }
 
   const rows: Row[] = events.map((event) => ({

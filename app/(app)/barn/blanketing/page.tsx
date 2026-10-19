@@ -5,7 +5,7 @@ import { BlanketPlanForm } from "@/components/BarnOpsForms";
 import { currentRole } from "@/lib/guard";
 import { blanketSummary, flySummary, listBlanketBoard } from "@/lib/barn-ops";
 
-export const metadata = { title: "Blanketing & fly care" };
+export const metadata = { title: "Blanketing" };
 
 /**
  * What goes on tonight, one row per horse.
@@ -28,11 +28,8 @@ export default async function BlanketingPage() {
 
   if (board.length === 0) {
     return (
-      <TabPage title="Blanketing & fly care" back="/barn">
-        <EmptyState
-          title="No horses yet"
-          body="Blanket and fly plans appear here once there are horses on the yard."
-        />
+      <TabPage title="Blanketing" back="/barn">
+        <EmptyState title="No horses yet" />
       </TabPage>
     );
   }
@@ -41,19 +38,12 @@ export default async function BlanketingPage() {
   const missing = board.filter((row) => !row.plan);
 
   return (
-    <TabPage title="Blanketing & fly care" back="/barn">
-      <p className="text-caption text-muted">
-        What goes on tonight. The barn reads the weather; the app does not do it for you yet.
-      </p>
-
+    <TabPage title="Blanketing" back="/barn">
       <section className="flex flex-col gap-3">
-        <SectionHeader title="Tonight" count={`${planned.length} of ${board.length}`} />
+        <SectionHeader title="Blanket plans" count={`${planned.length} of ${board.length}`} />
 
         {planned.length === 0 ? (
-          <EmptyState
-            title="No plans written"
-            body="Set a horse's blanket rules and they show up on this board."
-          />
+          <EmptyState title="No blanket plans yet" />
         ) : (
           planned.map(({ horse, plan }) => {
             const fly = plan ? flySummary(plan) : "";
@@ -74,7 +64,7 @@ export default async function BlanketingPage() {
                 {plan?.notes && <p className="text-caption text-muted">{plan.notes}</p>}
                 {isBarn && (
                   <SheetTrigger label="Edit" title={`${horse.name} — blanket and fly`}>
-                    <BlanketPlanForm horseId={horse.id} horseName={horse.name} plan={plan} />
+                    <BlanketPlanForm horseId={horse.id} plan={plan} />
                   </SheetTrigger>
                 )}
               </Card>
@@ -89,13 +79,13 @@ export default async function BlanketingPage() {
           {missing.map(({ horse }) => (
             <Card key={horse.id} className="flex flex-col gap-2 p-4">
               <h3 className="font-display text-heading leading-snug text-ink">{horse.name}</h3>
-              <p className="text-caption text-muted">Nobody has written what this horse wears.</p>
+              <p className="text-caption text-muted">No plan yet.</p>
               <SheetTrigger
-                label="Write a plan"
+                label="Add plan"
                 title={`${horse.name} — blanket and fly`}
                 variant="primary"
               >
-                <BlanketPlanForm horseId={horse.id} horseName={horse.name} plan={null} />
+                <BlanketPlanForm horseId={horse.id} plan={null} />
               </SheetTrigger>
             </Card>
           ))}

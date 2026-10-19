@@ -103,10 +103,7 @@ export default async function ManageHorsePage({
         />
 
         {activePlans.length === 0 && (
-          <EmptyState
-            title="No feed chart yet"
-            body="Set the morning and evening feeds below and this horse joins the feed board staff read at 6am."
-          />
+          <EmptyState title="No feed chart yet" />
         )}
 
         {activePlans.map((plan) => (
@@ -133,7 +130,7 @@ export default async function ManageHorsePage({
           </Card>
         ))}
 
-        <SheetTrigger label="Set a meal" title="Feed chart">
+        <SheetTrigger label="Add meal" title="Feed chart">
           <FeedPlanForm horseId={horse.id} current={activePlans} />
         </SheetTrigger>
 
@@ -166,10 +163,7 @@ export default async function ManageHorsePage({
           </SheetTrigger>
 
           {care.length === 0 ? (
-            <EmptyState
-              title="Nothing logged yet"
-              body="Vaccines, worming, farrier and vet visits go here. The first one you log starts the history."
-            />
+            <EmptyState title="No care logged" />
           ) : (
             <CareTimeline events={care} today={barnToday()} loggerNames={loggers} />
           )}
@@ -191,10 +185,7 @@ export default async function ManageHorsePage({
         </SheetTrigger>
 
         {training.length === 0 ? (
-          <EmptyState
-            title="Nothing logged yet"
-            body="Schooling, hacking and groundwork go here. The owner can see it too."
-          />
+          <EmptyState title="No sessions logged" />
         ) : (
           <TrainingTimeline logs={training} loggerNames={loggers} />
         )}
@@ -208,10 +199,7 @@ export default async function ManageHorsePage({
           />
 
           {documents.length === 0 ? (
-            <EmptyState
-              title="No papers on file"
-              body="Coggins, papers and vet reports. Owner-only."
-            />
+            <EmptyState title="No documents on file" />
           ) : (
             <DocumentList documents={documents} horseId={horse.id} canDelete />
           )}

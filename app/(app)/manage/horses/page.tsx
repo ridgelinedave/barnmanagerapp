@@ -91,11 +91,7 @@ export default async function ManageHorsesPage({
   if (!featureEnabled("horses")) {
     return (
       <TabPage title="Horses">
-        <StubScreen
-          heading="Horses"
-          phase="Phase 2"
-          detail="Horse records, rider assignments and feed charts."
-        />
+        <StubScreen heading="Horses" phase="Phase 2" />
       </TabPage>
     );
   }
@@ -135,7 +131,7 @@ export default async function ManageHorsesPage({
         />
 
         {inWork.length === 0 ? (
-          <EmptyState title="No horses yet" body="Add the first one with Add a horse." />
+          <EmptyState title="No horses yet" />
         ) : (
           <>
             <div className={`flex flex-col gap-3 ${MOBILE_ONLY}`}>

@@ -28,15 +28,7 @@ export default async function HorseDirectoryPage() {
   if (!featureEnabled("horses")) {
     return (
       <TabPage title="Horses">
-        <StubScreen
-          heading="Horses"
-          phase="Phase 2"
-          detail={
-            role === "parent"
-              ? "Your horse's record and feed chart."
-              : "The horse directory and feed charts."
-          }
-        />
+        <StubScreen heading="Horses" phase="Phase 2" />
       </TabPage>
     );
   }
@@ -59,22 +51,18 @@ export default async function HorseDirectoryPage() {
 
         {ridden.length > 0 && (
           <section className="flex flex-col gap-3">
-            <SectionHeader title="Horses your rider rides" />
+            <SectionHeader title="Horses ridden" />
             {ridden.map((horse) => (
               <HorseBasicsCard key={horse.id} horse={horse} />
             ))}
             <p className="text-caption text-muted">
-              These belong to the barn or to another family, so their records stay with their
-              owners.
+              Records stay with each horse&apos;s owner.
             </p>
           </section>
         )}
 
         {owned.length === 0 && ridden.length === 0 && (
-          <EmptyState
-            title="No horses yet"
-            body="Your rider’s horses appear here."
-          />
+          <EmptyState title="No horses yet" />
         )}
       </TabPage>
     );
@@ -92,10 +80,7 @@ export default async function HorseDirectoryPage() {
         <SectionHeader title="In work" count={`${inWork.length}`} />
 
         {inWork.length === 0 ? (
-          <EmptyState
-            title="No horses on the books"
-            body="The barn adds horses from Manage. Once they are on, their feed charts show up on the feed board."
-          />
+          <EmptyState title="No horses yet" />
         ) : (
           inWork.map((horse) => (
             <HorseCard

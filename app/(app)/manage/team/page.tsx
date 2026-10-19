@@ -43,7 +43,7 @@ import { inviteStatus } from "@/lib/invites";
 import { barn, featureEnabled } from "@/config/barn";
 import type { Role } from "@/lib/types";
 
-export const metadata = { title: "Team" };
+export const metadata = { title: "Team and access" };
 
 const ROLE_LABELS: Record<Role, string> = { admin: "Admin", staff: "Staff", parent: "Parent" };
 const ROLE_TONES = { admin: "gold", staff: "forest", parent: "neutral" } as const;
@@ -146,13 +146,13 @@ export default async function ManageTeamPage({
 
   return (
     <TabPage
-      title="Team"
+      title="Team and access"
       back="/more"
       layout="wide"
       action={
         featureEnabled("invites") ? (
           <div className="hidden lg:block">
-            <SheetTrigger label="Invite someone" title="New invite" variant="primary">
+            <SheetTrigger label="Invite" title="New invite" variant="primary">
               <InviteForm families={families} />
             </SheetTrigger>
           </div>
@@ -167,20 +167,12 @@ export default async function ManageTeamPage({
 
         {admins === 1 && (
           <Callout tone="gold" icon="alert">
-            One admin. If that login is ever lost there is nobody left who can restore it —
-            worth making a second person an admin before you need to.
+            One admin. If that login is lost, nobody can restore it.
           </Callout>
         )}
 
         {team.length === 0 ? (
-          <EmptyState
-            title="Nobody has a login yet"
-            body={
-              featureEnabled("invites")
-                ? `Everyone who signs in — ${barn.owner}, instructors, barn staff and parents — appears here once they've used their invite.`
-                : `Everyone who signs in — ${barn.owner}, instructors, barn staff and parents — appears here once their account exists.`
-            }
-          />
+          <EmptyState title="No accounts yet" />
         ) : (
           <>
           <div className={DESKTOP_ONLY}>
@@ -222,8 +214,7 @@ export default async function ManageTeamPage({
                     all — worth saying on the card, not just in the edit sheet. */}
                 {person.role === "parent" && !person.family_id && (
                   <Callout tone="gold" icon="alert">
-                    No family linked yet, so this login sees an empty app. Set their family
-                    below.
+                    No family linked. This login sees an empty app.
                   </Callout>
                 )}
 
@@ -255,10 +246,7 @@ export default async function ManageTeamPage({
           <SectionHeader title="Invites" count={`${openInvites.length}`} />
 
           {openInvites.length === 0 ? (
-            <EmptyState
-              title="No invites out"
-              body="Invite someone and you get a link to send."
-            />
+            <EmptyState title="No open invites" />
           ) : (
             <>
               <div className={DESKTOP_ONLY}>
@@ -290,7 +278,7 @@ export default async function ManageTeamPage({
           )}
 
           <div className={MOBILE_ONLY}>
-            <SheetTrigger label="Invite someone" title="New invite" variant="primary">
+            <SheetTrigger label="Invite" title="New invite" variant="primary">
               <InviteForm families={families} />
             </SheetTrigger>
           </div>
@@ -301,13 +289,10 @@ export default async function ManageTeamPage({
       {/* B — Families and riders                                             */}
       {/* ------------------------------------------------------------------ */}
       <section className="flex flex-col gap-3">
-        <SectionHeader title="Families & riders" count={`${familiesWithRiders.length}`} />
+        <SectionHeader title="Families and riders" count={`${familiesWithRiders.length}`} />
 
         {familiesWithRiders.length === 0 ? (
-          <EmptyState
-            title="No families yet"
-            body="Add a family, then its riders. Neither needs a login."
-          />
+          <EmptyState title="No families yet" />
         ) : (
           familiesWithRiders.map((family) => (
             <Card key={family.id} className="flex flex-col gap-3 p-4">
@@ -405,10 +390,7 @@ export default async function ManageTeamPage({
         <SectionHeader title="Levels" count={`${levels.length}`} />
 
         {levels.length === 0 ? (
-          <EmptyState
-            title="No levels yet"
-            body="Intro, Training, First. Levels decide who gets offered a seat."
-          />
+          <EmptyState title="No levels yet" />
         ) : (
           /*
            * NAME ON ITS OWN LINE, CONTROLS UNDER IT.

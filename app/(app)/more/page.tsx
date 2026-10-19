@@ -49,12 +49,11 @@ async function baseUrl(): Promise<string> {
   return `${protocol}://${host}`;
 }
 
-function Row({ href, title, meta, icon }: { href: string; title: string; meta: string; icon: IconName }) {
+function Row({ href, title, icon }: { href: string; title: string; icon: IconName }) {
   return (
     <ListRow
       href={href}
       title={title}
-      meta={meta}
       leading={
         <span className="flex size-10 shrink-0 items-center justify-center rounded-control bg-sunk text-muted lg:size-7 lg:bg-transparent">
           <Icon name={icon} className="size-5 lg:size-4" />
@@ -124,7 +123,7 @@ export default async function MorePage() {
         <section className="flex flex-col gap-3">
           <SectionHeader title={SETTINGS_ADMIN_GROUP.title} />
           {adminRows.map((entry) => (
-            <Row key={entry.href} href={entry.href} title={entry.title} meta={entry.meta} icon={entry.icon} />
+            <Row key={entry.href} href={entry.href} title={entry.title} icon={entry.icon} />
           ))}
         </section>
       )}
@@ -136,25 +135,19 @@ export default async function MorePage() {
             <Row
               href="/schedule?view=month"
               title="Calendar"
-              meta="Lessons, barn events and care due — the whole month"
               icon="calendar"
             />
           )}
           {yourRows.map((entry) => (
-            <Row key={entry.href} href={entry.href} title={entry.title} meta={entry.meta} icon={entry.icon} />
+            <Row key={entry.href} href={entry.href} title={entry.title} icon={entry.icon} />
           ))}
         </section>
       )}
 
       {calendarUrl && (
         <section className="flex flex-col gap-3">
-          <SectionHeader title="Your calendar" />
+          <SectionHeader title="Calendar feed" />
           <Card className="flex flex-col gap-3 p-4">
-            <p className="text-caption text-muted">
-              {role === "parent"
-                ? "Your riders' lessons and barn events, in your phone's calendar app."
-                : "Every lesson and barn event, in your phone's calendar app."}
-            </p>
             <CalendarSubscribe url={calendarUrl} />
           </Card>
         </section>
@@ -163,7 +156,7 @@ export default async function MorePage() {
       <InstallPrompt />
 
       <section className="flex flex-col gap-3">
-        <SectionHeader title="The barn" />
+        <SectionHeader title="Barn" />
         <Card className="p-4">
           <FactList
             facts={[

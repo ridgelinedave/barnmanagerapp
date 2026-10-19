@@ -27,7 +27,7 @@ export function DocumentUploadForm({ horseId }: { horseId: string }) {
       <Field
         label="Add a document"
         htmlFor="doc-file"
-        hint="Coggins, registration papers, vet reports. The owning family can read these; nobody else can."
+        hint="The owning family can read these; nobody else can."
       >
         <input
           id="doc-file"

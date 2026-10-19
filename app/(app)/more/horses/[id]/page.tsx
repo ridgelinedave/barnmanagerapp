@@ -158,14 +158,7 @@ export default async function HorseDetailPage({
           count={activePlans.length === 0 ? undefined : `${activePlans.length} meals`}
         />
         {activePlans.length === 0 ? (
-          <EmptyState
-            title="No feed chart yet"
-            body={
-              isBarn
-                ? "Set the morning and evening feeds on this horse and they will appear on the feed board."
-                : "The barn has not set a feed chart for this horse yet."
-            }
-          />
+          <EmptyState title="No feed chart yet" />
         ) : (
           <Card className="flex flex-col gap-3 p-4">
             {activePlans.map((plan) => (
@@ -204,14 +197,7 @@ export default async function HorseDetailPage({
           )}
 
           {care.length === 0 ? (
-            <EmptyState
-              title="Nothing logged yet"
-              body={
-                isBarn
-                  ? "Vaccines, worming, farrier and vet visits go here. The first one you log starts the history."
-                  : "When the barn logs a vaccine, a farrier visit or a vet call, it will show up here."
-              }
-            />
+            <EmptyState title="No care logged" />
           ) : (
             <CareTimeline events={care} today={today} loggerNames={loggers} />
           )}
@@ -238,14 +224,7 @@ export default async function HorseDetailPage({
         )}
 
         {training.length === 0 ? (
-          <EmptyState
-            title="Nothing logged yet"
-            body={
-              isBarn
-                ? "Schooling, hacking and groundwork go here."
-                : "When the barn schools your horse, the session shows up here."
-            }
-          />
+          <EmptyState title="No sessions logged" />
         ) : (
           <TrainingTimeline logs={training} loggerNames={loggers} />
         )}
@@ -258,10 +237,7 @@ export default async function HorseDetailPage({
             count={documents.length === 0 ? undefined : `${documents.length}`}
           />
           {documents.length === 0 ? (
-            <EmptyState
-              title="No papers on file"
-              body="Coggins, papers and vet reports. Owner-only."
-            />
+            <EmptyState title="No documents on file" />
           ) : (
             <DocumentList documents={documents} horseId={horse.id} canDelete={isBarn} />
           )}

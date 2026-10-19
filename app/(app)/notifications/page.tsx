@@ -29,10 +29,7 @@ export default async function NotificationsPage() {
   return (
     <TabPage title="Notifications">
       {items.length === 0 ? (
-        <EmptyState
-          title="Nothing waiting"
-          body="Reminders, offers and barn news land here."
-        />
+        <EmptyState title="No notifications" />
       ) : (
         <ul className="flex flex-col gap-3">
           {items.map((item) => (

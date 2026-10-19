@@ -41,7 +41,7 @@ export function VideoPlayer({ playback, title }: { playback: Playback; title: st
       </div>
       {!playback.ready && (
         <p className="text-caption text-muted">
-          Still being prepared — a freshly uploaded video can take a few minutes before it plays.
+          Still processing. A new upload can take a few minutes.
         </p>
       )}
     </div>

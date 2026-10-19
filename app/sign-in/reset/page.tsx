@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { barn } from "@/config/barn";
 
-export const metadata = { title: "Forgot my password" };
+export const metadata = { title: "Password reset" };
 
 /**
  * Password recovery — honest about what it is today.
@@ -18,11 +18,10 @@ export default function ResetPage() {
   return (
     <main className="flex min-h-dvh flex-col justify-center bg-deep px-7 text-white">
       <h1 className="font-display text-[1.75rem] font-semibold uppercase tracking-[0.08em]">
-        Forgot my password
+        Password reset
       </h1>
       <p className="mt-3 text-body text-white/70">
-        Message {barn.owner} and she&apos;ll send you a new sign-in link. Self-serve reset is
-        coming.
+        Message {barn.owner} for a new sign-in link.
       </p>
 
       <Link

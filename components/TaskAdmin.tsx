@@ -106,7 +106,7 @@ export function TaskTemplateForm({ assignable }: { assignable: Assignable[] }) {
         </Select>
       </Field>
 
-      <Field label="Usually done by" htmlFor="tpl-assignee">
+      <Field label="Default assignee" htmlFor="tpl-assignee">
         <Select id="tpl-assignee" name="default_assignee">
           <option value="">Unassigned</option>
           {assignable.map((person) => (

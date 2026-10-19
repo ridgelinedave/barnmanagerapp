@@ -195,7 +195,7 @@ export function FormTemplateEditor({ template }: { template?: FormTemplate }) {
       </Field>
 
       <Field
-        label="What it is for"
+        label="Description"
         htmlFor={`${id}-description`}
         optional
         hint="One line. Families see this above the form."
@@ -209,7 +209,7 @@ export function FormTemplateEditor({ template }: { template?: FormTemplate }) {
       </Field>
 
       <Field
-        label="Who fills it in"
+        label="Filled in by"
         htmlFor={`${id}-applies`}
         hint="Per rider means one copy for each rider in the family."
       >
@@ -256,7 +256,7 @@ export function FormTemplateEditor({ template }: { template?: FormTemplate }) {
 
         {fields.length === 0 && (
           <p className="text-caption text-muted">
-            A form with no questions is still a signature — add questions if you need answers too.
+            A form with no questions is a signature only.
           </p>
         )}
 

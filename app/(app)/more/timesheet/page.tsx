@@ -63,10 +63,7 @@ export default async function TimesheetPage() {
       <SectionHeader title="Last 4 weeks" />
 
       {days.length === 0 ? (
-        <EmptyState
-          title="No hours yet"
-          body="Your hours, day by day."
-        />
+        <EmptyState title="No hours yet" />
       ) : (
         days.map(([day, dayPunches]) => {
           const minutes = totalMinutes(pairPunches(dayPunches));

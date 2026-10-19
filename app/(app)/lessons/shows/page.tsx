@@ -16,11 +16,7 @@ export default async function ShowsPage() {
   if (!featureEnabled("shows")) {
     return (
       <TabPage title="Shows">
-        <StubScreen
-          heading="Shows"
-          phase="Phase 2"
-          detail="Where the barn is competing, who is entered, ride times and results."
-        />
+        <StubScreen heading="Shows" phase="Phase 2" />
       </TabPage>
     );
   }
@@ -35,14 +31,7 @@ export default async function ShowsPage() {
   if (all.length === 0) {
     return (
       <TabPage title="Shows" action={action}>
-        <EmptyState
-          title="No shows yet"
-          body={
-            canManage
-              ? "Add the first competition and it appears here with dates, entries and ride times."
-              : "When the barn adds a competition it appears here with dates, entries and ride times."
-          }
-        />
+        <EmptyState title="No shows yet" />
       </TabPage>
     );
   }

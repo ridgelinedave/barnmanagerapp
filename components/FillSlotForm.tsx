@@ -102,7 +102,7 @@ export function FillSlotForm({
         <Sunk className="flex flex-col gap-3">
           {eligible.length === 0 ? (
             <p className="text-caption text-muted">
-              No eligible riders — everyone at this level is already in the lesson.
+              No eligible riders at this level.
             </p>
           ) : (
             <>

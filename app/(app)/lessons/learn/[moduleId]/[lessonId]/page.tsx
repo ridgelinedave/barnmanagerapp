@@ -71,8 +71,7 @@ export default async function LearningLessonPage({
               <SectionHeader title="Notes" />
               {!lesson.notes.trim() && (
                 <p className="rounded-control border border-dashed border-muted/60 px-3 py-2 text-label text-muted">
-                  [Notes for this lesson — to be written by {barn.owner}. Members see nothing here until
-                  they are.]
+                  No notes yet. Members see nothing here until there are.
                 </p>
               )}
               <LearningNotesEditor lessonId={lesson.id} moduleId={module.id} notes={lesson.notes} />

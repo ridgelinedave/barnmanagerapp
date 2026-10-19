@@ -18,7 +18,7 @@ import { isRunningLow, listSupplies, type SupplyRow } from "@/lib/barn-ops";
 import { listFamilies } from "@/lib/team";
 import { SUPPLY_STATUS_LABELS } from "@/lib/types";
 
-export const metadata = { title: "Supply list" };
+export const metadata = { title: "Supplies" };
 
 /**
  * What is running out.
@@ -172,27 +172,20 @@ export default async function SuppliesPage({
 
   return (
     <TabPage
-      title="Supply list"
+      title="Supplies"
       back="/barn"
       layout="wide"
       density="tight"
       action={
         isBarn ? (
-          <SheetTrigger label="Add" title="Add a supply item" variant="primary">
+          <SheetTrigger label="Add" title="Supply item" variant="primary">
             <SupplyAddForm families={families} />
           </SheetTrigger>
         ) : undefined
       }
     >
       {items.length === 0 && (
-        <EmptyState
-          title={isBarn ? "Nothing on the list" : "Nothing needed from you"}
-          body={
-            isBarn
-              ? "Add something as it starts running low and it appears here."
-              : "If the barn needs you to bring something for your horse, it shows up here."
-          }
-        />
+        <EmptyState title={isBarn ? "No supplies on the list" : "Nothing needed for your horse"} />
       )}
 
       {isBarn && barn.length > 0 && (

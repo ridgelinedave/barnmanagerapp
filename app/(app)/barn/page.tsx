@@ -46,7 +46,6 @@ function Group({ group, role }: { group: DestinationGroup; role: Role }) {
           key={entry.href}
           href={entry.href}
           title={entry.title}
-          meta={entry.meta}
           leading={
             <span className="flex size-10 shrink-0 items-center justify-center rounded-control bg-sunk text-muted lg:size-7 lg:bg-transparent">
               <Icon name={entry.icon} className="size-5 lg:size-4" />
@@ -72,10 +71,7 @@ export default async function BarnPage() {
       {anything ? (
         BARN_GROUPS.map((group) => <Group key={group.title} group={group} role={role} />)
       ) : (
-        <EmptyState
-          title="Nothing here yet"
-          body="This is where the barn's horses and daily jobs will appear."
-        />
+        <EmptyState title="Nothing here yet" />
       )}
     </TabPage>
   );

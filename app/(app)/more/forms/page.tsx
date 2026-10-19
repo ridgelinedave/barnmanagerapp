@@ -14,11 +14,7 @@ export default async function FormsPage() {
   if (!featureEnabled("forms")) {
     return (
       <TabPage title="Forms">
-        <StubScreen
-          heading="Forms"
-          phase="Phase 2"
-          detail="Waivers and barn paperwork, filled in and signed on your phone."
-        />
+        <StubScreen heading="Forms" phase="Phase 2" />
       </TabPage>
     );
   }
@@ -27,10 +23,7 @@ export default async function FormsPage() {
   if (role === "staff") {
     return (
       <TabPage title="Forms" back="/more">
-        <EmptyState
-          title="Not your paperwork"
-          body="Family forms are between the family and the barn owner, so there is nothing here for staff."
-        />
+        <EmptyState title="No forms for staff" />
       </TabPage>
     );
   }
@@ -43,10 +36,7 @@ export default async function FormsPage() {
   if (submissions.length === 0) {
     return (
       <TabPage title="Forms" back="/more">
-        <EmptyState
-          title="Nothing to fill in"
-          body="Anything the barn needs signed appears here."
-        />
+        <EmptyState title="No forms to sign" />
       </TabPage>
     );
   }
@@ -63,10 +53,7 @@ export default async function FormsPage() {
         />
 
         {outstanding.length === 0 ? (
-          <EmptyState
-            title="Everything is signed"
-            body="Your paperwork is on file with the barn."
-          />
+          <EmptyState title="All forms signed" />
         ) : (
           outstanding.map((submission) => {
             const template = byId.get(submission.template_id);

@@ -33,11 +33,7 @@ export default async function ManageEventsPage() {
   if (!featureEnabled("events")) {
     return (
       <TabPage title="Calendar">
-        <StubScreen
-          heading="Calendar"
-          phase="Phase 2"
-          detail="Shows, clinics, farrier and vet days, closures and calendar subscriptions."
-        />
+        <StubScreen heading="Calendar" phase="Phase 2" />
       </TabPage>
     );
   }
@@ -50,10 +46,7 @@ export default async function ManageEventsPage() {
         <SectionHeader title="Coming up" count={`${upcoming.length}`} />
 
         {upcoming.length === 0 ? (
-          <EmptyState
-            title="Nothing on the calendar"
-            body="Shows, clinics, farrier and vet days, closures."
-          />
+          <EmptyState title="No events yet" />
         ) : (
           upcoming.map((event) => (
             <Card key={event.id} className="p-4">
@@ -87,7 +80,7 @@ export default async function ManageEventsPage() {
         )}
       </section>
 
-      <SheetTrigger label="Add to the calendar" title="New calendar entry" variant="primary">
+      <SheetTrigger label="Add event" title="New calendar entry" variant="primary">
         <EventForm today={barnToday()} />
       </SheetTrigger>
 

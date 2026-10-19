@@ -52,8 +52,7 @@ export function OnboardingPicker({ families }: { families: Family[] }) {
   return (
     <div className="flex flex-col gap-3">
       <p className="text-caption text-muted">
-        Adds every required form to that family, and to each of their riders. Anything they
-        already have is left alone.
+        Anything they already have is left alone.
       </p>
 
       {families.map((family) => (

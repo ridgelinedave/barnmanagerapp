@@ -10,7 +10,7 @@ import { listTasksForDate, listTaskTemplates, listAssignableProfiles, nameMap } 
 import { barnToday, formatBarnDayLabel, WEEKDAY_NAMES } from "@/lib/dates";
 import { assignTask, deleteTask, deleteTaskTemplate, setTemplateActive } from "./actions";
 
-export const metadata = { title: "Tasks" };
+export const metadata = { title: "Task list" };
 
 function recurrenceLabel(recurrence: string, weekday: number | null): string {
   if (recurrence === "daily") return "Every day";
@@ -32,16 +32,13 @@ export default async function ManageTasksPage() {
   const people = assignable.map((p) => ({ id: p.id, name: p.full_name ?? "Unnamed" }));
 
   return (
-    <TabPage title="Tasks" back="/barn">
+    <TabPage title="Task list" back="/barn">
       <section className="flex flex-col gap-3">
         <SectionHeader title={formatBarnDayLabel(today)} count={`${tasks.length} on the list`} />
         <GenerateTasksButton />
 
         {tasks.length === 0 ? (
-          <EmptyState
-            title="Nothing scheduled today"
-            body="Generate the day, or add a one-off."
-          />
+          <EmptyState title="No tasks today" />
         ) : (
           tasks.map((task) => (
             <div key={task.id} className="flex flex-col gap-2">
@@ -94,10 +91,7 @@ export default async function ManageTasksPage() {
         <SectionHeader title="Recurring templates" count={`${templates.length}`} />
 
         {templates.length === 0 ? (
-          <EmptyState
-            title="No templates yet"
-            body="Recurring jobs the day builds itself from."
-          />
+          <EmptyState title="No templates yet" />
         ) : (
           templates.map((template) => (
             <Card

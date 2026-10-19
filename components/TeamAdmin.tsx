@@ -40,9 +40,9 @@ const ROLE_LABELS: Record<Role, string> = {
 
 /** What each role actually gets, said in one line so a role change is an informed one. */
 const ROLE_EXPLAINS: Record<Role, string> = {
-  admin: "Runs the barn. Sees and can change everything, including who is on this screen.",
-  staff: "Works the barn. Sees every family and horse; can only change what is ticked below.",
-  parent: "A family's login. Sees their own riders, lessons and paperwork, and nothing else.",
+  admin: "Sees and can change everything, including who has access.",
+  staff: "Sees every family and horse; changes only what is ticked below.",
+  parent: "Sees only their own family's riders, lessons and paperwork.",
 };
 
 function Feedback({ state }: { state: TeamState }) {
@@ -180,7 +180,7 @@ function PersonRoleForm({
           label="Family"
           htmlFor={`${id}-family`}
           optional
-          hint="A parent sees their family's riders, lessons and paperwork. Leave unset until you know which family."
+          hint="Without it a parent sees an empty app."
         >
           <Select id={`${id}-family`} name="family_id" defaultValue={person.family_id ?? ""}>
             <option value="">Not set yet</option>
@@ -282,7 +282,6 @@ export function FamilyForm({ family }: { family?: Family }) {
       <Field
         label="Family name"
         htmlFor={`${id}-name`}
-        hint="However the barn says it out loud — usually the surname."
       >
         <Input id={`${id}-name`} name="name" required defaultValue={family?.name ?? ""} />
       </Field>
@@ -404,7 +403,6 @@ export function LevelForm({ level }: { level?: Level }) {
       <Field
         label="Level name"
         htmlFor={`${id}-name`}
-        hint="What the barn calls it on the whiteboard — Intro, Training, First."
       >
         <Input id={`${id}-name`} name="name" required defaultValue={level?.name ?? ""} />
       </Field>

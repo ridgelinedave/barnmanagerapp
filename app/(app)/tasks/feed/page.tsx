@@ -20,7 +20,7 @@ export default async function FeedBoardPage() {
   if (!featureEnabled("horses")) {
     return (
       <TabPage title="Feed board" back="/tasks">
-        <StubScreen heading="Feed board" phase="Phase 2" detail="The daily feed list, by horse." />
+        <StubScreen heading="Feed board" phase="Phase 2" />
       </TabPage>
     );
   }

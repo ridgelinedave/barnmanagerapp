@@ -5,7 +5,7 @@ import { CheckedNowButton } from "@/components/BarnOpsForms";
 import { isBarnSide, listWaterSources, sinceLabel, waterIsOverdue } from "@/lib/barn-ops";
 import type { WaterSource } from "@/lib/types";
 
-export const metadata = { title: "Water troughs" };
+export const metadata = { title: "Water" };
 
 /**
  * Trough timers. Due-a-check first, because that is the only reason to open
@@ -51,11 +51,8 @@ export default async function WaterPage() {
 
   if (sources.length === 0) {
     return (
-      <TabPage title="Water troughs" back="/barn">
-        <EmptyState
-          title="No troughs set up"
-          body="Once the barn owner adds a trough, its check timer appears here."
-        />
+      <TabPage title="Water" back="/barn">
+        <EmptyState title="No troughs yet" />
       </TabPage>
     );
   }
@@ -64,10 +61,10 @@ export default async function WaterPage() {
   const fine = sources.filter((s) => !waterIsOverdue(s));
 
   return (
-    <TabPage title="Water troughs" back="/barn">
+    <TabPage title="Water" back="/barn">
       {overdue.length > 0 && (
         <section className="flex flex-col gap-3">
-          <SectionHeader title="Due a check" count={`${overdue.length}`} />
+          <SectionHeader title="Overdue" count={`${overdue.length}`} />
           {overdue.map((s) => (
             <TroughCard key={s.id} source={s} overdue />
           ))}

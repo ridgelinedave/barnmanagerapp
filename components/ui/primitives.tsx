@@ -207,33 +207,23 @@ export function ChipRow({ children }: { children: ReactNode }) {
 /* -------------------------------------------------------------------------- */
 
 /**
- * The empty state: ONE short left-aligned line.
- *
- * It was a dashed box with a centred heading over a centred paragraph — the
- * icon-over-text stack that every generated dashboard ships. The wording was
- * already right (warm, specific, says what would fill it), so the words stay
- * and the stack goes: the title leads the sentence in ink, the body follows in
- * muted, and it sits where the content would have started.
- *
- * `body` is still REQUIRED. A bare "No data" is the laziest thing an
- * interface can say.
+ * The empty state: ONE short factual line, left-aligned, where the content
+ * would have started — "No horses yet." There is deliberately no body: an
+ * empty state is not an invitation or an explanation (CLAUDE.md, copy rule 4).
+ * If the add button is on screen, the line does not mention it.
  */
 export function EmptyState({
   title,
-  body,
   action,
 }: {
   title: string;
-  body: string;
   action?: ReactNode;
 }) {
-  const lead = /[.!?…]$/.test(title.trim()) ? title.trim() : `${title.trim()}.`;
+  const line = /[.!?…]$/.test(title.trim()) ? title.trim() : `${title.trim()}.`;
 
   return (
     <div className="flex flex-col items-start gap-2 py-1">
-      <p className="text-label text-muted">
-        <span className="font-semibold text-ink">{lead}</span> {body}
-      </p>
+      <p className="text-label text-muted">{line}</p>
       {action}
     </div>
   );

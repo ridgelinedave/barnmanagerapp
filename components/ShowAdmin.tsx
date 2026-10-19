@@ -70,7 +70,7 @@ export function ShowForm({ show, today }: { show?: Show; today: string }) {
         label="Where"
         htmlFor={`${id}-location`}
         optional
-        hint="The venue as people say it — Tryon International, not the full address."
+        hint="The venue name, not the full address."
       >
         <Input id={`${id}-location`} name="location" defaultValue={show?.location ?? ""} />
       </Field>
@@ -109,7 +109,7 @@ export function ShowForm({ show, today }: { show?: Show; today: string }) {
       </Field>
 
       <Field
-        label="Who sees it"
+        label="Audience"
         htmlFor={`${id}-visibility`}
         hint="Staff-only shows never appear on a family's screen."
       >
@@ -123,7 +123,7 @@ export function ShowForm({ show, today }: { show?: Show; today: string }) {
         </Select>
       </Field>
 
-      <CheckRow label="Pin to the top" name="pinned" defaultChecked={show?.pinned ?? false} />
+      <CheckRow label="Pin" name="pinned" defaultChecked={show?.pinned ?? false} />
 
       <FormFeedback error={state.error} message={state.message} />
 
@@ -268,7 +268,7 @@ export function EntryForm({
           action={deleteEntry}
           showId={showId}
           id={entry.id}
-          label="Remove from this show"
+          label="Remove entry"
         />
       )}
     </div>
@@ -367,7 +367,7 @@ export function ResultForm({
           action={deleteResult}
           showId={showId}
           id={result.id}
-          label="Remove this result"
+          label="Remove result"
         />
       )}
     </div>
@@ -397,7 +397,7 @@ export function BannerForm({ showId, hasBanner }: { showId: string; hasBanner: b
         <Field
           label="Banner image"
           htmlFor={`${id}-file`}
-          hint="Landscape reads best on the card. Up to 6 MB, JPEG, PNG, WebP or AVIF."
+          hint="Landscape. Up to 6 MB, JPEG, PNG, WebP or AVIF."
         >
           <input
             id={`${id}-file`}

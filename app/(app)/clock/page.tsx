@@ -17,11 +17,7 @@ export default async function ClockPage() {
   if (!featureEnabled("clockIn")) {
     return (
       <TabPage title="Clock">
-        <StubScreen
-          heading="Clock in and out"
-          phase="Phase 1"
-          detail="The in/out button, today's punches and your week total."
-        />
+        <StubScreen heading="Clock in and out" phase="Phase 1" />
       </TabPage>
     );
   }

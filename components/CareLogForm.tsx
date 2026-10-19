@@ -30,7 +30,7 @@ export function CareLogForm({ horseId, today }: { horseId: string; today: string
     <form action={formAction} className="flex flex-col gap-3">
       <input type="hidden" name="horse_id" value={horseId} />
 
-      <Field label="What was done" htmlFor="care-type">
+      <Field label="Care type" htmlFor="care-type">
         <Select id="care-type" name="type" defaultValue="farrier">
           {CARE_TYPES.map((type) => (
             <option key={type} value={type}>

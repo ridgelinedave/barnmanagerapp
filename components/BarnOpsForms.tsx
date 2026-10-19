@@ -54,11 +54,11 @@ export function SupplyAddForm({ families }: { families: Family[] }) {
 
   return (
     <form action={formAction} className="flex flex-col gap-4">
-      <Field label="What is running out" htmlFor={`${id}-name`}>
+      <Field label="Item" htmlFor={`${id}-name`}>
         <Input id={`${id}-name`} name="name" required placeholder="Shavings" />
       </Field>
 
-      <Field label="Whose supply" htmlFor={`${id}-scope`}>
+      <Field label="For" htmlFor={`${id}-scope`}>
         <Select
           id={`${id}-scope`}
           name="scope"
@@ -74,7 +74,7 @@ export function SupplyAddForm({ families }: { families: Family[] }) {
       {scope === "boarder" && (
         <>
           <Field
-            label="Which family"
+            label="Family"
             htmlFor={`${id}-family`}
             hint="They are notified as soon as you add this."
           >
@@ -92,7 +92,7 @@ export function SupplyAddForm({ families }: { families: Family[] }) {
 
       <div className="flex gap-2">
         <div className="min-w-0 flex-1">
-          <Field label="How many" htmlFor={`${id}-qty`} optional>
+          <Field label="Quantity" htmlFor={`${id}-qty`} optional>
             <Input id={`${id}-qty`} name="quantity" inputMode="decimal" placeholder="2" />
           </Field>
         </div>
@@ -104,7 +104,7 @@ export function SupplyAddForm({ families }: { families: Family[] }) {
       </div>
 
       <Field
-        label="Tell me when it drops to"
+        label="Reorder at"
         htmlFor={`${id}-threshold`}
         optional
         hint="Leave blank if you would rather just mark it needed."
@@ -194,15 +194,15 @@ export function MaintenanceAddForm() {
 
   return (
     <form action={formAction} className="flex flex-col gap-4">
-      <Field label="What is broken" htmlFor={`${id}-title`}>
+      <Field label="Problem" htmlFor={`${id}-title`}>
         <Input id={`${id}-title`} name="title" required placeholder="Arena gate latch" />
       </Field>
 
-      <Field label="Anything else worth knowing" htmlFor={`${id}-desc`} optional>
+      <Field label="Notes" htmlFor={`${id}-desc`} optional>
         <Textarea id={`${id}-desc`} name="description" rows={3} />
       </Field>
 
-      <Field label="How urgent" htmlFor={`${id}-priority`}>
+      <Field label="Urgency" htmlFor={`${id}-priority`}>
         <Select id={`${id}-priority`} name="priority" defaultValue="normal">
           {MAINTENANCE_PRIORITIES.map((p) => (
             <option key={p} value={p}>
@@ -268,11 +268,9 @@ export function MaintenanceStatusButton({
  */
 export function BlanketPlanForm({
   horseId,
-  horseName,
   plan,
 }: {
   horseId: string;
-  horseName: string;
   plan: BlanketPlan | null;
 }) {
   const [state, formAction, pending] = useActionState<PlanState, FormData>(
@@ -291,8 +289,7 @@ export function BlanketPlanForm({
       <input type="hidden" name="rules" value={JSON.stringify(rules)} />
 
       <p className="text-caption text-muted">
-        What {horseName} wears, by temperature. The barn reads the forecast; nothing here does
-        it automatically yet.
+        The app does not read the forecast.
       </p>
 
       <div className="flex flex-col gap-2">
@@ -429,11 +426,11 @@ export function TurnoutPlanForm({
     <form action={formAction} className="flex flex-col gap-4">
       <input type="hidden" name="horse_id" value={horseId} />
 
-      <Field label="Paddock or field" htmlFor={`${id}-paddock`}>
+      <Field label="Paddock" htmlFor={`${id}-paddock`}>
         <Input id={`${id}-paddock`} name="paddock" defaultValue={plan?.paddock ?? ""} />
       </Field>
 
-      <Field label="Group" htmlFor={`${id}-group`} optional hint="Who they go out with.">
+      <Field label="Group" htmlFor={`${id}-group`} optional>
         <Input id={`${id}-group`} name="turnout_group" defaultValue={plan?.turnout_group ?? ""} />
       </Field>
 

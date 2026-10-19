@@ -17,11 +17,7 @@ export default async function TasksPage() {
   if (!featureEnabled("tasks")) {
     return (
       <TabPage title="Tasks">
-        <StubScreen
-          heading="Today's tasks"
-          phase="Phase 1"
-          detail="Your job list, the daily feed board and quick care logging."
-        />
+        <StubScreen heading="Today's tasks" phase="Phase 1" />
       </TabPage>
     );
   }
@@ -39,7 +35,6 @@ export default async function TasksPage() {
         <ListRow
           href="/tasks/feed"
           title="Feed board"
-          meta="Who eats what, morning, lunch and evening"
           leading={
             <span className="flex size-10 shrink-0 items-center justify-center rounded-control bg-sunk text-muted lg:size-7 lg:bg-transparent">
               <Icon name="bucket" className="size-5 lg:size-4" />
@@ -60,10 +55,7 @@ export default async function TasksPage() {
       />
 
       {tasks.length === 0 ? (
-        <EmptyState
-          title="Nothing on your list"
-          body="Jobs with your name on them show up here."
-        />
+        <EmptyState title="No tasks assigned to you" />
       ) : (
         <>
           {open.map((task) => (
@@ -71,10 +63,7 @@ export default async function TasksPage() {
           ))}
 
           {open.length === 0 && (
-            <EmptyState
-              title="That's the lot"
-              body="Everything assigned to you today is ticked off. Nice work."
-            />
+            <EmptyState title="All tasks done" />
           )}
 
           {done.length > 0 && (

@@ -20,11 +20,7 @@ export default async function MyLessonsPage() {
   if (!featureEnabled("lessons")) {
     return (
       <TabPage title="My lessons" back="/lessons">
-        <StubScreen
-          heading="Upcoming lessons"
-          phase="Phase 1"
-          detail="Your riders' lessons, cancelling a spot, and the barn calendar."
-        />
+        <StubScreen heading="Upcoming lessons" phase="Phase 1" />
       </TabPage>
     );
   }
@@ -65,10 +61,7 @@ export default async function MyLessonsPage() {
       />
 
       {upcoming.length === 0 ? (
-        <EmptyState
-          title="Nothing booked right now"
-          body="Booked lessons appear here."
-        />
+        <EmptyState title="No lessons booked" />
       ) : (
         upcoming.map(({ booking, instance }) => (
           <ParentLessonCard

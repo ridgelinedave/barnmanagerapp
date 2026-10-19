@@ -129,7 +129,6 @@ export function roleCanAccess(role: Role, pathname: string): boolean {
 export type Destination = {
   href: string;
   title: string;
-  meta: string;
   icon: IconName;
   roles: Role[];
   /** Omitted for screens over always-present tables with no switch. */
@@ -164,7 +163,6 @@ const BARN_TODAY: DestinationGroup = {
       flag: "tasks",
       href: "/tasks/feed",
       title: "Feed board",
-      meta: "Tonight's feed, by horse",
       icon: "horse",
       roles: BARN_SIDE,
     },
@@ -172,7 +170,6 @@ const BARN_TODAY: DestinationGroup = {
       flag: "tasks",
       href: "/tasks",
       title: "Task list",
-      meta: "Today's jobs and who is doing them",
       icon: "list",
       roles: ["staff"],
     },
@@ -180,23 +177,20 @@ const BARN_TODAY: DestinationGroup = {
       flag: "tasks",
       href: "/manage/tasks",
       title: "Task list",
-      meta: "Templates, today's jobs, and who's doing what",
       icon: "list",
       roles: ADMIN,
     },
     {
       flag: "clockIn",
       href: "/clock",
-      title: "Clock in",
-      meta: "Start and end your shift",
+      title: "Clock",
       icon: "clock",
       roles: ["staff"],
     },
     {
       flag: "clockIn",
       href: "/manage/timesheets",
-      title: "Clock-ins & timesheets",
-      meta: "Who's on the clock, hours, corrections and export",
+      title: "Clock-ins and timesheets",
       icon: "clock",
       roles: ADMIN,
     },
@@ -217,7 +211,6 @@ const BARN_HORSES: DestinationGroup = {
       flag: "horses",
       href: "/manage/horses",
       title: "Horses",
-      meta: "Records, who rides what, and feed charts",
       icon: "horse",
       // ADMIN, not BARN_SIDE. The screen lives under /manage, which is
       // admin-gated, so listing it for staff would have shown them a row that
@@ -228,7 +221,6 @@ const BARN_HORSES: DestinationGroup = {
       flag: "horses",
       href: "/more/horses",
       title: "My horses",
-      meta: "Your horse's record, feed chart and care history",
       icon: "horse",
       roles: ["parent"],
     },
@@ -236,7 +228,6 @@ const BARN_HORSES: DestinationGroup = {
       flag: "care",
       href: "/manage/care",
       title: "Care due",
-      meta: "Vaccines, Coggins, worming and farrier dates coming up",
       icon: "alert",
       roles: ADMIN,
     },
@@ -245,12 +236,11 @@ const BARN_HORSES: DestinationGroup = {
 
 /** Barn — the running of the place (migration 0022). */
 const BARN_OPERATIONS: DestinationGroup = {
-  title: "Running the barn",
+  title: "Operations",
   entries: [
     {
       href: "/barn/supplies",
-      title: "Supply list",
-      meta: "What is running out, for the barn and for boarders",
+      title: "Supplies",
       icon: "bucket",
       // The one barn-ops row a family sees: they get their OWN boarder items,
       // never Crouse stock. Enforced by policy, mirrored here.
@@ -258,29 +248,25 @@ const BARN_OPERATIONS: DestinationGroup = {
     },
     {
       href: "/barn/water",
-      title: "Water troughs",
-      meta: "When each was last checked, and what is due",
+      title: "Water",
       icon: "bucket",
       roles: BARN_SIDE,
     },
     {
       href: "/barn/blanketing",
-      title: "Blanketing & fly care",
-      meta: "What goes on tonight, by horse",
+      title: "Blanketing",
       icon: "horse",
       roles: ALL,
     },
     {
       href: "/barn/turnout",
       title: "Turnout",
-      meta: "Who goes out where, and with whom",
       icon: "pin",
       roles: ALL,
     },
     {
       href: "/barn/maintenance",
       title: "Maintenance",
-      meta: "Broken things, and what is being done about them",
       icon: "alert",
       roles: BARN_SIDE,
     },
@@ -298,15 +284,13 @@ const BARN_RECORDS: DestinationGroup = {
       flag: "announcements",
       href: "/manage/announcements",
       title: "Announcements",
-      meta: "Post barn news to families and staff",
       icon: "bell",
       roles: ADMIN,
     },
     {
       flag: "events",
       href: "/manage/events",
-      title: "Barn events",
-      meta: "Clinics, farrier and vet days, closures",
+      title: "Events",
       icon: "pin",
       roles: ADMIN,
     },
@@ -314,7 +298,6 @@ const BARN_RECORDS: DestinationGroup = {
       flag: "forms",
       href: "/manage/forms",
       title: "Forms",
-      meta: "Who has signed their paperwork, and who hasn't",
       icon: "document",
       roles: ADMIN,
     },
@@ -331,7 +314,7 @@ export const BARN_GROUPS: DestinationGroup[] = [
 
 /** The Lessons landing page — teaching and competing. */
 export const LESSONS_GROUP: DestinationGroup = {
-  title: "Lessons & shows",
+  title: "Lessons and shows",
   entries: [
     // The family's own lessons. First, because for a parent this tab is still
     // mostly "when does my kid ride".
@@ -339,7 +322,6 @@ export const LESSONS_GROUP: DestinationGroup = {
       flag: "lessons",
       href: "/lessons/mine",
       title: "My lessons",
-      meta: "Your riders' next four weeks, and cancelling a spot",
       icon: "calendar",
       roles: ["parent"],
     },
@@ -347,15 +329,13 @@ export const LESSONS_GROUP: DestinationGroup = {
       flag: "lessons",
       href: "/manage/lesson-templates",
       title: "Students",
-      meta: "The weekly lesson pattern and who rides in it",
       icon: "people",
       roles: ADMIN,
     },
     {
       flag: "shows",
       href: "/lessons/shows",
-      title: "Show information",
-      meta: "Where the barn is competing, entries, ride times and results",
+      title: "Shows",
       icon: "ribbon",
       roles: ALL,
     },
@@ -363,7 +343,6 @@ export const LESSONS_GROUP: DestinationGroup = {
       flag: "lessons",
       href: "/lessons/makeups",
       title: "Makeups",
-      meta: "Open spots when someone cancels",
       icon: "clock",
       roles: ["parent"],
     },
@@ -374,7 +353,6 @@ export const LESSONS_GROUP: DestinationGroup = {
       href: "/lessons/learn",
       title: "Learning",
       barnLabel: "learning",
-      meta: "Video lessons from the barn",
       icon: "play",
       roles: ALL,
     },
@@ -391,16 +369,14 @@ export const SETTINGS_ADMIN_GROUP: DestinationGroup = {
   entries: [
     {
       href: "/manage/team",
-      title: "Team & access",
-      meta: "Invite someone, set roles and permissions, families and riders",
+      title: "Team and access",
       icon: "people",
       roles: ADMIN,
     },
     {
       flag: "clockIn",
       href: "/manage/timesheets",
-      title: "Clock-ins & timesheets",
-      meta: "Who's on the clock right now, hours and approvals",
+      title: "Clock-ins and timesheets",
       icon: "clock",
       roles: ADMIN,
     },
@@ -409,13 +385,12 @@ export const SETTINGS_ADMIN_GROUP: DestinationGroup = {
 
 /** Settings (the More tab) — your own things. */
 export const SETTINGS_YOURS_GROUP: DestinationGroup = {
-  title: "Your things",
+  title: "Personal",
   entries: [
     {
       flag: "clockIn",
       href: "/more/timesheet",
       title: "My timesheet",
-      meta: "Your punches and approved hours",
       icon: "clock",
       roles: BARN_SIDE,
     },
@@ -425,7 +400,6 @@ export const SETTINGS_YOURS_GROUP: DestinationGroup = {
       flag: "horses",
       href: "/more/horses",
       title: "Your horses",
-      meta: "Your horse's record and feed chart",
       icon: "horse",
       roles: ["parent"],
     },
@@ -433,7 +407,6 @@ export const SETTINGS_YOURS_GROUP: DestinationGroup = {
       flag: "horses",
       href: "/more/horses",
       title: "Horse directory",
-      meta: "Every horse at the barn, and what they're fed",
       icon: "horse",
       roles: BARN_SIDE,
     },
@@ -441,7 +414,6 @@ export const SETTINGS_YOURS_GROUP: DestinationGroup = {
       flag: "forms",
       href: "/more/forms",
       title: "Forms",
-      meta: "Barn paperwork — fill in and sign on your phone",
       icon: "document",
       roles: ["parent"],
     },
@@ -496,9 +468,9 @@ export type SidebarModel = { sections: SidebarSection[]; footer: SidebarLink[] }
  *   (no heading)      the four subject tabs, so the mobile mental model holds
  *   Office            admin's people-and-paperwork work, first, because it is
  *                     the desk work a laptop is opened for (DESIGN-MASTER §14b)
- *   Today / Horses / Running the barn / Lessons & shows
+ *   Today / Horses / Operations / Lessons and shows
  *                     the aisle work, in the same order as the landing pages
- *   Your things       the viewer's own records
+ *   Personal          the viewer's own records
  *   footer            Settings (the More tab) and sign-out, by the account
  * A destination listed in two groups appears once, in the first group that
  * has it. A group with nothing left for this role does not render.
@@ -547,9 +519,9 @@ export function sidebarFor(
     { title: "Office", links: take(fromGroups([SETTINGS_ADMIN_GROUP, BARN_RECORDS])) },
     { title: "Today", links: take(fromGroups([BARN_TODAY])) },
     { title: "Horses", links: take(fromGroups([BARN_HORSES])) },
-    { title: "Running the barn", links: take(fromGroups([BARN_OPERATIONS])) },
-    { title: "Lessons & shows", links: take(fromGroups([LESSONS_GROUP])) },
-    { title: "Your things", links: take(fromGroups([SETTINGS_YOURS_GROUP])) },
+    { title: "Operations", links: take(fromGroups([BARN_OPERATIONS])) },
+    { title: "Lessons and shows", links: take(fromGroups([LESSONS_GROUP])) },
+    { title: "Personal", links: take(fromGroups([SETTINGS_YOURS_GROUP])) },
   ].filter((section) => section.links.length > 0);
 
   return { sections, footer };
@@ -557,7 +529,7 @@ export function sidebarFor(
 
 /**
  * Which sidebar link is the current one: the LONGEST href that `pathname`
- * equals or sits under, so /barn/water marks Water troughs rather than Barn,
+ * equals or sits under, so /barn/water marks Water rather than Barn,
  * and exactly one link is ever current.
  */
 export function currentHref(hrefs: string[], pathname: string): string | null {

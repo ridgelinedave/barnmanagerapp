@@ -5,53 +5,27 @@ import { AnnouncementFeed } from "@/components/AnnouncementFeed";
 import { BackfillOfferCard } from "@/components/BackfillOfferCard";
 import { Board, Chip, ChipRow, EmptyState, SectionHeader } from "@/components/ui/primitives";
 import { currentRole } from "@/lib/guard";
-import { getViewer } from "@/lib/session";
 import { listAnnouncements } from "@/lib/announcements";
 import { listOffers, listUpcomingInstances, listVisibleRiders } from "@/lib/lessons";
 import { addBarnDays, barnToday, formatBarnDayLabel, formatTime } from "@/lib/dates";
-import { barn, featureEnabled } from "@/config/barn";
+import { featureEnabled } from "@/config/barn";
 
 export const metadata = { title: "Home" };
 
 /** Still stubbed for staff and admin — those dashboards are their own pass. */
 const HOME_BY_ROLE = {
   staff: {
-    heading: "Today at the barn",
+    heading: "Today",
     phase: "Phase 1",
-    detail: "Your shift, open task count, and your clock status land here.",
   },
   admin: {
-    heading: "Barn dashboard",
+    heading: "Dashboard",
     phase: "Phase 1",
-    detail:
-      "Who's clocked in, today's lessons, unassigned tasks, cancellations needing backfill, due-soon care, and onboarding stragglers land here.",
   },
 } as const;
 
-/**
- * Barn-time greeting. Small thing; it is also the first line anyone reads.
- *
- * The barn's clock, not the phone's — a parent checking in from a show three
- * states away should still be greeted by the morning the barn is having.
- */
-function greeting(): string {
-  const hour = Number(
-    new Intl.DateTimeFormat("en-GB", {
-      timeZone: barn.timezone,
-      hour: "2-digit",
-      hour12: false,
-    }).format(new Date()),
-  );
-  if (hour < 12) return "Good morning";
-  if (hour < 17) return "Good afternoon";
-  return "Good evening";
-}
-
 export default async function HomePage() {
   const role = await currentRole();
-  const viewer = await getViewer();
-  const firstName =
-    viewer.status === "viewer" ? (viewer.viewer.profile?.full_name ?? "").split(" ")[0] : "";
 
   // Unfiltered on audience by design — RLS scopes it. See lib/announcements.ts.
   const announcements = featureEnabled("announcements") ? await listAnnouncements(10) : [];
@@ -78,16 +52,11 @@ export default async function HomePage() {
 
   // The soonest scheduled lesson. RLS already limits these to this family's.
   const nextLesson = instances.filter((i) => i.status === "scheduled")[0] ?? null;
-  const hello = greeting();
 
   return (
     <TabPage title="Home">
       {role === "parent" ? (
         <>
-          <h2 className="font-display text-title text-ink">
-            {firstName ? `${hello}, ${firstName}` : hello}
-          </h2>
-
           {offerCards.map(({ offer, instance }) => (
             <BackfillOfferCard
               key={offer.id}
@@ -99,7 +68,7 @@ export default async function HomePage() {
           ))}
 
           {featureEnabled("lessons") && (
-            <Board label="Next in the diary" action={{ href: "/lessons", label: "All lessons" }}>
+            <Board label="Next lesson" action={{ href: "/lessons", label: "All lessons" }}>
               {nextLesson ? (
                 <div className="flex items-start gap-3">
                   <span
@@ -130,22 +99,16 @@ export default async function HomePage() {
                   </div>
                 </div>
               ) : (
-                <EmptyState
-                  title="Nothing booked just yet"
-                  body="Your rider’s next lesson shows up here."
-                />
+                <EmptyState title="No lessons booked" />
               )}
             </Board>
           )}
 
           {featureEnabled("announcements") && (
             <section className="flex flex-col gap-3">
-              <SectionHeader title="From the barn" />
+              <SectionHeader title="Announcements" />
               {announcements.length === 0 ? (
-                <EmptyState
-                  title="All quiet"
-                  body="Barn news lands here."
-                />
+                <EmptyState title="No barn news" />
               ) : (
                 <AnnouncementFeed announcements={announcements} />
               )}
@@ -159,18 +122,11 @@ export default async function HomePage() {
           {featureEnabled("announcements") && (
             <section className="flex flex-col gap-3">
               <SectionHeader
-                title="From the barn"
+                title="Announcements"
                 action={role === "admin" ? { href: "/manage/announcements", label: "Manage" } : undefined}
               />
               {announcements.length === 0 ? (
-                <EmptyState
-                  title="Nothing posted yet"
-                  body={
-                    role === "admin"
-                      ? "Post the first one from Manage — families see it the moment you do."
-                      : "Nothing from the barn right now."
-                  }
-                />
+                <EmptyState title="No announcements yet" />
               ) : (
                 <AnnouncementFeed announcements={announcements} showAudience />
               )}
@@ -179,11 +135,7 @@ export default async function HomePage() {
 
           <InstallPrompt />
 
-          <StubScreen
-            heading={HOME_BY_ROLE[role].heading}
-            phase={HOME_BY_ROLE[role].phase}
-            detail={HOME_BY_ROLE[role].detail}
-          />
+          <StubScreen heading={HOME_BY_ROLE[role].heading} phase={HOME_BY_ROLE[role].phase} />
         </>
       )}
     </TabPage>

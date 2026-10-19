@@ -13,11 +13,11 @@ import { listAnnouncements } from "@/lib/announcements";
 
 export const metadata = { title: "Announcements" };
 
-const EMPTY_BODY: Record<AnnouncementFilter, string> = {
-  all: "Post something and families see it straight away.",
-  pinned: "Pin a notice while it matters and it leads the feed for everyone.",
-  families: "Nothing addressed to everyone yet.",
-  staff: "Nothing staff-only yet. Staff-only notices never reach parents.",
+const EMPTY: Record<AnnouncementFilter, string> = {
+  all: "No announcements yet",
+  pinned: "Nothing pinned",
+  families: "No announcements for families",
+  staff: "No staff-only announcements",
 };
 
 /**
@@ -59,10 +59,7 @@ export default async function ManageAnnouncementsPage({
       </ButtonLink>
 
       {shown.length === 0 ? (
-        <EmptyState
-          title={filter === "all" ? "Nothing posted yet" : "Nothing here"}
-          body={EMPTY_BODY[filter]}
-        />
+        <EmptyState title={EMPTY[filter]} />
       ) : (
         <AnnouncementFeed
           announcements={shown}

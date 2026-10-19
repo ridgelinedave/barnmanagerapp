@@ -33,7 +33,7 @@ export function InviteClaimForm({
 
       {knownEmail ? (
         <Field
-          label="Your sign-in email"
+          label="Sign-in email"
           htmlFor={`${id}-email`}
           hint="The barn already has this. Ask them to change it if it's wrong."
         >
@@ -43,7 +43,7 @@ export function InviteClaimForm({
         </Field>
       ) : (
         <Field
-          label="Your email"
+          label="Email"
           htmlFor={`${id}-email`}
           hint="This is what you'll sign in with."
         >
@@ -59,7 +59,7 @@ export function InviteClaimForm({
       )}
 
       <Field
-        label="Choose a password"
+        label="Password"
         htmlFor={`${id}-password`}
         hint="At least 8 characters."
       >
@@ -73,7 +73,7 @@ export function InviteClaimForm({
         />
       </Field>
 
-      <Field label="Type it again" htmlFor={`${id}-confirm`}>
+      <Field label="Confirm password" htmlFor={`${id}-confirm`}>
         <Input
           id={`${id}-confirm`}
           name="confirm"

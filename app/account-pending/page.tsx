@@ -44,12 +44,11 @@ export default async function AccountPendingPage() {
 
         <div className="flex flex-col gap-2">
           <h1 className="font-display text-display text-ink">
-            Your account isn&apos;t set up yet
+            Account not set up
           </h1>
           <p className="text-caption text-muted">
-            You&apos;re signed in{state.email ? ` as ${state.email}` : ""}, but this account
-            hasn&apos;t been linked to a barn profile. Contact {barn.owner} and we&apos;ll get you
-            set up.
+            Signed in{state.email ? ` as ${state.email}` : ""}. This account is not linked to a barn
+            profile yet. Contact {barn.owner}.
           </p>
         </div>
 

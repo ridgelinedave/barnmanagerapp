@@ -75,7 +75,7 @@ export function AnnouncementForm({
         ))}
       </fieldset>
 
-      <CheckRow label="Pin to the top" name="pinned" defaultChecked={announcement?.pinned ?? false} />
+      <CheckRow label="Pin" name="pinned" defaultChecked={announcement?.pinned ?? false} />
 
       <label className="flex min-h-12 items-start gap-3 rounded-control border border-line bg-surface p-3">
         <input

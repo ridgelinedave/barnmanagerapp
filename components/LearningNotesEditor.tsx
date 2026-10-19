@@ -26,7 +26,7 @@ export function LearningNotesEditor({
     <form action={formAction} className="flex flex-col gap-3">
       <input type="hidden" name="lesson_id" value={lessonId} />
       <input type="hidden" name="module_id" value={moduleId} />
-      <Field label="Notes under this video" htmlFor={`notes-${lessonId}`} hint="Members read these under the video.">
+      <Field label="Notes" htmlFor={`notes-${lessonId}`}>
         <Textarea id={`notes-${lessonId}`} name="notes" rows={8} defaultValue={notes} />
       </Field>
       <FormFeedback error={state.error} message={state.message} />

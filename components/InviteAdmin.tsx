@@ -47,7 +47,7 @@ export function InviteForm({ families }: { families: Family[] }) {
 
   return (
     <form action={formAction} className="flex flex-col gap-3">
-      <Field label="Their name" htmlFor={`${id}-name`} hint="What they'll see on the invite.">
+      <Field label="Name" htmlFor={`${id}-name`}>
         <Input id={`${id}-name`} name="full_name" required autoComplete="off" />
       </Field>
 
@@ -71,7 +71,7 @@ export function InviteForm({ families }: { families: Family[] }) {
           label="Family"
           htmlFor={`${id}-family`}
           optional
-          hint="Which household this login belongs to. Without it they'll see an empty app."
+          hint="Without it they'll see an empty app."
         >
           <Select id={`${id}-family`} name="family_id" defaultValue="">
             <option value="">Not set yet</option>
@@ -108,13 +108,12 @@ export function InviteForm({ families }: { families: Family[] }) {
 
       {role === "admin" && (
         <Callout tone="gold" icon="alert">
-          An admin can see and change everything, including inviting other admins and removing
-          your own access. Only send this to someone who runs the barn.
+          An admin can see and change everything, including removing your own access.
         </Callout>
       )}
 
       <Field
-        label="Their email"
+        label="Email"
         htmlFor={`${id}-email`}
         optional
         hint="If you leave it blank they'll choose one when they set up their login."
@@ -122,7 +121,7 @@ export function InviteForm({ families }: { families: Family[] }) {
         <Input id={`${id}-email`} name="email" type="email" inputMode="email" autoComplete="off" />
       </Field>
 
-      <Field label="Their phone" htmlFor={`${id}-phone`} optional>
+      <Field label="Phone" htmlFor={`${id}-phone`} optional>
         <Input id={`${id}-phone`} name="phone" type="tel" inputMode="tel" autoComplete="off" />
       </Field>
 
@@ -133,8 +132,7 @@ export function InviteForm({ families }: { families: Family[] }) {
       </Button>
 
       <p className="text-caption text-muted">
-        No email is sent. You&apos;ll get a link to share however you like, good for{" "}
-        {INVITE_LIFETIME_DAYS} days.
+        No email is sent. The link lasts {INVITE_LIFETIME_DAYS} days.
       </p>
     </form>
   );

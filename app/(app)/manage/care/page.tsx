@@ -37,11 +37,7 @@ export default async function ManageCarePage({
   if (!featureEnabled("care")) {
     return (
       <TabPage title="Care due">
-        <StubScreen
-          heading="Care due"
-          phase="Phase 2"
-          detail="Vaccines, Coggins, worming and farrier dates, and what is coming up."
-        />
+        <StubScreen heading="Care due" phase="Phase 2" />
       </TabPage>
     );
   }
@@ -77,15 +73,8 @@ export default async function ManageCarePage({
 
   return (
     <TabPage title="Care due" back="/barn" layout="wide" density="tight">
-      <p className="text-caption text-muted">
-        Everything falling due in the next {CARE_DUE_SOON_DAYS} days, soonest first.
-      </p>
-
       {due.length === 0 ? (
-        <EmptyState
-          title="Nothing due"
-          body={`No vaccine, Coggins, worming or farrier date falls inside the next ${CARE_DUE_SOON_DAYS} days. Log care on a horse and set its next-due date to see it here.`}
-        />
+        <EmptyState title={`Nothing due in the next ${CARE_DUE_SOON_DAYS} days`} />
       ) : (
         <>
           <div className={DESKTOP_ONLY}>
@@ -148,8 +137,7 @@ export default async function ManageCarePage({
       <Card className="flex flex-col gap-3 p-4">
         <h2 className="font-display text-heading text-ink">Remind the barn</h2>
         <p className="text-caption text-muted">
-          Sends a notification for each item above. Safe to press twice — an item already sent
-          is not sent again.
+          One notification per item. An item already sent is not sent again.
         </p>
         <SendCareDigestButton />
       </Card>

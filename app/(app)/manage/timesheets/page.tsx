@@ -32,7 +32,7 @@ import {
 import { barn } from "@/config/barn";
 import { setPeriodStatus, suggestedPeriod } from "./actions";
 
-export const metadata = { title: "Clock-ins & timesheets" };
+export const metadata = { title: "Clock-ins and timesheets" };
 
 const timeFormatter = new Intl.DateTimeFormat("en-US", {
   weekday: "short",
@@ -217,7 +217,7 @@ export default async function ManageTimesheetsPage({
 
   return (
     <TabPage
-      title="Clock-ins"
+      title="Clock-ins and timesheets"
       back="/barn"
       layout="wide"
       action={
@@ -225,7 +225,7 @@ export default async function ManageTimesheetsPage({
         // phone that would crush the title at 320px, so it stays at the foot
         // of the screen, below.
         <div className="hidden lg:block">
-          <SheetTrigger label="Open a pay period" title="New pay period" variant="primary">
+          <SheetTrigger label="New pay period" title="New pay period" variant="primary">
             <NewPayPeriodForm start={suggestion.start} end={suggestion.end} />
           </SheetTrigger>
         </div>
@@ -234,15 +234,12 @@ export default async function ManageTimesheetsPage({
       {/* The daily question, above the fortnightly one. */}
       <section className="flex flex-col gap-3">
         <SectionHeader
-          title="On the clock now"
+          title="On the clock"
           count={onClock.length === 1 ? "1 person" : `${onClock.length} people`}
         />
 
         {onClock.length === 0 ? (
-          <EmptyState
-            title="Nobody is on the clock"
-            body="Anyone who punches in from the Clock tab appears here until they punch out."
-          />
+          <EmptyState title="Nobody clocked in" />
         ) : (
           <Card className="flex flex-col gap-3 p-4">
             {onClock.map((person) => (
@@ -261,15 +258,12 @@ export default async function ManageTimesheetsPage({
         )}
       </section>
 
-      <SectionHeader title="Hours & approvals" />
+      <SectionHeader title="Hours and approvals" />
 
       {periodTabs}
 
       {!period ? (
-        <EmptyState
-          title="No pay periods yet"
-          body="Open one below and the week's punches get grouped under it, ready to check and approve."
-        />
+        <EmptyState title="No pay periods yet" />
       ) : (
         <>
           <Card className="p-4">
@@ -305,16 +299,12 @@ export default async function ManageTimesheetsPage({
             </div>
 
             <p className="mt-2 text-caption text-muted">
-              CSV export stands in for QuickBooks while the API sync is deferred. Confirm the
-              column layout against the barn&apos;s QuickBooks before relying on a straight import.
+              Check the columns against QuickBooks before importing.
             </p>
           </Card>
 
           {sheets.length === 0 ? (
-            <EmptyState
-              title="No punches in this period"
-              body="Each person’s hours appear once they clock in."
-            />
+            <EmptyState title="No punches in this period" />
           ) : (
             <>
               <div className={`flex flex-col gap-3 ${MOBILE_ONLY}`}>
@@ -351,7 +341,7 @@ export default async function ManageTimesheetsPage({
       )}
 
       <div className={MOBILE_ONLY}>
-        <SheetTrigger label="Open a pay period" title="New pay period">
+        <SheetTrigger label="New pay period" title="New pay period">
           <NewPayPeriodForm start={suggestion.start} end={suggestion.end} />
         </SheetTrigger>
       </div>

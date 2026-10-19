@@ -27,7 +27,7 @@ export function TrainingLogForm({ horseId, today }: { horseId: string; today: st
     <form action={formAction} className="flex flex-col gap-3">
       <input type="hidden" name="horse_id" value={horseId} />
 
-      <Field label="What was the work" htmlFor={`${id}-discipline`}>
+      <Field label="Discipline" htmlFor={`${id}-discipline`}>
         <Select id={`${id}-discipline`} name="discipline" defaultValue="flatwork">
           {DISCIPLINES.map((discipline) => (
             <option key={discipline} value={discipline}>
@@ -37,7 +37,7 @@ export function TrainingLogForm({ horseId, today }: { horseId: string; today: st
         </Select>
       </Field>
 
-      <Field label="Day" htmlFor={`${id}-performed`} hint="Yesterday's ride can go in today.">
+      <Field label="Day" htmlFor={`${id}-performed`}>
         <Input id={`${id}-performed`} name="performed_at" type="date" defaultValue={today} required />
       </Field>
 
@@ -45,7 +45,6 @@ export function TrainingLogForm({ horseId, today }: { horseId: string; today: st
         label="Focus"
         htmlFor={`${id}-focus`}
         optional
-        hint="What you worked on — shoulder-in, grids, hill work."
       >
         <Input id={`${id}-focus`} name="focus" />
       </Field>

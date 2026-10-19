@@ -31,11 +31,7 @@ export default async function MakeupsPage() {
   if (!featureEnabled("lessons")) {
     return (
       <TabPage title="Makeups" back="/lessons">
-        <StubScreen
-          heading="Makeups"
-          phase="Phase 1"
-          detail="When a spot opens up in a lesson, the offer appears here."
-        />
+        <StubScreen heading="Makeups" phase="Phase 1" />
       </TabPage>
     );
   }
@@ -70,10 +66,7 @@ export default async function MakeupsPage() {
   if (offerCards.length === 0) {
     return (
       <TabPage title="Makeups" back="/lessons">
-        <EmptyState
-          title="No makeups open"
-          body="When someone cancels and a spot opens up, the offer appears here and on your home screen."
-        />
+        <EmptyState title="No open makeups" />
       </TabPage>
     );
   }

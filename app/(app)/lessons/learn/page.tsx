@@ -21,12 +21,12 @@ import { barn, featureEnabled } from "@/config/barn";
 export const metadata = { title: barn.learning.label };
 
 export default async function LearningPage() {
-  const role = await requireTab("/lessons");
+  await requireTab("/lessons");
 
   if (!featureEnabled("learning")) {
     return (
       <TabPage title={barn.learning.label} back="/lessons">
-        <StubScreen heading={barn.learning.label} phase="Phase 2" detail="Video lessons, grouped into modules." />
+        <StubScreen heading={barn.learning.label} phase="Phase 2" />
       </TabPage>
     );
   }
@@ -38,14 +38,7 @@ export default async function LearningPage() {
       <section className="flex flex-col gap-3">
         <SectionHeader title="Modules" count={modules.length ? `${modules.length}` : undefined} />
         {modules.length === 0 ? (
-          <EmptyState
-            title="Nothing here yet"
-            body={
-              role === "admin"
-                ? "Modules appear here as videos are added."
-                : "When the barn shares a module with you, it appears here."
-            }
-          />
+          <EmptyState title="No modules yet" />
         ) : (
           <div className="flex flex-col gap-3 lg:gap-0">
             {modules.map((module) => (

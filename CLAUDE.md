@@ -182,6 +182,24 @@ backfill was held back for exactly this reason.
 
 ### UI
 
+**Copy: kill the chatter (standing rule, DESIGN-MASTER §0).** This is a real
+tool, not a tutorial. Four rules, enforced on every screen, both shells:
+
+1. **A screen has a title. It does not have a subtitle.** No descriptive line
+   under a screen title, section heading or list-row title — delete it, don't
+   shorten it. Nothing of the shape "<time framing>, by <thing>", nothing that
+   restates what the screen obviously is.
+2. **Headings are nouns, not sentences.** Feed board · Task list · Clock-ins and
+   timesheets · Supplies · Horses · Turnout · Blanketing · Maintenance · Water.
+   No time-of-day framing, no "by horse", no gerunds, no personality.
+3. **Helper text survives only if it carries information the control cannot.**
+   A constraint, a consequence or a rule stays ("Ignored for a private lesson,
+   which is always one." · "Internal. Parents never see it."). An explanation
+   of what a screen or field is for goes.
+4. **Empty states are one short factual line, or nothing.** "No horses yet." ·
+   "Nothing due this week." Not an invitation, not encouragement, not a dash
+   and a suggestion. If the add button is on screen, don't mention it.
+
 **Two shells, one app** (see `design/DESIGN-MASTER.md` §14b, decided
 2026-10-18). Same routes, same server components, same data functions; a
 breakpoint picks the chrome and the column count. Divergence belongs in layout

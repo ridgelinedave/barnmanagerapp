@@ -163,19 +163,12 @@ export default async function ShowDetailPage({ params }: { params: Promise<{ id:
       {/* ---------------------------------------------------------------- */}
       <section className="flex flex-col gap-3">
         <SectionHeader
-          title="Who is going"
+          title="Entries"
           count={entries.length === 0 ? undefined : `${entries.length}`}
         />
 
         {entries.length === 0 ? (
-          <EmptyState
-            title="No entries yet"
-            body={
-              canManage
-                ? "Enter the first rider below. Ride times can wait until the prize list lands."
-                : "Riders appear here as the barn enters them."
-            }
-          />
+          <EmptyState title="No entries yet" />
         ) : (
           <>
           <div className={DESKTOP_ONLY}>
@@ -240,7 +233,7 @@ export default async function ShowDetailPage({ params }: { params: Promise<{ id:
         )}
 
         {canManage && (
-          <SheetTrigger label="Enter a rider" title={`Enter a rider — ${show.name}`} variant="primary">
+          <SheetTrigger label="Add entry" title={`Enter a rider — ${show.name}`} variant="primary">
             <EntryForm
               showId={show.id}
               riders={riderOptions}
@@ -267,10 +260,7 @@ export default async function ShowDetailPage({ params }: { params: Promise<{ id:
           />
 
           {results.length === 0 ? (
-            <EmptyState
-              title="Nothing posted yet"
-              body="Placings and scores land here once the classes have been ridden."
-            />
+            <EmptyState title="No results yet" />
           ) : (
             <>
             <div className={DESKTOP_ONLY}>

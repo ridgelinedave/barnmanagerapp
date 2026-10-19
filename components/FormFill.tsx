@@ -93,8 +93,7 @@ export function FormFill({
     return (
       <div className="flex flex-col gap-3">
         <Callout tone="forest" icon="check">
-          Signed by {submission.signed_name}. A copy is on file with the barn — ask them if
-          anything needs changing.
+          Signed by {submission.signed_name}. Only the barn can change it.
         </Callout>
 
         <Card className="p-4">
@@ -139,9 +138,9 @@ export function FormFill({
         <h2 className="font-display text-heading text-ink">Sign</h2>
 
         <Field
-          label="Type your full name"
+          label="Full name"
           htmlFor="signed_name"
-          hint="This is your signature. Once signed, only the barn can change it."
+          hint="Once signed, only the barn can change it."
         >
           <Input id="signed_name" name="signed_name" autoComplete="name" />
         </Field>

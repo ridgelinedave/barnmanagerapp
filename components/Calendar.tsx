@@ -271,10 +271,7 @@ export function Calendar({
       ) : (
         <>
           {upcomingDays.length === 0 ? (
-            <EmptyState
-              title="Nothing coming up"
-              body="Lessons, barn events and care due dates land here."
-            />
+            <EmptyState title="Nothing coming up" />
           ) : (
             upcomingDays.map((day) => (
               <DayAgenda key={day.date} date={day.date} items={day.items} today={today} />
