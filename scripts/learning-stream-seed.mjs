@@ -37,7 +37,7 @@ import { describeVideo, streamCredentialsFrom } from "../lib/stream-core.ts";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const VIDEO_DIR = join(root, "assets", "academy videos");
 const FILES = ["Stirrups Off.mp4", "Stirrups On.mp4"]; // the module's order
-const MODULE_TITLE = "Stirrups Off · Stirrups On"; // the two titles, nothing more
+const MODULE_TITLE = "Adjusting Stirrups";
 const CHUNK = 50 * 1024 * 1024;
 
 const creds = streamCredentialsFrom(process.env); // throws, by name, if missing

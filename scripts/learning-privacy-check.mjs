@@ -28,7 +28,7 @@ import { createServerClient } from "@supabase/ssr";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const APP = process.argv[2] ?? "http://localhost:3210";
-const MODULE_TITLE = "Stirrups Off · Stirrups On";
+const MODULE_TITLE = "Adjusting Stirrups";
 const fixtures = JSON.parse(readFileSync(join(root, "supabase", "seed", "seed-output.json"), "utf8"));
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
