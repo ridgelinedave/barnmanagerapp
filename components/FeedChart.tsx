@@ -78,7 +78,7 @@ export function FeedChart({
             <div className="flex size-full items-end p-4">
               <span
                 aria-hidden="true"
-                className="font-display text-[2.5rem] font-bold leading-none tracking-[0.04em] text-accent/35"
+                className="font-display text-[2.5rem] font-bold leading-none tracking-[0.04em] text-ink/20"
               >
                 {horseInitials(horse)}
               </span>

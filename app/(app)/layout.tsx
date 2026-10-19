@@ -46,6 +46,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <ViewerProvider value={{ role: viewer.role, isDevRole: viewer.isDevRole }}>
+      {/* First in the tab order, so a keyboard user can skip the sidebar's
+          twenty-odd links on every screen. TabPage's <main> carries the id. */}
+      <a
+        href="#main"
+        className="skip-link rounded-control border border-line bg-surface px-3 py-2 text-label font-semibold text-ink"
+      >
+        Skip to content
+      </a>
       <Sidebar model={sidebarFor(viewer.role, featureEnabled)} account={account} />
       {/* lg:pl-64 makes room for the fixed sidebar; below lg it is absent. */}
       <div className="flex min-h-dvh flex-col lg:pl-64">

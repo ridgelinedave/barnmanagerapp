@@ -11,14 +11,18 @@ import { Icon, type IconName } from "@/components/ui/Icon";
  * a list feel native rather than web.
  *
  * `Avatar` takes the horse's photo where there is one and falls back to its
- * initial on the accent. A real photo is worth more than any icon on a screen
- * full of animals people know by sight.
+ * initial. A real photo is worth more than any icon on a screen full of
+ * animals people know by sight.
  *
- * THE INITIAL IS `accent-on`, NOT `ink`. It was ink, left over from the gold
- * skin where the accent fill carried dark text at 9.26:1. On Belle's oxblood
- * fill (#6E1A3D) ink measures 1.19:1 — a letter you cannot see. `accent-on` is
- * the token that exists precisely so a component does not have to know which
- * skin it is rendering: white here at 11.18:1, ink on a gold barn.
+ * THE FALLBACK IS INK ON THE SUNK TILE, NOT THE ACCENT. An oxblood square on
+ * every person and horse without a photo was the accent used as ornament on
+ * the most repeated element in the app. Ink on #FAFAF9 is 16.9:1 on any skin.
+ * A 6px square, not a circle: no radius above 6px.
+ *
+ * TWO REGISTERS (DESIGN-MASTER §14b). On the phone a row is a bordered card
+ * you can hit anywhere, 56px tall. From `lg` it is a 40px row on a hairline
+ * with a whole-row hover — a list on a desk is read in a column, not tapped
+ * one card at a time.
  */
 export function Avatar({
   name,
@@ -40,7 +44,7 @@ export function Avatar({
       <img
         src={src}
         alt=""
-        className={`${sizes[size]} shrink-0 rounded-full border border-line object-cover`}
+        className={`${sizes[size]} shrink-0 rounded-avatar border border-line object-cover`}
       />
     );
   }
@@ -48,7 +52,7 @@ export function Avatar({
   return (
     <span
       aria-hidden="true"
-      className={`${sizes[size]} ${text[size]} flex shrink-0 items-center justify-center rounded-full bg-accent font-display font-bold text-accent-on`}
+      className={`${sizes[size]} ${text[size]} flex shrink-0 items-center justify-center rounded-avatar border border-line bg-sunk font-display font-bold text-ink`}
     >
       {name.trim().charAt(0).toUpperCase()}
     </span>
@@ -80,26 +84,27 @@ export function ListRow({
       {leading}
       <span className="min-w-0 flex-1">
         <span
-          className={`block font-display text-heading leading-snug ${muted ? "text-muted" : "text-ink"}`}
+          className={`block font-display text-heading leading-snug lg:font-sans lg:text-table lg:font-semibold ${muted ? "text-muted" : "text-ink"}`}
         >
           {title}
         </span>
-        {meta && <span className="mt-0.5 block text-caption text-muted">{meta}</span>}
-        {chips && <span className="mt-1.5 block">{chips}</span>}
+        {meta && <span className="mt-0.5 block text-caption text-muted lg:mt-0 lg:text-table">{meta}</span>}
+        {chips && <span className="mt-1.5 block lg:mt-1">{chips}</span>}
       </span>
-      {trailing ?? (href && <Icon name="chevron" className="size-5 shrink-0 text-muted" />)}
+      {trailing ?? (href && <Icon name="chevron" className="size-5 shrink-0 text-muted lg:size-4" />)}
     </>
   );
 
   const shell =
-    "flex min-h-14 w-full items-center gap-3 rounded-card border border-line bg-surface p-3.5 text-left";
+    "flex min-h-14 w-full items-center gap-3 rounded-card border border-line bg-surface p-3.5 text-left " +
+    "lg:min-h-10 lg:rounded-none lg:border-0 lg:border-b lg:bg-transparent lg:px-2 lg:py-2";
 
   if (!href) return <div className={shell}>{body}</div>;
 
   return (
     <Link
       href={href}
-      className={`${shell} transition-transform duration-150 ease-out active:scale-[0.99]`}
+      className={`${shell} transition-[transform,background-color] duration-150 ease-out active:scale-[0.99] lg:hover:bg-surface lg:active:scale-100`}
     >
       {body}
     </Link>

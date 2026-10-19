@@ -102,6 +102,7 @@ export default async function HorseDetailPage({
       title={horse.name}
       back="/more/horses"
       subject={{ name: horse.name, meta: headerMeta || undefined, photoUrl: horse.photo_url }}
+      density="airy"
     >
       {/* Status at a glance — the things that change, before the things that don't. */}
       <ChipRow>
@@ -282,7 +283,7 @@ export default async function HorseDetailPage({
       {role === "staff" && (
         <Link
           href="/tasks/feed"
-          className="py-1 text-center text-label font-medium text-accent-text underline underline-offset-4"
+          className="flex min-h-11 items-center justify-center text-label font-medium text-ink underline underline-offset-4"
         >
           Today&apos;s feed board
         </Link>

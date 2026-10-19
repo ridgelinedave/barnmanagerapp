@@ -83,14 +83,16 @@ function snippet(body: string): string {
  * grey the mockup uses, which fails AA at any size.
  */
 function Tag({ tone, children }: { tone: "pinned" | "staff"; children: string }) {
+  // Outlined, transparent fill (2026-10): a solid pastel pill reads as a
+  // sticker. Ink at 17:1 and gold-deep at 6.67:1 on white.
   const tones = {
-    pinned: "bg-accent-tint text-accent-text",
-    staff: "bg-gold-tint text-gold-deep",
+    pinned: "border-ink/40 text-ink",
+    staff: "border-gold-deep/70 text-gold-deep",
   } as const;
 
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-chip px-2 py-0.5 text-[0.6875rem] font-bold uppercase tracking-[0.06em] ${tones[tone]}`}
+      className={`inline-flex items-center gap-1 rounded-chip border bg-transparent px-1.5 py-0.5 font-sans text-micro uppercase ${tones[tone]}`}
     >
       {tone === "pinned" && <Icon name="pin" className="size-3 shrink-0" strokeWidth={2.5} />}
       {children}
@@ -140,24 +142,17 @@ function FeaturedAnnouncement({
 
   const inner = (
     <>
-      <div className="bg-deep px-4 pb-4 pt-3.5">
-        <div className="flex flex-wrap items-center gap-1.5">
-          {announcement.pinned && (
-            <span className="inline-flex items-center gap-1 rounded-chip bg-accent-tint px-2 py-0.5 text-[0.6875rem] font-bold uppercase tracking-[0.06em] text-accent-text">
-              <Icon name="pin" className="size-3 shrink-0" strokeWidth={2.5} />
-              Pinned
-            </span>
-          )}
-          {staffOnly && (
-            <span className="inline-flex items-center gap-1 rounded-chip bg-gold-tint px-2 py-0.5 text-[0.6875rem] font-bold uppercase tracking-[0.06em] text-gold-deep">
-              Staff only
-            </span>
-          )}
-        </div>
+      {/* The lead notice leads by SIZE and position, not by an oxblood block:
+          that was the barn colour used as a banner on content. */}
+      <div className="px-4 pb-1 pt-4">
+        {(announcement.pinned || staffOnly) && (
+          <div className="mb-2 flex flex-wrap items-center gap-1.5">
+            {announcement.pinned && <Tag tone="pinned">Pinned</Tag>}
+            {staffOnly && <Tag tone="staff">Staff only</Tag>}
+          </div>
+        )}
 
-        <h3 className="mt-2 font-display text-title leading-tight text-white">
-          {announcement.title}
-        </h3>
+        <h3 className="font-display text-title leading-tight text-ink">{announcement.title}</h3>
       </div>
 
       <div className="px-4 pb-4 pt-3">
@@ -177,7 +172,7 @@ function FeaturedAnnouncement({
   );
 
   const shell =
-    "block overflow-hidden rounded-card border border-line bg-surface shadow-card";
+    "block overflow-hidden rounded-card border border-line bg-surface";
 
   if (!href) return <article className={shell}>{inner}</article>;
 

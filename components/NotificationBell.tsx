@@ -60,11 +60,14 @@ export function NotificationBell() {
     <a
       href="/notifications"
       aria-label={label}
-      className="relative -mr-1.5 inline-flex size-11 shrink-0 items-center justify-center rounded-chip text-white"
+      className="relative -mr-1.5 inline-flex size-11 shrink-0 items-center justify-center rounded-control text-white lg:size-9 lg:text-ink"
     >
-      <Icon name="bell" className="size-6" />
+      <Icon name="bell" className="size-6 lg:size-5" />
       {unread > 0 && (
-        <span className="absolute right-0.5 top-1 min-w-5 rounded-chip bg-gold px-1 text-center font-display text-caption font-bold leading-5 text-ink">
+        /* White carrying ink on the oxblood header (17:1), ink carrying white
+           on the desktop's light page header. It was gold — gold is decorative
+           only in this system, and a count is information. */
+        <span className="absolute right-0.5 top-1 min-w-5 rounded-chip bg-white px-1 text-center font-sans text-micro leading-5 text-ink tabular-nums lg:-right-1 lg:top-0 lg:bg-ink lg:text-white">
           {unread > 99 ? "99+" : unread}
         </span>
       )}

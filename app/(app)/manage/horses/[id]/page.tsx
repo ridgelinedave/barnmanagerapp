@@ -63,6 +63,7 @@ export default async function ManageHorsePage({
       title={horse.name}
       back="/manage/horses"
       subject={{ name: horse.name, meta: horse.breed ?? undefined, photoUrl: horse.photo_url }}
+      density="airy"
     >
       <SheetTrigger label="Edit details" title={`Edit ${horse.name}`}>
         <HorseForm horse={horse} families={[...families].map(([fid, name]) => ({ id: fid, name }))} />

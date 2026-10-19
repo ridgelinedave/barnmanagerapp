@@ -146,6 +146,69 @@ production release.
 
 ---
 
+## Aesthetics pass — two registers, and the generated-UI tells removed (2026-10-19, `phase-2`)
+
+**No SQL, no migration, no policy, no flag.** Presentation only.
+
+**The kill list, applied tree-wide.** Every elevation shadow is gone (only
+the inset press lip on primary buttons remains). No radius above 6px — chip,
+sheet and avatar tokens moved to 3px / 6px / 6px, and the last `rounded-lg`,
+`rounded-full` and 12px corners were swept. Section labels are the new 11px
+uppercase `text-micro` over a full-width hairline, left-aligned. Empty states
+are one left-aligned sentence (title in ink, body in muted) — no box, no
+centring. Chips are outlined: 1px border in the status colour, transparent
+fill, icon kept. Screen titles are Barlow Condensed at 31px on the phone and
+20px in the desktop page header, tracking −0.02em.
+
+**One accent.** Oxblood now appears only on primary buttons, the active nav
+item (tab bar, sidebar, sub-view tabs, filter chips) and the selected
+calendar day. Removed from: card left edges, section headings, neutral chips,
+avatars, icon tiles, links, the featured-announcement block, the shows banner
+gradient, the calendar's "today", the focus ring (now ink; gold on the
+oxblood header), the bell badge (now white/ink). The phone's AppHeader keeps
+the oxblood brand plane; on the desktop shell the page header is light and the
+only deep plane is the sidebar's brand block.
+
+**Desktop register.** Light page header: title left, primary action right,
+1px border, sub-view tabs beneath (`TabPage tabs=`; Schedule uses it).
+`wide` bucket = fluid, capped at 80rem with 32px gutters. Sidebar: 11px
+group labels, ~32px rows, active = oxblood left border + blush tint.
+`components/ui/DataTable.tsx`: 13px, 40px rows, hairlines, whole-row hover,
+11px headers, tabular right-aligned numbers, URL-driven sort with
+`aria-sort`. Tables now on: timesheets, supplies, team (people + invites),
+show roster + results, horses, care due, care history, forms (submissions +
+templates), punches. Phone keeps its cards on every one of them.
+
+**Density** is declared per screen (`TabPage density=`): tight on the data
+screens, airy on the horse profiles and the show page.
+
+**Found and fixed on the way:** `Field` inputs used `focus:border-accent-deep`,
+a token that does not exist — a focused field never changed border; the
+horse-document file button was ink on oxblood (~1.2:1); four hard-coded barn
+facts in UI strings ("Crouse supply" twice, "Belle" twice) now come from
+config or are generic; a skip link was missing.
+
+**Measured this session** (dev-role preview, which renders no data):
+320 and 390 — no sideways scroll, max radius 6px, zero elevation shadows,
+nothing centred, oxblood only on the brand header / active nav / primary
+buttons, no target under 44px except the dev-only role switcher, on /home
+/barn /barn/supplies /schedule /schedule?view=month /lessons/shows
+/manage/team /manage/forms /manage/timesheets /more. 1024 / 1280 / 1440 —
+light page header, 20px title, sidebar the only deep plane, `wide` main =
+768 / 1024 / 1120px wide beside the sidebar, no sideways scroll, ink focus
+ring, skip link first in the tab order. DataTable measured on synthetic rows
+in a temporary page (deleted before commit): rows 40px, headers 11px
+uppercase, body 13px, numbers right/tabular, `aria-sort` correct.
+
+**Not measured:** any table with real data (the dev preview reads nothing
+under RLS), WebKit, the month-view day cells at 320px (40×52, under 44 wide —
+pre-existing; seven columns cannot be 44px at that width).
+
+Gate: verify green (0 errors, 6 baseline warnings; nav 115), db:gate 628 / 0
+/ 0 twice, advisor clean across 8 lints.
+
+---
+
 ## Desktop shell — one app, two shells (2026-10-18, on `phase-2`, not on `main`)
 
 **No SQL. No new table, policy, function or migration; no feature flag

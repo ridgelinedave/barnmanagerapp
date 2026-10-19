@@ -263,7 +263,8 @@ export const barn = {
   backfillCutoffMinutes: 120,
 
   /**
-   * CONFIRMED BY BELLE — rider age groups.
+   * CONFIRMED BY BELLE — rider age groups. They are the common show
+   * divisions, which is why the edges fall where they do.
    *
    * A rider's age group is DERIVED from `dob`, never stored: an age column
    * would be wrong within a year of being typed, and there is exactly one true

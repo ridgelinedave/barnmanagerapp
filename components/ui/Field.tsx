@@ -12,7 +12,9 @@ import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTML
  */
 const CONTROL =
   "min-h-12 w-full rounded-control border border-line bg-surface px-3 text-body text-ink " +
-  "placeholder:text-muted/80 focus:border-accent-deep";
+  // focus:border-ink. This was `focus:border-accent-deep`, a token that does
+  // not exist, so a focused field never changed its border at all.
+  "placeholder:text-muted/80 focus:border-ink";
 
 export function Field({
   label,

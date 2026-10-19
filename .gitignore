@@ -48,3 +48,7 @@ supabase/seed/seed-output.json
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Source videos for learning modules (hundreds of MB). They are uploaded to
+# storage, never committed.
+/assets/academy videos/

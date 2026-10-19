@@ -37,7 +37,7 @@ function HorseAvatar({ entry }: { entry: HorseFeed }) {
   return (
     <span
       aria-hidden="true"
-      className="flex size-[3.25rem] shrink-0 items-center justify-center rounded-avatar bg-accent font-display text-[1.375rem] font-bold tracking-[0.04em] text-accent-on"
+      className="flex size-[3.25rem] shrink-0 items-center justify-center rounded-avatar border border-line bg-sunk font-display text-[1.375rem] font-bold tracking-[0.04em] text-ink"
     >
       {horseInitials(horse)}
     </span>
@@ -78,12 +78,12 @@ export function FeedBoard({ board }: { board: HorseFeed[] }) {
               </span>
 
               {cadence ? (
-                <span className="shrink-0 rounded-[0.375rem] bg-accent-tint px-2 py-1 text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-accent-text">
+                <span className="shrink-0 rounded-chip border border-ink/40 px-1.5 py-0.5 font-sans text-micro uppercase text-ink">
                   {cadence}
                 </span>
               ) : (
                 /* No chart is a state worth seeing on the board, not a blank. */
-                <span className="shrink-0 rounded-[0.375rem] bg-sunk px-2 py-1 text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-muted">
+                <span className="shrink-0 rounded-chip border border-muted/60 px-1.5 py-0.5 font-sans text-micro uppercase text-muted">
                   No chart
                 </span>
               )}

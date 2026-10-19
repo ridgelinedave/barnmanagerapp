@@ -5,6 +5,14 @@ import { FormIssuer } from "@/components/FormIssuer";
 import { OnboardingPicker } from "@/components/FormsAdmin";
 import { Card, Chip, ChipRow, EmptyState, SectionHeader } from "@/components/ui/primitives";
 import { SheetTrigger } from "@/components/ui/Sheet";
+import {
+  DataTable,
+  MOBILE_ONLY,
+  parseSort,
+  sortHrefFor,
+  sortRows,
+  type Row,
+} from "@/components/ui/DataTable";
 import { requireTab } from "@/lib/guard";
 import { submissionRows, templateProgress } from "@/lib/forms";
 import { listFamilies } from "@/lib/team";
@@ -14,18 +22,31 @@ import { featureEnabled } from "@/config/barn";
 export const metadata = { title: "Forms" };
 
 /**
- * The barn's paperwork — a checklist of cards, not a table.
+ * The barn's paperwork.
  *
  * Two questions, in the order Belle actually asks them: WHO STILL OWES ME
  * SOMETHING, and WHAT FORMS DO I HAVE. Outstanding leads, because a list of
  * templates does not tell anyone what to do next.
  *
- * One action per card throughout. No SQL was needed for any of this — it is UI
- * over `form_templates` and `form_submissions`, both admin-policed since
- * migration 0013.
+ * TWO REGISTERS. On a phone, a checklist of cards with one action each. On
+ * the desk, two tables — every submission (sortable, outstanding first by
+ * default) and the forms with their counts — because this is the office
+ * screen DESIGN-MASTER §14b names, and forty families of paperwork is a table.
+ *
+ * No SQL was needed for any of this — it is UI over `form_templates` and
+ * `form_submissions`, both admin-policed since migration 0013.
  */
-export default async function ManageFormsPage() {
+export default async function ManageFormsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ sort?: string; dir?: string }>;
+}) {
   await requireTab("/manage");
+  const params = await searchParams;
+  const sortState = parseSort(params, ["who", "family", "form", "status"], {
+    key: "status",
+    dir: "asc",
+  });
 
   if (!featureEnabled("forms")) {
     return (
@@ -49,8 +70,124 @@ export default async function ManageFormsPage() {
   const complete = rows.filter((row) => row.submission.status === "complete");
   const templates = progress.map((entry) => entry.template);
 
+  const submissionTable: Row[] = rows.map((row) => {
+    const done = row.submission.status === "complete";
+    return {
+      key: row.submission.id,
+      muted: done,
+      sort: {
+        who: row.riderName ?? row.familyName,
+        family: row.familyName,
+        form: row.templateName,
+        // Outstanding sorts first ascending.
+        status: done ? 1 : 0,
+      },
+      cells: {
+        who: row.riderName ?? row.familyName,
+        family: row.familyName,
+        form: row.templateName,
+        status: done ? (
+          <Chip value="Signed" icon="check" tone="forest" />
+        ) : (
+          <Chip value="Awaiting" icon="clock" tone="gold" />
+        ),
+      },
+    };
+  });
+
+  const templateTable: Row[] = progress.map(({ template, issued, complete: signed }) => {
+    const fieldCount = fieldsOf(template.schema).length;
+    return {
+      key: template.id,
+      muted: !template.active,
+      cells: {
+        name: (
+          <span className="flex flex-wrap items-center gap-1.5">
+            {template.name}
+            {!template.active && <Chip value="Off" icon="clock" />}
+          </span>
+        ),
+        applies: template.applies_to === "rider" ? "Per rider" : "Per family",
+        required: template.required ? (
+          <Chip value="Required" icon="alert" tone="gold" />
+        ) : (
+          <Chip value="Optional" icon="check" />
+        ),
+        questions: fieldCount,
+        signed,
+        issued,
+        actions: (
+          <span className="flex gap-1.5">
+            <SheetTrigger label="Edit" title={template.name} size="sm">
+              <FormTemplateEditor template={template} />
+            </SheetTrigger>
+            <SheetTrigger label="Issue to…" title={`Issue ${template.name}`} size="sm">
+              <FormIssuer templates={templates} families={families} defaultTemplateId={template.id} />
+            </SheetTrigger>
+          </span>
+        ),
+      },
+    };
+  });
+
   return (
-    <TabPage title="Forms" back="/barn">
+    <TabPage
+      title="Forms"
+      back="/barn"
+      layout="wide"
+      density="tight"
+      action={
+        <div className="hidden gap-2 lg:flex">
+          <SheetTrigger label="Set up a family's paperwork" title="Required forms">
+            <OnboardingPicker families={families} />
+          </SheetTrigger>
+          <SheetTrigger label="Build a form" title="New form" variant="primary">
+            <FormTemplateEditor />
+          </SheetTrigger>
+        </div>
+      }
+    >
+      {/* ------------------------------------------------------------------ */}
+      {/* Desktop: two tables                                                 */}
+      {/* ------------------------------------------------------------------ */}
+      <section className="hidden flex-col gap-3 lg:flex">
+        <SectionHeader
+          title="Submissions"
+          count={`${outstanding.length} awaiting · ${complete.length} signed`}
+        />
+        <DataTable
+          caption="Form submissions"
+          columns={[
+            { key: "who", label: "Rider or family", sortable: true },
+            { key: "family", label: "Family", sortable: true },
+            { key: "form", label: "Form", sortable: true },
+            { key: "status", label: "Status", sortable: true },
+          ]}
+          rows={sortRows(submissionTable, sortState.key, sortState.dir)}
+          sort={{ ...sortState, href: sortHrefFor("/manage/forms", params) }}
+          empty="Nothing has been issued yet."
+        />
+      </section>
+
+      <section className="hidden flex-col gap-3 lg:flex">
+        <SectionHeader title="Forms" count={`${templates.length}`} />
+        <DataTable
+          caption="Forms"
+          columns={[
+            { key: "name", label: "Form" },
+            { key: "applies", label: "Applies to" },
+            { key: "required", label: "Required" },
+            { key: "questions", label: "Questions", numeric: true },
+            { key: "signed", label: "Signed", numeric: true },
+            { key: "issued", label: "Issued", numeric: true },
+            { key: "actions", label: "Actions", hideLabel: true, className: "w-px whitespace-nowrap" },
+          ]}
+          rows={templateTable}
+          empty="No forms yet. Build a waiver or a contact sheet, then issue it to your families."
+        />
+      </section>
+
+      <div className={`flex flex-col gap-5 ${MOBILE_ONLY}`}>
       {/* ------------------------------------------------------------------ */}
       {/* Needs signature — the reason anyone opens this screen               */}
       {/* ------------------------------------------------------------------ */}
@@ -188,6 +325,7 @@ export default async function ManageFormsPage() {
           <OnboardingPicker families={families} />
         </SheetTrigger>
       </section>
+      </div>
     </TabPage>
   );
 }

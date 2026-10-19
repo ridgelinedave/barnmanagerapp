@@ -1,4 +1,6 @@
-# Crouse App — Design & Build Master Doc (v1)
+# Monarch Barn Management Software — Design & Build Master Doc (v1)
+
+*Crouse Equestrian is a white-labelled client of Monarch (§16c), not the product.*
 
 The running source of truth for the aesthetic/personality pass. David reviews section-by-section; this records every decision and hands Claude Code discrete jobs. Keep it updated as we lock things.
 
@@ -110,6 +112,20 @@ Current: nothing addable under the Shows tab. Build the hub David + research alr
   serve. So it belongs in a paid tier with a storage cap, and the cap must be
   visible to the barn before they upload. Decide the tier and the cap before
   this ships, not after (§15).
+- **VIDEO HOSTING — a provider seam, not a storage path (2026-10-19).** Each
+  lesson stores a provider and an external id (`video_provider`,
+  `video_ref`), and the app plays it through one resolver and one player
+  component, so changing host is a config change and a two-column update, not
+  a rewrite. Today: Supabase Storage, a private `learning` bucket. Intended
+  destination once an account exists: **Cloudflare Stream — $5 per 1,000
+  minutes stored, $1 per 1,000 minutes delivered, encoding and bandwidth
+  included, no egress fees.** That pricing is per minute of video rather than
+  per byte of egress, which is what makes the per-barn cost above predictable.
+  Supabase limits to settle first: on the Free plan every file is capped at
+  50 MB (the two launch videos are 172 MB and 154 MB), storage at 1 GB and
+  egress at roughly 5 GB a month; uploads above ~6 MB should be resumable
+  (TUS). Migration printed for audit: `supabase/proposed/20261019000100_learning_modules.sql`.
+- **Placement:** the barn owner asked for it under the **Lessons** tab.
 - The old "Crouse Equestrian & Academy" naming question is closed. The product
   surface is generic; each barn names its own instance.
 
@@ -176,6 +192,11 @@ Each still follows the standing rules: any new SQL printed for audit before appl
 - **SMS (Twilio):** hits any phone, no app, no install — likely the most reliable channel for barn/show-day alerts.
 - **Native app** (thin App Store wrapper) later — for rock-solid iPhone push and credibility when selling.
 - **Plan:** web push + SMS now; native app when selling seriously. Needs the email service (Resend) for email mirrors.
+- **A PWA CANNOT AUTO-CLOCK-OUT ON GEOFENCE EXIT (recorded 2026-10-19 — this nearly became a promise to a client).** Browsers give a web app no background geolocation, so nothing can observe a person leaving the property; the page only knows where the phone is while it is open and in front. Auto clock-out needs a native app with always-on location permission. Do not offer it on the PWA.
+- **What IS buildable, and is what the barn actually wants — the intended design:**
+  - **(a) Location at punch time.** Stamp lat/lng on every punch; flag any punch taken off-property (outside the configured geofence) or with no location for admin review. The punch itself is never blocked or altered — the flag is for a person to judge.
+  - **(b) The forgotten clock-out.** Detect a punch still open after N hours (N in `config/barn.ts`), flag it, notify the admin, and close it with an **admin-adjustment correction row** referencing the original, which stays exactly as recorded — the append-only ledger rule (`punches`). Never auto-close by editing the original, never invent the out time silently.
+  - **Already wired (checked 2026-10-19):** (a) is built except the notification. `ClockButton` reads the phone's position at punch time and the action stores lat/lng (null when the phone declines); `flagsForPunch()` in `lib/timeclock.ts` returns `no_location` and `outside_geofence` ("Away from the barn"), shown as chips in `PunchList` and counted per person on `/manage/timesheets`. `outside_geofence` is dormant until `geofence` in `config/barn.ts` has real coordinates — the code returns no flag while any of lat/lng/radius is null. Flags are computed at render, not stored, and nothing notifies the admin. (b) is not built; `pairPunches` already refuses to guess an out time and shows an unclosed pair as zero minutes, which is the right starting point.
 
 ### 14b. Desktop / responsive — DECIDED
 
@@ -253,6 +274,7 @@ Each still follows the standing rules: any new SQL printed for audit before appl
 **The product is Monarch. Barns are skins on it. Crouse Equestrian is skin #1.**
 
 ### 16a. Product identity
+- **Full product name (DECIDED 2026-10-19): Monarch Barn Management Software.** Used everywhere the product is referred to — repo docs, specs, marketing. Crouse Equestrian is a white-labelled client of Monarch, not the product; what the barn's own app displays is unchanged (§16c: their crest and name, a small "Powered by Monarch" mark).
 - **Name:** Monarch. **Domain:** monarchbarns.com (purchased). **Descriptor:** "Barn Management Software" (this is where the SEO-friendly plain words live — NOT in the name).
 - **Tagline (pick one):** "Barn management, elevated." / "Run your barn beautifully." / "The modern barn, in one place." — with "Barn Management Software" as the sub-descriptor.
 - **Wordmark:** MONARCH in **Cinzel** (Roman inscription caps). **No icon for now** — wordmark only; a pro refines a mark later.

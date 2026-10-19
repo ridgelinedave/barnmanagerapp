@@ -10,6 +10,7 @@ import { Chip, ChipRow, EmptyState } from "@/components/ui/primitives";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { SheetTrigger } from "@/components/ui/Sheet";
+import { SubTabs } from "@/components/ui/SubTabs";
 import { requireTab, currentRole } from "@/lib/guard";
 import {
   listInstancesForDate,
@@ -61,26 +62,21 @@ function viewHref(view: View, date: string): string {
   return view === "day" ? `/schedule?date=${date}` : `/schedule?view=${view}`;
 }
 
-/** Day / Month / Agenda. Links, not buttons — the server renders each view. */
+/**
+ * Day / Month / Agenda. Links, not buttons — the server renders each view.
+ * Handed to TabPage as `tabs`, so it sits in the page header on the desktop
+ * shell and opens the body on a phone.
+ */
 function ViewSwitch({ view, date }: { view: View; date: string }) {
   return (
-    <nav aria-label="Schedule view" className="flex gap-1 rounded-control bg-sunk p-1">
-      {VIEWS.map(([value, label]) => {
-        const active = view === value;
-        return (
-          <Link
-            key={value}
-            href={viewHref(value, date)}
-            aria-current={active ? "page" : undefined}
-            className={`flex min-h-11 flex-1 items-center justify-center rounded-[0.25rem] font-display text-label font-bold uppercase tracking-[0.08em] transition-colors duration-150 ${
-              active ? "bg-accent text-accent-on" : "text-muted"
-            }`}
-          >
-            {label}
-          </Link>
-        );
-      })}
-    </nav>
+    <SubTabs
+      label="Schedule view"
+      items={VIEWS.map(([value, label]) => ({
+        href: viewHref(value, date),
+        label,
+        current: view === value,
+      }))}
+    />
   );
 }
 
@@ -176,9 +172,9 @@ async function DayBody({ date, role }: { date: string; role: Role }) {
             {formatBarnDayLabel(date)}
           </span>
           {isToday ? (
-            <span className="font-display text-eyebrow uppercase text-accent-text">Today</span>
+            <span className="font-sans text-micro uppercase text-muted">Today</span>
           ) : (
-            <Link href="/schedule" className="text-caption text-accent-text underline underline-offset-2">
+            <Link href="/schedule" className="text-caption text-ink underline underline-offset-2">
               Back to today
             </Link>
           )}
@@ -310,8 +306,8 @@ export default async function SchedulePage({
           <ScheduleAdminMenu date={date} dayLabel={formatBarnDayLabel(date)} />
         ) : undefined
       }
+      tabs={<ViewSwitch view={view} date={date} />}
     >
-      <ViewSwitch view={view} date={date} />
 
       {/*
        * No Suspense boundary around the body. There used to be one on the old

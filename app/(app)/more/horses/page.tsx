@@ -94,7 +94,7 @@ export default async function HorseDirectoryPage() {
         {inWork.length === 0 ? (
           <EmptyState
             title="No horses on the books"
-            body="Belle adds horses from Manage. Once they are on, their feed charts show up on the feed board."
+            body="The barn adds horses from Manage. Once they are on, their feed charts show up on the feed board."
           />
         ) : (
           inWork.map((horse) => (

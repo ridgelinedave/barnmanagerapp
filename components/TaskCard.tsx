@@ -48,7 +48,7 @@ export function TaskCard({
       >
         <span
           aria-hidden="true"
-          className={`mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full border-2 ${
+          className={`mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-control border-2 ${
             done ? "border-forest bg-forest text-white" : "border-muted/50"
           }`}
         >

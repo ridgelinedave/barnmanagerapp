@@ -62,8 +62,8 @@ export function Sheet({
         if (event.target === ref.current) onClose();
       }}
       className="
-        m-0 mt-auto w-full max-w-screen-sm rounded-t-sheet border-0 bg-surface p-0
-        text-ink shadow-sheet backdrop:bg-chrome/50
+        m-0 mt-auto w-full max-w-screen-sm rounded-t-sheet border border-b-0 border-line bg-surface p-0
+        text-ink backdrop:bg-chrome/50
         sm:mx-auto sm:mb-0
       "
     >
@@ -79,7 +79,7 @@ export function Sheet({
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="-mr-1.5 flex size-11 shrink-0 items-center justify-center rounded-chip text-muted"
+            className="-mr-1.5 flex size-11 shrink-0 items-center justify-center rounded-control text-muted"
           >
             <Icon name="plus" className="size-5 rotate-45" strokeWidth={2} />
           </button>
@@ -100,11 +100,14 @@ export function SheetTrigger({
   title,
   children,
   variant = "secondary",
+  size = "default",
 }: {
   label: string;
   title: string;
   children: ReactNode | ((close: () => void) => ReactNode);
   variant?: "primary" | "secondary";
+  /** `sm`: a 32px inline control for a desktop table row. */
+  size?: "default" | "sm";
 }) {
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
@@ -112,14 +115,22 @@ export function SheetTrigger({
   const styles =
     variant === "primary"
       ? "bg-accent text-accent-on border-transparent"
-      : "bg-surface text-ink border-line";
+      : "bg-surface text-ink border-line hover:bg-sunk";
+  // Default: a full-width 48px block on a phone, a normal-width 36px button on
+  // the desk. `sm` is the table-row control.
+  const sizes =
+    size === "sm"
+      ? "min-h-8 px-3 text-table"
+      : // self-start: in a flex column (every section here) width:auto alone
+        // still stretches, and a full-width oxblood bar on a desk is a banner.
+        "min-h-12 w-full px-4 text-label lg:min-h-9 lg:w-auto lg:self-start lg:text-table";
 
   return (
     <>
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className={`inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-control border px-4 text-label font-semibold transition-transform duration-150 ease-out active:scale-[0.985] ${styles}`}
+        className={`inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-control border font-semibold transition-transform duration-150 ease-out active:scale-[0.985] ${sizes} ${styles}`}
       >
         {label}
       </button>

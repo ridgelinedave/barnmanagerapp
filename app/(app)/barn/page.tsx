@@ -48,8 +48,8 @@ function Group({ group, role }: { group: DestinationGroup; role: Role }) {
           title={entry.title}
           meta={entry.meta}
           leading={
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-control bg-sunk text-accent-text">
-              <Icon name={entry.icon} className="size-5" />
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-control bg-sunk text-muted lg:size-7 lg:bg-transparent">
+              <Icon name={entry.icon} className="size-5 lg:size-4" />
             </span>
           }
         />

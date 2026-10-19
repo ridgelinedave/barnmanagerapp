@@ -37,11 +37,15 @@ const KIND_ICON: Record<CalendarKind, IconName> = {
   care: "alert",
 };
 
-/** Neutral tones. Deliberately close together — this is not a key. */
+/**
+ * Outlined labels, deliberately close together — this is not a key. The
+ * accent is not one of them: oxblood marks the active view and the selected
+ * day, which answer "where am I", not what kind of thing a row is.
+ */
 const KIND_TONE: Record<CalendarKind, string> = {
-  lesson: "bg-sunk text-ink",
-  event: "bg-accent-tint text-accent-text",
-  care: "bg-danger-soft text-danger",
+  lesson: "border-muted/60 text-muted",
+  event: "border-ink/40 text-ink",
+  care: "border-danger/70 text-danger",
 };
 
 function ItemRow({ item }: { item: CalendarItem }) {
@@ -59,7 +63,7 @@ function ItemRow({ item }: { item: CalendarItem }) {
       </span>
 
       <span
-        className={`inline-flex shrink-0 items-center gap-1 rounded-[0.375rem] px-2 py-1 text-[0.625rem] font-semibold uppercase tracking-[0.06em] ${KIND_TONE[item.kind]}`}
+        className={`inline-flex shrink-0 items-center gap-1 rounded-chip border bg-transparent px-1.5 py-0.5 font-sans text-micro uppercase ${KIND_TONE[item.kind]}`}
       >
         <Icon name={KIND_ICON[item.kind]} className="size-3" strokeWidth={2} />
         {item.label}
@@ -91,7 +95,7 @@ function DayAgenda({ date, items, today }: { date: string; items: CalendarItem[]
       <div className="flex items-baseline gap-2">
         <h2 className="font-display text-heading text-ink">{label}</h2>
         {date === today && (
-          <span className="rounded-[0.375rem] bg-accent px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase tracking-[0.06em] text-accent-on">
+          <span className="rounded-chip border border-ink/50 px-1.5 py-0.5 font-sans text-micro uppercase text-ink">
             Today
           </span>
         )}
@@ -222,9 +226,12 @@ export function Calendar({
                     }`}
                   >
                     <span
-                      className={`flex size-6 items-center justify-center rounded-full text-caption tabular-nums ${
+                      className={`flex size-6 items-center justify-center rounded-control text-caption tabular-nums ${
                         isToday
-                          ? "bg-accent font-bold text-accent-on"
+                          ? // Today is a fact, not the place you are: an ink
+                            // outline and weight. The selected day carries the
+                            // tint, because selecting it is navigation.
+                            "font-bold text-ink ring-1 ring-ink"
                           : cell.inMonth
                             ? "text-ink"
                             : // NOT muted/50 — that measured 2.18:1 and a date
@@ -245,7 +252,7 @@ export function Calendar({
                           <span
                             key={item.id}
                             className={`size-1 rounded-full ${
-                              item.kind === "care" ? "bg-danger" : "bg-accent"
+                              item.kind === "care" ? "bg-danger" : "bg-ink/60"
                             }`}
                           />
                         ))}

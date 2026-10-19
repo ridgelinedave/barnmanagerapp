@@ -64,7 +64,7 @@ export function DevRoleSwitcher({ current }: { current: DevRoleSelection | null 
             disabled={pending}
             onClick={() => select(option.value)}
             aria-pressed={current === option.value}
-            className={`min-h-9 rounded-lg px-3 text-xs font-semibold capitalize disabled:opacity-50 ${
+            className={`min-h-9 rounded-control px-3 text-xs font-semibold capitalize disabled:opacity-50 ${
               current === option.value
                 ? "bg-amber-900 text-amber-50"
                 : "border border-amber-400 bg-white text-amber-900"
@@ -77,7 +77,7 @@ export function DevRoleSwitcher({ current }: { current: DevRoleSelection | null 
           type="button"
           disabled={pending}
           onClick={clear}
-          className="min-h-9 rounded-lg px-3 text-xs font-medium underline disabled:opacity-50"
+          className="min-h-9 rounded-control px-3 text-xs font-medium underline disabled:opacity-50"
         >
           Clear
         </button>

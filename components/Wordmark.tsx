@@ -29,7 +29,9 @@ export function Wordmark({
 
   const tones = {
     muted: "text-muted",
-    accent: "text-accent-text",
+    // Ink, not the accent: the accent is for primary buttons and the active
+    // nav item. The tone name is kept so callers do not change.
+    accent: "text-ink",
     ink: "text-ink",
     // For the oxblood surfaces — the sign-in screen and the splash. `muted`
     // is #5D5F6B, which is 2.5:1 on #4A002A and unreadable; this screen's own

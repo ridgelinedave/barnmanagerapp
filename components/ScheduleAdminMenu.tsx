@@ -33,7 +33,7 @@ export function ScheduleAdminMenu({ date, dayLabel }: { date: string; dayLabel: 
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-label="Lesson admin tools"
-        className="-mr-1 flex size-11 shrink-0 items-center justify-center rounded-chip text-white"
+        className="-mr-1 flex size-11 shrink-0 items-center justify-center rounded-control text-white lg:size-9 lg:border lg:border-line lg:text-ink lg:hover:bg-sunk"
       >
         <Icon name="more" className="size-6" strokeWidth={2.5} />
       </button>

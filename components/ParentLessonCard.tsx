@@ -47,11 +47,11 @@ export function ParentLessonCard({
       <div className="flex items-start gap-3">
         <span
           aria-hidden="true"
-          className={`flex size-12 shrink-0 flex-col items-center justify-center rounded-control leading-none ${
-            cancelled ? "bg-line/60" : "bg-accent-tint"
+          className={`flex size-12 shrink-0 flex-col items-center justify-center gap-0.5 rounded-control border leading-none ${
+            cancelled ? "border-line bg-line/60" : "border-line bg-sunk"
           }`}
         >
-          <span className="font-display text-eyebrow uppercase text-accent-text">
+          <span className="font-sans text-micro uppercase text-muted">
             {formatBarnDayLabel(instance.date).split(",")[0]}
           </span>
           <span className="font-display text-heading font-bold text-ink">

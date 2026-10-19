@@ -1,13 +1,13 @@
-# Crouse Barn App
+# Monarch Barn Management Software
 
-A mobile-first barn-management PWA for **Crouse Equestrian** (Asheville / Candler, NC).
+A barn-management PWA. This deployment is white-labelled for its first client,
+**Crouse Equestrian** (Asheville / Candler, NC), whose crest and name the app shows.
 Parents see their riders' schedule and shows; staff clock in and work tasks; the owner runs
 the whole barn from her phone.
 
-**Status: Phase 0 (skeleton), Part 1 — no live database yet.**
-The app shell, auth screens, PWA and all database code exist. Nothing has been applied to a
-Supabase project. Follow **[Part 2: connect Supabase](#part-2-connect-supabase)** to finish
-Phase 0.
+**Status: live.** `main` deploys to Vercel; current state is in
+[`PHASE-2-PROGRESS.md`](PHASE-2-PROGRESS.md) and `CLAUDE.md`. The Phase 0 setup notes below
+are kept as history.
 
 - Full product spec: [`SPEC.md`](SPEC.md)
 - Phase 0 scope and Definition of Done: [`docs/PHASE0-BRIEF.md`](docs/PHASE0-BRIEF.md)

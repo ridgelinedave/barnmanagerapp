@@ -56,8 +56,8 @@ function Row({ href, title, meta, icon }: { href: string; title: string; meta: s
       title={title}
       meta={meta}
       leading={
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-control bg-sunk text-accent-text">
-          <Icon name={icon} className="size-5" />
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-control bg-sunk text-muted lg:size-7 lg:bg-transparent">
+          <Icon name={icon} className="size-5 lg:size-4" />
         </span>
       }
     />
@@ -101,7 +101,7 @@ export default async function MorePage() {
         <Card className="flex items-center gap-3 p-4">
           <span
             aria-hidden="true"
-            className="flex size-11 shrink-0 items-center justify-center rounded-full bg-accent font-display text-heading font-bold text-accent-on"
+            className="flex size-11 shrink-0 items-center justify-center rounded-avatar border border-line bg-sunk font-display text-heading font-bold text-ink"
           >
             {(name ?? email ?? "?").trim().charAt(0).toUpperCase()}
           </span>

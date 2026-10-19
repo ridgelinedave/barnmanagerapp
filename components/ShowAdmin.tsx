@@ -405,7 +405,7 @@ export function BannerForm({ showId, hasBanner }: { showId: string; hasBanner: b
             type="file"
             required
             accept="image/jpeg,image/png,image/webp,image/avif"
-            className="min-h-12 w-full rounded-control border border-line bg-surface p-2.5 text-body text-ink file:mr-3 file:min-h-8 file:rounded-control file:border-0 file:bg-accent file:px-3 file:font-display file:text-label file:font-bold file:uppercase file:tracking-[0.08em] file:text-accent-on"
+            className="min-h-12 w-full rounded-control border border-line bg-surface p-2.5 text-body text-ink file:mr-3 file:min-h-8 file:rounded-control file:border file:border-line file:bg-sunk file:px-3 file:text-label file:font-semibold file:text-ink"
           />
         </Field>
 

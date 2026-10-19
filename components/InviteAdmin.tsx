@@ -148,17 +148,9 @@ export function InviteForm({ families }: { families: Family[] }) {
  * shown in full so it can be checked, with the consequence said out loud, and
  * revocable in one tap.
  */
-export function InviteRow({
-  invite,
-  familyName,
-  barnName,
-}: {
-  invite: Invite;
-  familyName: string | null;
-  barnName: string;
-}) {
+/** The invite link and its copy actions, shared by the phone row and the desktop table. */
+function useInviteCopy(invite: Invite, barnName: string) {
   const [copied, setCopied] = useState<"link" | "message" | null>(null);
-  const status = inviteStatus(invite);
 
   // Built in the browser so the link carries whatever host the barn actually
   // uses, rather than one baked in at build time.
@@ -187,6 +179,42 @@ export function InviteRow({
       window.prompt("Copy this:", text);
     }
   }
+
+  return { url, copied, copy };
+}
+
+/**
+ * The desktop table's controls for one invite: copy the link, or copy a
+ * message to send. Only for a pending invite — an expired one has nothing
+ * worth copying.
+ */
+export function InviteTableActions({ invite, barnName }: { invite: Invite; barnName: string }) {
+  const { copied, copy } = useInviteCopy(invite, barnName);
+  if (inviteStatus(invite) !== "pending") return null;
+
+  return (
+    <span className="flex justify-end gap-1.5">
+      <Button type="button" size="sm" variant="secondary" onClick={() => copy("link")}>
+        {copied === "link" ? "Copied" : "Copy link"}
+      </Button>
+      <Button type="button" size="sm" variant="secondary" onClick={() => copy("message")}>
+        {copied === "message" ? "Copied" : "Copy message"}
+      </Button>
+    </span>
+  );
+}
+
+export function InviteRow({
+  invite,
+  familyName,
+  barnName,
+}: {
+  invite: Invite;
+  familyName: string | null;
+  barnName: string;
+}) {
+  const { url, copied, copy } = useInviteCopy(invite, barnName);
+  const status = inviteStatus(invite);
 
   const tone =
     status === "pending" ? "gold" : status === "accepted" ? "forest" : "neutral";

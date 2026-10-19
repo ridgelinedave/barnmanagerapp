@@ -34,7 +34,7 @@ const VARIANTS: Record<Variant, string> = {
     "bg-transparent text-ink border-line active:bg-sunk active:translate-y-px",
   // Text with an underline on press. For the third action on a screen.
   ghost:
-    "bg-transparent text-accent-text border-transparent underline-offset-4 active:underline",
+    "bg-transparent text-ink border-transparent underline underline-offset-4 decoration-line active:decoration-ink",
   // Destructive stays a ghost too — a filled red button invites the tap it
   // is trying to make you think about.
   danger:
@@ -58,13 +58,17 @@ const BASE =
  * aligned, in the reading face, so a long plain label ("Generate lessons from
  * the weekly schedule") reads as an option rather than a billboard.
  */
-type Size = "default" | "menu";
+type Size = "default" | "menu" | "sm";
 
 const SIZES: Record<Size, string> = {
+  // 48px under a thumb; 40px on the desk, where a pointer does not need it.
   default:
-    "min-h-12 justify-center px-5 " +
+    "min-h-12 justify-center px-5 lg:min-h-10 lg:px-4 lg:text-[0.9375rem] " +
     "font-display text-[1.0625rem] font-bold uppercase tracking-[0.11em] leading-none",
   menu: "min-h-14 justify-start px-4 py-2.5 text-left text-body font-semibold leading-snug",
+  // A control inside a desktop table row: 32px, the reading face, sentence
+  // case. Only for the desktop register — the phone keeps its 44px+ targets.
+  sm: "min-h-8 justify-center px-3 text-table font-semibold leading-none",
 };
 
 export function Button({

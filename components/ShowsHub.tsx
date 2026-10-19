@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Icon } from "@/components/ui/Icon";
-import { EmptyState } from "@/components/ui/primitives";
+import { EmptyState, SectionHeader } from "@/components/ui/primitives";
 import type { ShowSummary } from "@/lib/shows";
 
 /**
@@ -56,23 +56,22 @@ const EMPTY: Record<Tab, { title: string; body: string }> = {
 function Banner({ summary }: { summary: ShowSummary }) {
   const { show, bannerUrl } = summary;
   return (
-    <div className="relative h-[7.5rem] w-full overflow-hidden bg-accent-text">
+    <div className="relative h-[7.5rem] w-full overflow-hidden border-b border-line bg-sunk">
       {bannerUrl ? (
         /* Signed, per-request storage URL — next/image would proxy a one-time
            link it cannot cache. Same reason as the horse profile photo. */
         /* eslint-disable-next-line @next/next/no-img-element */
         <img src={bannerUrl} alt="" className="size-full object-cover" />
       ) : (
-        /* Two oxbloods on the diagonal. Deliberately abstract: a stock horse
-           photo on every card would say less than the show's own name. */
-        <div
-          aria-hidden="true"
-          className="size-full bg-[linear-gradient(135deg,var(--color-accent),var(--color-accent-text))]"
-        />
+        /* No banner: a quiet sunk tile. It was an oxblood gradient — the
+           accent as wallpaper on every card. A stock horse photo would say
+           less than the show's own name, which sits right under it. */
+        <div aria-hidden="true" className="size-full" />
       )}
 
       {show.pinned && (
-        <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-chip bg-gold px-2 py-0.5 font-display text-eyebrow uppercase text-ink">
+        /* Solid surface under it so the label reads over any photo. */
+        <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-chip border border-line bg-surface px-1.5 py-0.5 font-sans text-micro uppercase text-ink">
           <Icon name="pin" className="size-3" strokeWidth={2} />
           Pinned
         </span>
@@ -88,13 +87,13 @@ function ShowCard({ summary }: { summary: ShowSummary }) {
       href={`/lessons/shows/${show.id}`}
       /* 15.5rem, and shrink-0 so the row scrolls instead of squashing. The
          next card peeking past the edge is what tells a thumb to swipe. */
-      className="flex w-62 shrink-0 flex-col overflow-hidden rounded-card border border-line border-l-[3px] border-l-accent-text bg-surface shadow-card"
+      className="flex w-62 shrink-0 flex-col overflow-hidden rounded-card border border-line bg-surface lg:hover:border-muted/40"
     >
       <Banner summary={summary} />
       <span className="flex flex-col gap-0.5 p-3">
         <span className="font-display text-heading leading-tight text-ink">{show.name}</span>
         {show.location && <span className="text-caption text-muted">{show.location}</span>}
-        <span className="mt-1 font-display text-label font-bold text-accent-text">{dateLabel}</span>
+        <span className="mt-1 text-label font-semibold tabular-nums text-ink">{dateLabel}</span>
       </span>
     </Link>
   );
@@ -109,7 +108,7 @@ function DateBlock({ iso }: { iso: string }) {
       <span className="block font-display text-eyebrow uppercase text-muted">
         {at({ month: "short", timeZone: "UTC" })}
       </span>
-      <span className="block font-display text-title leading-none text-accent-text">
+      <span className="block font-display text-title leading-none tabular-nums text-ink">
         {at({ day: "numeric", timeZone: "UTC" })}
       </span>
     </span>
@@ -148,11 +147,11 @@ function NextUpRow({ summary, isBarn }: { summary: ShowSummary; isBarn: boolean 
        * it reads as an instruction rather than a control.
        */}
       {isBarn ? (
-        <span className="shrink-0 rounded-chip bg-accent-tint px-2.5 py-1 font-display text-eyebrow uppercase text-accent-text">
+        <span className="shrink-0 rounded-chip border border-muted/60 px-1.5 py-0.5 font-sans text-micro uppercase text-muted">
           Roster
         </span>
       ) : mine ? (
-        <span className="shrink-0 rounded-chip bg-accent-tint px-2.5 py-1 font-display text-eyebrow uppercase text-accent-text">
+        <span className="shrink-0 rounded-chip border border-muted/60 px-1.5 py-0.5 font-sans text-micro uppercase text-muted">
           My rides
         </span>
       ) : (
@@ -193,10 +192,10 @@ export function ShowsHub({
               role="tab"
               aria-selected={active}
               onClick={() => setTab(key)}
-              className={`-mb-px flex min-h-11 items-center border-b-2 font-display text-label uppercase tracking-[0.08em] transition-colors ${
+              className={`-mb-px flex min-h-11 items-center border-b-2 text-label transition-colors lg:min-h-9 lg:text-table ${
                 active
-                  ? "border-accent-text text-accent-text"
-                  : "border-transparent text-muted hover:text-ink"
+                  ? "border-accent font-semibold text-ink"
+                  : "border-transparent font-medium text-muted hover:text-ink"
               }`}
             >
               {label}
@@ -221,9 +220,7 @@ export function ShowsHub({
           </div>
 
           <section className="flex flex-col gap-2">
-            <h2 className="relative pb-1.5 font-display text-heading text-accent-text after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-6 after:bg-gold after:content-['']">
-              {tab === "results" ? "How we did" : "The team's next up"}
-            </h2>
+            <SectionHeader title={tab === "results" ? "How we did" : "The team's next up"} />
             {shown.map((summary) => (
               <NextUpRow key={summary.show.id} summary={summary} isBarn={isBarn} />
             ))}

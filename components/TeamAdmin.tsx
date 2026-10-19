@@ -78,10 +78,13 @@ function PermissionToggle({
       <button
         type="submit"
         aria-pressed={on}
-        className={`inline-flex min-h-11 items-center gap-1.5 rounded-chip border px-3 text-caption font-semibold ${
+        // Outlined, not a solid pastel pill. On: the forest border and text
+        // with its check; off: muted with a plus — the state is in the icon
+        // and the word as well as the colour.
+        className={`inline-flex min-h-11 items-center gap-1.5 rounded-chip border bg-transparent px-2.5 text-caption font-semibold lg:min-h-7 lg:px-2 lg:text-micro lg:uppercase ${
           on
-            ? "border-forest/25 bg-forest-soft text-forest"
-            : "border-line bg-surface text-muted"
+            ? "border-forest/70 text-forest"
+            : "border-line text-muted hover:border-muted/60"
         }`}
       >
         <Icon name={on ? "check" : "plus"} className="size-3.5 shrink-0" strokeWidth={2} />
@@ -401,7 +404,7 @@ export function LevelForm({ level }: { level?: Level }) {
       <Field
         label="Level name"
         htmlFor={`${id}-name`}
-        hint="What Belle calls it on the whiteboard — Intro, Training, First."
+        hint="What the barn calls it on the whiteboard — Intro, Training, First."
       >
         <Input id={`${id}-name`} name="name" required defaultValue={level?.name ?? ""} />
       </Field>

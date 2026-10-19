@@ -1,6 +1,19 @@
-import Link from "next/link";
 import { TabPage } from "@/components/TabPage";
-import { EmployeeTimesheetCard, NewPayPeriodForm } from "@/components/TimesheetAdmin";
+import {
+  EmployeeTimesheetCard,
+  NewPayPeriodForm,
+  TimesheetRowActions,
+} from "@/components/TimesheetAdmin";
+import {
+  DESKTOP_ONLY,
+  DataTable,
+  MOBILE_ONLY,
+  parseSort,
+  sortHrefFor,
+  sortRows,
+  type Row,
+} from "@/components/ui/DataTable";
+import { SubTabs } from "@/components/ui/SubTabs";
 import { Avatar } from "@/components/ui/ListRow";
 import { Card, Chip, EmptyState, SectionHeader } from "@/components/ui/primitives";
 import { Button } from "@/components/ui/Button";
@@ -68,11 +81,15 @@ function onClockWindow(): { now: number; from: string; to: string } {
 export default async function ManageTimesheetsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ period?: string }>;
+  searchParams: Promise<{ period?: string; sort?: string; dir?: string }>;
 }) {
   await requireTab("/manage");
 
   const params = await searchParams;
+  const sortState = parseSort(params, ["name", "hours", "approved", "flags"], {
+    key: "name",
+    dir: "asc",
+  });
   const [periods, people, suggestion] = await Promise.all([
     listPayPeriods(),
     listAssignableProfiles(),
@@ -139,8 +156,81 @@ export default async function ManageTimesheetsPage({
   // Only staff appear — an admin who never punches shouldn't clutter payroll.
   const employees = people.filter((p) => p.role === "staff" || byProfile.has(p.id));
 
+  // One computation per person, shared by the phone cards and the desktop table.
+  const sheets = employees.map((person) => {
+    const theirs = byProfile.get(person.id) ?? [];
+    const pairs = pairPunches(theirs);
+    return {
+      id: person.id,
+      name: names.get(person.id) ?? "Unnamed",
+      minutes: totalMinutes(pairs),
+      flagged:
+        theirs.filter((p) => p.source === "self" && flagsForPunch(p).length > 0).length +
+        pairs.filter((p) => p.unclosed).length,
+      approved: approvedByProfile.get(person.id) ?? null,
+      correctable: theirs
+        .slice()
+        .reverse()
+        .map((punch) => ({
+          id: punch.id,
+          label: `${punch.direction === "in" ? "In" : "Out"} · ${timeFormatter.format(
+            new Date(punch.punched_at),
+          )}`,
+        })),
+    };
+  });
+
+  const tableRows: Row[] = period
+    ? sheets.map((s) => ({
+        key: s.id,
+        sort: { name: s.name, hours: s.minutes, approved: s.approved, flags: s.flagged },
+        cells: {
+          name: s.name,
+          hours: formatMinutes(s.minutes),
+          approved: s.approved === null ? "—" : formatMinutes(s.approved),
+          flags: s.flagged > 0 ? <Chip value={`${s.flagged} to check`} icon="alert" tone="gold" /> : "—",
+          actions: (
+            <TimesheetRowActions
+              periodId={period.id}
+              profileId={s.id}
+              name={s.name}
+              minutes={s.minutes}
+              approvedMinutes={s.approved}
+              correctable={s.correctable}
+            />
+          ),
+        },
+      }))
+    : [];
+
+  const periodTabs =
+    periods.length > 0 ? (
+      <SubTabs
+        label="Pay period"
+        items={periods.slice(0, 6).map((p) => ({
+          href: `/manage/timesheets?period=${p.id}`,
+          label: formatBarnDayLabel(p.start_date),
+          current: p.id === period?.id,
+        }))}
+      />
+    ) : null;
+
   return (
-    <TabPage title="Clock-ins" back="/barn">
+    <TabPage
+      title="Clock-ins"
+      back="/barn"
+      layout="wide"
+      action={
+        // Desktop: the primary action sits right in the page header. On a
+        // phone that would crush the title at 320px, so it stays at the foot
+        // of the screen, below.
+        <div className="hidden lg:block">
+          <SheetTrigger label="Open a pay period" title="New pay period" variant="primary">
+            <NewPayPeriodForm start={suggestion.start} end={suggestion.end} />
+          </SheetTrigger>
+        </div>
+      }
+    >
       {/* The daily question, above the fortnightly one. */}
       <section className="flex flex-col gap-3">
         <SectionHeader
@@ -173,22 +263,7 @@ export default async function ManageTimesheetsPage({
 
       <SectionHeader title="Hours & approvals" />
 
-      {periods.length > 0 && (
-        <nav aria-label="Pay period" className="flex flex-wrap gap-2">
-          {periods.slice(0, 6).map((p) => (
-            <Link
-              key={p.id}
-              href={`/manage/timesheets?period=${p.id}`}
-              aria-current={p.id === period?.id ? "page" : undefined}
-              className={`flex min-h-11 items-center rounded-chip px-3 text-label font-semibold ${
-                p.id === period?.id ? "bg-accent text-accent-on" : "border border-line bg-surface text-ink"
-              }`}
-            >
-              {formatBarnDayLabel(p.start_date)}
-            </Link>
-          ))}
-        </nav>
-      )}
+      {periodTabs}
 
       {!period ? (
         <EmptyState
@@ -235,48 +310,51 @@ export default async function ManageTimesheetsPage({
             </p>
           </Card>
 
-          {employees.length === 0 ? (
+          {sheets.length === 0 ? (
             <EmptyState
               title="No punches in this period"
               body="Each person’s hours appear once they clock in."
             />
           ) : (
-            employees.map((person) => {
-              const theirs = byProfile.get(person.id) ?? [];
-              const pairs = pairPunches(theirs);
-              const minutes = totalMinutes(pairs);
-              const flagged =
-                theirs.filter((p) => p.source === "self" && flagsForPunch(p).length > 0).length +
-                pairs.filter((p) => p.unclosed).length;
-
-              return (
-                <EmployeeTimesheetCard
-                  key={person.id}
-                  periodId={period.id}
-                  profileId={person.id}
-                  name={names.get(person.id) ?? "Unnamed"}
-                  minutes={minutes}
-                  flaggedCount={flagged}
-                  approvedMinutes={approvedByProfile.get(person.id) ?? null}
-                  correctable={theirs
-                    .slice()
-                    .reverse()
-                    .map((punch) => ({
-                      id: punch.id,
-                      label: `${punch.direction === "in" ? "In" : "Out"} · ${timeFormatter.format(
-                        new Date(punch.punched_at),
-                      )}`,
-                    }))}
+            <>
+              <div className={`flex flex-col gap-3 ${MOBILE_ONLY}`}>
+                {sheets.map((s) => (
+                  <EmployeeTimesheetCard
+                    key={s.id}
+                    periodId={period.id}
+                    profileId={s.id}
+                    name={s.name}
+                    minutes={s.minutes}
+                    flaggedCount={s.flagged}
+                    approvedMinutes={s.approved}
+                    correctable={s.correctable}
+                  />
+                ))}
+              </div>
+              <div className={DESKTOP_ONLY}>
+                <DataTable
+                  caption="Hours by person for this pay period"
+                  columns={[
+                    { key: "name", label: "Employee", sortable: true },
+                    { key: "hours", label: "Hours", numeric: true, sortable: true },
+                    { key: "approved", label: "Approved", numeric: true, sortable: true },
+                    { key: "flags", label: "To check", sortable: true },
+                    { key: "actions", label: "Actions", hideLabel: true, className: "w-px whitespace-nowrap" },
+                  ]}
+                  rows={sortRows(tableRows, sortState.key, sortState.dir)}
+                  sort={{ ...sortState, href: sortHrefFor("/manage/timesheets", params) }}
                 />
-              );
-            })
+              </div>
+            </>
           )}
         </>
       )}
 
-      <SheetTrigger label="Open a pay period" title="New pay period">
-        <NewPayPeriodForm start={suggestion.start} end={suggestion.end} />
-      </SheetTrigger>
+      <div className={MOBILE_ONLY}>
+        <SheetTrigger label="Open a pay period" title="New pay period">
+          <NewPayPeriodForm start={suggestion.start} end={suggestion.end} />
+        </SheetTrigger>
+      </div>
     </TabPage>
   );
 }

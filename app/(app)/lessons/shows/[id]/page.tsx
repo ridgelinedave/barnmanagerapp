@@ -4,6 +4,7 @@ import { ShowManageMenu } from "@/components/ShowManageMenu";
 import { EntryForm, ResultForm } from "@/components/ShowAdmin";
 import { SheetTrigger } from "@/components/ui/Sheet";
 import { Card, Chip, ChipRow, EmptyState, SectionHeader, Sunk } from "@/components/ui/primitives";
+import { DESKTOP_ONLY, DataTable, MOBILE_ONLY, type Row } from "@/components/ui/DataTable";
 import { requireTab } from "@/lib/guard";
 import { canManageShows, loadShow, ordinal, showDateLabel } from "@/lib/shows";
 import { listVisibleRiders } from "@/lib/lessons";
@@ -72,10 +73,55 @@ export default async function ShowDetailPage({ params }: { params: Promise<{ id:
 
   const multiDay = show.start_date !== show.end_date;
 
+  // The desktop register of the roster and the results: tables, same data.
+  const rosterRows: Row[] = entries.map((entry) => ({
+    key: entry.id,
+    cells: {
+      rider: entry.riderName,
+      horse: entry.horseName ?? "—",
+      classes: entry.classes || "—",
+      day: entry.ride_time ? rideDayLabel(entry.ride_time) : "—",
+      time: entry.ride_time ? rideTimeLabel(entry.ride_time) : "—",
+      actions: canManage ? (
+        <SheetTrigger label="Edit" title={entry.riderName} size="sm">
+          <EntryForm
+            showId={show.id}
+            entry={entry}
+            riders={riderOptions}
+            horses={horseOptions}
+            timeZone={barn.timezone}
+            defaultDate={show.start_date}
+          />
+        </SheetTrigger>
+      ) : null,
+    },
+  }));
+
+  const resultRows: Row[] = results.map((result) => ({
+    key: result.id,
+    cells: {
+      rider: result.riderName,
+      class: result.class || "—",
+      score: result.score === null ? "—" : String(result.score),
+      placing: result.placing === null ? "—" : ordinal(result.placing),
+      actions: canManage ? (
+        <SheetTrigger
+          label="Edit"
+          title={`${result.riderName}${result.class ? ` — ${result.class}` : ""}`}
+          size="sm"
+        >
+          <ResultForm showId={show.id} result={result} riders={riderOptions} />
+        </SheetTrigger>
+      ) : null,
+    },
+  }));
+
   return (
     <TabPage
       title={show.name}
       back="/lessons/shows"
+      layout="wide"
+      density="airy"
       action={canManage ? <ShowManageMenu show={show} /> : undefined}
     >
       <Card className="flex flex-col gap-3 p-4">
@@ -131,7 +177,23 @@ export default async function ShowDetailPage({ params }: { params: Promise<{ id:
             }
           />
         ) : (
-          entries.map((entry) => (
+          <>
+          <div className={DESKTOP_ONLY}>
+            <DataTable
+              caption="Who is going"
+              columns={[
+                { key: "rider", label: "Rider" },
+                { key: "horse", label: "Horse" },
+                { key: "classes", label: "Classes" },
+                ...(multiDay ? [{ key: "day", label: "Day" }] : []),
+                { key: "time", label: "Ride time", numeric: true },
+                ...(canManage ? [{ key: "actions", label: "Actions", hideLabel: true, className: "w-px" }] : []),
+              ]}
+              rows={rosterRows}
+            />
+          </div>
+          <div className={`flex flex-col gap-3 ${MOBILE_ONLY}`}>
+          {entries.map((entry) => (
             <Card key={entry.id} className="flex flex-col gap-3 p-4">
               <div className="flex items-baseline gap-3">
                 <span className="min-w-0 flex-1">
@@ -145,7 +207,7 @@ export default async function ShowDetailPage({ params }: { params: Promise<{ id:
                 </span>
                 {entry.ride_time && (
                   <span className="shrink-0 text-right">
-                    <span className="block font-display text-heading tabular-nums text-accent-text">
+                    <span className="block font-display text-heading tabular-nums text-ink">
                       {rideTimeLabel(entry.ride_time)}
                     </span>
                     {/* The day only earns its line on a show that spans one —
@@ -172,7 +234,9 @@ export default async function ShowDetailPage({ params }: { params: Promise<{ id:
                 </SheetTrigger>
               )}
             </Card>
-          ))
+          ))}
+          </div>
+          </>
         )}
 
         {canManage && (
@@ -208,7 +272,22 @@ export default async function ShowDetailPage({ params }: { params: Promise<{ id:
               body="Placings and scores land here once the classes have been ridden."
             />
           ) : (
-            results.map((result) => (
+            <>
+            <div className={DESKTOP_ONLY}>
+              <DataTable
+                caption="Results"
+                columns={[
+                  { key: "rider", label: "Rider" },
+                  { key: "class", label: "Class" },
+                  { key: "score", label: "Score", numeric: true },
+                  { key: "placing", label: "Placing", numeric: true },
+                  ...(canManage ? [{ key: "actions", label: "Actions", hideLabel: true, className: "w-px" }] : []),
+                ]}
+                rows={resultRows}
+              />
+            </div>
+            <div className={`flex flex-col gap-3 ${MOBILE_ONLY}`}>
+            {results.map((result) => (
               <Sunk key={result.id} className="flex flex-col gap-2">
                 <div className="flex items-baseline gap-3">
                   <span className="min-w-0 flex-1">
@@ -226,7 +305,7 @@ export default async function ShowDetailPage({ params }: { params: Promise<{ id:
                   )}
                   {/* Placing is the fact people look for, so it is the loud one.
                       An unplaced ride says so in words rather than showing a gap. */}
-                  <span className="shrink-0 font-display text-heading tabular-nums text-accent-text">
+                  <span className="shrink-0 font-display text-heading tabular-nums text-ink">
                     {result.placing === null ? "—" : ordinal(result.placing)}
                   </span>
                 </div>
@@ -240,7 +319,9 @@ export default async function ShowDetailPage({ params }: { params: Promise<{ id:
                   </SheetTrigger>
                 )}
               </Sunk>
-            ))
+            ))}
+            </div>
+            </>
           )}
 
           {canManage && (

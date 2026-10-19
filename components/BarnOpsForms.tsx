@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { Field, FormFeedback, Input, Select, Textarea } from "@/components/ui/Field";
 import { Sunk } from "@/components/ui/primitives";
 import { Icon } from "@/components/ui/Icon";
+import { barn } from "@/config/barn";
 import {
   createSupplyItem,
   setSupplyStatus,
@@ -64,7 +65,8 @@ export function SupplyAddForm({ families }: { families: Family[] }) {
           value={scope}
           onChange={(event) => setScope(event.target.value as "barn" | "boarder")}
         >
-          <option value="barn">Crouse supply</option>
+          {/* The barn's own name from config, never typed in a component. */}
+          <option value="barn">{barn.shortName} supply</option>
           <option value="boarder">Boarder supply</option>
         </Select>
       </Field>
@@ -149,7 +151,7 @@ export function SupplyStatusButton({
       <button
         type="submit"
         disabled={pending}
-        className="min-h-11 shrink-0 rounded-control border border-line px-3 text-caption font-semibold text-accent-text disabled:opacity-50"
+        className="min-h-11 shrink-0 rounded-control border border-line px-3 text-caption font-semibold text-ink hover:bg-sunk disabled:opacity-50 lg:min-h-8 lg:px-2.5"
       >
         {pending ? "…" : label}
       </button>
@@ -240,7 +242,7 @@ export function MaintenanceStatusButton({
       <button
         type="submit"
         disabled={pending}
-        className="min-h-11 shrink-0 rounded-control border border-line px-3 text-caption font-semibold text-accent-text disabled:opacity-50"
+        className="min-h-11 shrink-0 rounded-control border border-line px-3 text-caption font-semibold text-ink hover:bg-sunk disabled:opacity-50 lg:min-h-8 lg:px-2.5"
       >
         {pending ? "…" : label}
       </button>
@@ -386,7 +388,7 @@ export function BlanketPlanForm({
               type="checkbox"
               name={name}
               defaultChecked={Boolean(checked)}
-              className="size-5 shrink-0 accent-[var(--accent)]"
+              className="size-5 shrink-0 accent-[var(--brand-ink)]"
             />
             <span className="text-body text-ink">{label}</span>
           </label>

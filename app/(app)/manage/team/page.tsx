@@ -19,7 +19,17 @@ import {
   PersonSheetBody,
   RiderForm,
 } from "@/components/TeamAdmin";
-import { InviteForm, InviteRow } from "@/components/InviteAdmin";
+import { InviteForm, InviteRow, InviteTableActions } from "@/components/InviteAdmin";
+import {
+  DESKTOP_ONLY,
+  DataTable,
+  MOBILE_ONLY,
+  parseSort,
+  sortHrefFor,
+  sortRows,
+  type Row,
+} from "@/components/ui/DataTable";
+import { INVITE_STATUS_LABELS } from "@/lib/invites";
 import { requireTab } from "@/lib/guard";
 import {
   listFamilies,
@@ -51,9 +61,15 @@ const ROLE_TONES = { admin: "gold", staff: "forest", parent: "neutral" } as cons
  * all, in the case of riders). Inviting and provisioning new logins is its own
  * slice, because it touches auth rather than these four tables.
  */
-export default async function ManageTeamPage() {
+export default async function ManageTeamPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ sort?: string; dir?: string }>;
+}) {
   const role = await requireTab("/manage");
   if (role !== "admin") redirect("/home");
+  const params = await searchParams;
+  const sortState = parseSort(params, ["name", "role", "family"], { key: "role", dir: "asc" });
 
   const [team, families, familiesWithRiders, levels, invites] = await Promise.all([
     listTeam(),
@@ -71,8 +87,78 @@ export default async function ManageTeamPage() {
   // it in the list would show the same human twice, one of them as paperwork.
   const openInvites = invites.filter((invite) => inviteStatus(invite) !== "accepted");
 
+  // Admin, staff, parent — the order the screen already lists them in.
+  const ROLE_ORDER: Record<Role, number> = { admin: 0, staff: 1, parent: 2 };
+
+  const peopleRows: Row[] = team.map((person) => {
+    const name = person.full_name ?? "Unnamed";
+    return {
+      key: person.id,
+      sort: { name, role: ROLE_ORDER[person.role], family: person.familyName },
+      cells: {
+        name,
+        role: (
+          <Chip
+            value={ROLE_LABELS[person.role]}
+            tone={ROLE_TONES[person.role]}
+            icon={person.role === "parent" ? undefined : "check"}
+          />
+        ),
+        phone: person.phone ?? "—",
+        family:
+          person.role === "parent" && !person.family_id ? (
+            <Chip value="No family linked" icon="alert" tone="danger" />
+          ) : (
+            (person.familyName ?? "—")
+          ),
+        permissions: <PermissionRow person={person} />,
+        actions: (
+          <SheetTrigger label="Edit" title={name} size="sm">
+            <PersonSheetBody person={person} families={families} isOnlyAdmin={admins <= 1} />
+          </SheetTrigger>
+        ),
+      },
+    };
+  });
+
+  const inviteRows: Row[] = openInvites.map((invite) => {
+    const status = inviteStatus(invite);
+    return {
+      key: invite.id,
+      muted: status !== "pending",
+      cells: {
+        name: invite.full_name,
+        role: ROLE_LABELS[invite.role],
+        family: invite.family_id ? (familyName.get(invite.family_id) ?? "—") : "—",
+        email: invite.email ?? "—",
+        status: (
+          <Chip
+            value={INVITE_STATUS_LABELS[status]}
+            tone={status === "pending" ? "gold" : "neutral"}
+            icon={status === "pending" ? "clock" : "alert"}
+          />
+        ),
+        expires: new Date(invite.expires_at).toLocaleDateString(),
+        actions: <InviteTableActions invite={invite} barnName={barn.name} />,
+      },
+    };
+  });
+
   return (
-    <TabPage title="Team" back="/more">
+    <TabPage
+      title="Team"
+      back="/more"
+      layout="wide"
+      action={
+        featureEnabled("invites") ? (
+          <div className="hidden lg:block">
+            <SheetTrigger label="Invite someone" title="New invite" variant="primary">
+              <InviteForm families={families} />
+            </SheetTrigger>
+          </div>
+        ) : undefined
+      }
+    >
       {/* ------------------------------------------------------------------ */}
       {/* A — People                                                          */}
       {/* ------------------------------------------------------------------ */}
@@ -91,12 +177,29 @@ export default async function ManageTeamPage() {
             title="Nobody has a login yet"
             body={
               featureEnabled("invites")
-                ? "Everyone who signs in — Belle, instructors, barn staff and parents — appears here once they've used their invite."
-                : "Everyone who signs in — Belle, instructors, barn staff and parents — appears here once their account exists."
+                ? `Everyone who signs in — ${barn.owner}, instructors, barn staff and parents — appears here once they've used their invite.`
+                : `Everyone who signs in — ${barn.owner}, instructors, barn staff and parents — appears here once their account exists.`
             }
           />
         ) : (
-          team.map((person) => {
+          <>
+          <div className={DESKTOP_ONLY}>
+            <DataTable
+              caption="People with a login"
+              columns={[
+                { key: "name", label: "Name", sortable: true },
+                { key: "role", label: "Role", sortable: true },
+                { key: "phone", label: "Phone", className: "whitespace-nowrap tabular-nums" },
+                { key: "family", label: "Family", sortable: true },
+                { key: "permissions", label: "Permissions" },
+                { key: "actions", label: "Actions", hideLabel: true, className: "w-px" },
+              ]}
+              rows={sortRows(peopleRows, sortState.key, sortState.dir)}
+              sort={{ ...sortState, href: sortHrefFor("/manage/team", params) }}
+            />
+          </div>
+          <div className={`flex flex-col gap-3 ${MOBILE_ONLY}`}>
+          {team.map((person) => {
             const name = person.full_name ?? "Unnamed";
             const facts = [person.phone, person.familyName].filter(Boolean).join(" · ");
 
@@ -135,7 +238,9 @@ export default async function ManageTeamPage() {
                 </SheetTrigger>
               </Card>
             );
-          })
+          })}
+          </div>
+          </>
         )}
       </section>
 
@@ -155,21 +260,40 @@ export default async function ManageTeamPage() {
               body="Invite someone and you get a link to send."
             />
           ) : (
-            <Card className="flex flex-col gap-3 p-4">
-              {openInvites.map((invite) => (
-                <InviteRow
-                  key={invite.id}
-                  invite={invite}
-                  familyName={invite.family_id ? (familyName.get(invite.family_id) ?? null) : null}
-                  barnName={barn.name}
+            <>
+              <div className={DESKTOP_ONLY}>
+                <DataTable
+                  caption="Open invites"
+                  columns={[
+                    { key: "name", label: "Name" },
+                    { key: "role", label: "Role" },
+                    { key: "family", label: "Family" },
+                    { key: "email", label: "Email" },
+                    { key: "status", label: "Status" },
+                    { key: "expires", label: "Expires", numeric: true },
+                    { key: "actions", label: "Actions", hideLabel: true, className: "w-px whitespace-nowrap" },
+                  ]}
+                  rows={inviteRows}
                 />
-              ))}
-            </Card>
+              </div>
+              <Card className={`flex flex-col gap-3 p-4 ${MOBILE_ONLY}`}>
+                {openInvites.map((invite) => (
+                  <InviteRow
+                    key={invite.id}
+                    invite={invite}
+                    familyName={invite.family_id ? (familyName.get(invite.family_id) ?? null) : null}
+                    barnName={barn.name}
+                  />
+                ))}
+              </Card>
+            </>
           )}
 
-          <SheetTrigger label="Invite someone" title="New invite" variant="primary">
-            <InviteForm families={families} />
-          </SheetTrigger>
+          <div className={MOBILE_ONLY}>
+            <SheetTrigger label="Invite someone" title="New invite" variant="primary">
+              <InviteForm families={families} />
+            </SheetTrigger>
+          </div>
         </section>
       )}
 

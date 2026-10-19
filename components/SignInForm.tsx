@@ -81,7 +81,7 @@ export function SignInForm() {
   }
 
   const field =
-    "h-[3.125rem] w-full rounded-[0.75rem] border border-white/[0.16] bg-white/[0.05] px-4 " +
+    "h-[3.125rem] w-full rounded-control border border-white/[0.16] bg-white/[0.05] px-4 " +
     "text-body text-white placeholder:text-white/40 outline-none " +
     "focus:border-gold focus:bg-white/[0.08] transition-colors duration-150";
 

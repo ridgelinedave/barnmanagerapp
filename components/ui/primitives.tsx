@@ -5,7 +5,7 @@ import { Icon, type IconName } from "@/components/ui/Icon";
 /**
  * Surfaces, labels and chips — the vocabulary every screen is built from.
  *
- * TWO RULES THAT ARE EASY TO BREAK AND EXPENSIVE TO UNDO:
+ * RULES THAT ARE EASY TO BREAK AND EXPENSIVE TO UNDO:
  *
  *  1. Cards never nest. A card inside a card gives you two competing borders
  *     and a radius that has to fight its parent. When something needs to sit
@@ -13,6 +13,12 @@ import { Icon, type IconName } from "@/components/ui/Icon";
  *     border at all.
  *  2. Nothing here takes a raw colour. Components name tokens (`bg-surface`,
  *     `text-muted`) so a second barn re-skins from config/barn.ts alone.
+ *  3. THE ACCENT IS NOT DECORATION (2026-10 aesthetics pass). It marks the
+ *     primary button and the active nav item and nothing else. Nothing in this
+ *     file uses it: no oxblood card edge, no oxblood heading, no oxblood chip.
+ *     A colour that is on everything stops meaning "act here".
+ *  4. No elevation shadow, no radius above 6px. A hairline separates; a small
+ *     corner reads as a made object.
  */
 
 /* -------------------------------------------------------------------------- */
@@ -20,18 +26,16 @@ import { Icon, type IconName } from "@/components/ui/Icon";
 /* -------------------------------------------------------------------------- */
 
 /**
- * A white panel floating on the blush ground: warm hairline, soft oxblood-tinted
- * shadow, and an oxblood left edge.
+ * A white panel on the blush ground, separated by a 1px hairline and nothing
+ * else.
  *
- * This used to be a hairline and explicitly NO shadow, on the reasoning that a
- * shadow over a warm ground goes muddy. That held while the page was white and
- * the card was white — there was nothing to lift off. Now the page is blush and
- * the card is the only white thing on it, so a barely-there lift is what makes
- * it read as a card at all. The shadow is tinted with the oxblood rather than
- * black, which is what stops it going grey.
+ * CARDS ARE FOR THINGS THAT ARE GENUINELY A CARD — a horse, a person, an
+ * announcement, a lesson you might cancel. A list of facts, a set of controls
+ * or a table of contents is rows, not a stack of cards; the identical-card
+ * column is what made this app read as generated.
  *
- * The left edge is Belle's, from the mockup, and is the one place this system
- * uses a heavy side border deliberately.
+ * The oxblood left edge and the tinted shadow that used to sit here are gone:
+ * the shadow was elevation, and the edge was the accent used as ornament.
  */
 export function Card({
   children,
@@ -43,22 +47,16 @@ export function Card({
   as?: "section" | "div" | "article" | "li";
 }) {
   return (
-    <Tag
-      className={`rounded-card border border-line border-l-[3px] border-l-accent-text bg-surface shadow-card ${className}`}
-    >
-      {children}
-    </Tag>
+    <Tag className={`rounded-card border border-line bg-surface ${className}`}>{children}</Tag>
   );
 }
 
 /**
- * A panel with a tinted cap — the barn-board look. Used for the one or two
- * groupings on a screen that are genuinely a *board* rather than a section, so
- * it stays a signal instead of decoration.
+ * A panel with a labelled cap — the barn-board look. Used for the one or two
+ * groupings on a screen that are genuinely a *board* rather than a section.
  *
- * The cap was charcoal. On a white app a black bar inside the content reads as
- * a second header; a wash of the accent tint says "this is a group" without
- * shouting, and it follows the skin.
+ * The cap is the 11px label over a hairline, not a tinted bar: a wash of the
+ * accent under a heading was the accent as decoration.
  */
 export function Board({
   label,
@@ -70,16 +68,16 @@ export function Board({
   children: ReactNode;
 }) {
   return (
-    <section className="overflow-hidden rounded-card border border-line bg-surface">
-      <div className="flex items-center gap-2 border-b border-line bg-accent-tint px-4 py-2.5">
-        <h2 className="font-display text-eyebrow uppercase text-accent-text">{label}</h2>
+    <section className="rounded-card border border-line bg-surface">
+      <div className="flex items-center gap-2 border-b border-line px-4 py-2.5">
+        <h2 className="font-sans text-micro uppercase text-muted">{label}</h2>
         {action && (
-          /* The hit area is 44px even though the label is 19px: padding plus a
+          /* The hit area is 44px even though the label is small: padding plus a
              negative margin gives the finger a real target without inflating
              the bar. A text link that only looks tappable is not tappable. */
           <Link
             href={action.href}
-            className="-my-2.5 ml-auto flex min-h-11 shrink-0 items-center text-caption font-medium text-accent-text underline-offset-4 hover:underline"
+            className="-my-2.5 ml-auto flex min-h-11 shrink-0 items-center text-caption font-medium text-ink underline underline-offset-4"
           >
             {action.label}
           </Link>
@@ -100,9 +98,12 @@ export function Sunk({
   className?: string;
   tone?: "neutral" | "gold" | "forest" | "danger";
 }) {
+  // `gold` is the gold TINT as a ground — decorative, never text, never the
+  // accent. It used to be the accent tint, which put oxblood where nothing
+  // was to be pressed.
   const tones = {
     neutral: "bg-sunk text-ink",
-    gold: "bg-accent-tint text-ink",
+    gold: "bg-gold-tint text-ink",
     forest: "bg-forest-soft text-ink",
     danger: "bg-danger-soft text-ink",
   } as const;
@@ -115,12 +116,13 @@ export function Sunk({
 /* -------------------------------------------------------------------------- */
 
 /**
- * A section heading with an optional action on the right.
+ * A section label: 11px uppercase letterspaced muted, LEFT aligned, over a
+ * hairline that runs the width of the section.
  *
- * Note this is a real heading in the condensed face at readable size — NOT a
- * tiny tracked all-caps eyebrow. The eyebrow above every section is the single
- * most recognisable generated-UI tic; here that treatment is reserved for
- * <Board>, where it labels a physical thing.
+ * It used to be an oxblood heading in the condensed face with a short gold
+ * rule — a display treatment on every section, so nothing on a screen was
+ * louder than anything else. A section label is structure, and structure is
+ * quiet; the screen title is where the display face earns its place.
  */
 export function SectionHeader({
   title,
@@ -133,19 +135,14 @@ export function SectionHeader({
   action?: { href: string; label: string };
 }) {
   return (
-    <div className="flex items-baseline gap-3">
-      {/* Oxblood with a short gold rule under it. The rule is 24px and fixed,
-          not the width of the words — a full-width underline reads as a
-          divider and would compete with the card edges below it. */}
-      <h2 className="relative pb-1.5 font-display text-heading text-accent-text after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-6 after:bg-gold after:content-['']">
-        {title}
-      </h2>
-      {count && <p className="text-caption text-muted">{count}</p>}
+    <div className="flex items-baseline gap-3 border-b border-line pb-1.5">
+      <h2 className="font-sans text-micro uppercase text-muted">{title}</h2>
+      {count && <p className="text-micro text-muted tabular-nums">{count}</p>}
       {action && (
-        /* Same 44px hit area, same trick. */
+        /* 44px hit area on a phone, by padding and a negative margin. */
         <Link
           href={action.href}
-          className="-my-2 ml-auto flex min-h-11 shrink-0 items-center text-label font-medium text-accent-text underline-offset-4 hover:underline"
+          className="-my-3 ml-auto flex min-h-11 shrink-0 items-center text-caption font-medium text-ink underline underline-offset-4 lg:min-h-0 lg:my-0"
         >
           {action.label}
         </Link>
@@ -159,12 +156,16 @@ export function SectionHeader({
 /* -------------------------------------------------------------------------- */
 
 /**
- * A pill of fact or status.
+ * A status or a labelled fact.
  *
- * Two shapes, because a barn screen has two kinds of pill: a labelled fact
- * ("AGE 19y") where the label is quiet and the value is loud, and a bare status
- * ("Overdue"). Status never relies on colour alone — every tone that means
- * something carries an icon too.
+ * OUTLINED, NOT FILLED: 11px uppercase, a 1px border in the status colour,
+ * transparent fill. A solid pastel pill reads as a sticker and, stacked three
+ * to a row, as noise; an outlined label reads as a label.
+ *
+ * Status never relies on colour alone — every tone that means something keeps
+ * the icon it carries. Every tone's colour is AA as 11px text on white and on
+ * the blush ground: muted 6.34:1, gold-deep 6.67:1, forest and danger higher.
+ * `gold` is gold-DEEP, never gold, which is 2.19:1 and decorative only.
  */
 export function Chip({
   label,
@@ -172,34 +173,26 @@ export function Chip({
   icon,
   tone = "neutral",
 }: {
-  /** Quiet leading label. Omit for a bare status pill. */
+  /** Quiet leading label. Omit for a bare status. */
   label?: string;
   value: string;
   icon?: IconName;
   tone?: "neutral" | "gold" | "forest" | "danger";
 }) {
-  /*
-   * Neutral is blush carrying oxblood — the default pill is now branded rather
-   * than grey. `gold` keeps its own tint so "Staff only" stays distinguishable
-   * from an ordinary fact at a glance; its text is gold-deep, NOT gold, which
-   * is 1.86:1 and unusable on anything light.
-   */
   const tones = {
-    neutral: "bg-accent-tint text-accent-text",
-    gold: "bg-gold-tint text-gold-deep",
-    forest: "bg-forest-soft text-forest",
-    danger: "bg-danger-soft text-danger",
+    neutral: "border-muted/60 text-muted",
+    gold: "border-gold-deep/70 text-gold-deep",
+    forest: "border-forest/70 text-forest",
+    danger: "border-danger/70 text-danger",
   } as const;
 
   return (
     <span
-      className={`inline-flex max-w-full items-center gap-1.5 rounded-chip px-2.5 py-1 ${tones[tone]}`}
+      className={`inline-flex max-w-full items-center gap-1 rounded-chip border bg-transparent px-1.5 py-0.5 text-micro uppercase ${tones[tone]}`}
     >
-      {icon && <Icon name={icon} className="size-3.5 shrink-0" strokeWidth={2} />}
-      {label && (
-        <span className="font-display text-eyebrow uppercase opacity-70">{label}</span>
-      )}
-      <span className="truncate text-caption font-semibold">{value}</span>
+      {icon && <Icon name={icon} className="size-3 shrink-0" strokeWidth={2} />}
+      {label && <span className="opacity-80">{label}</span>}
+      <span className="truncate">{value}</span>
     </span>
   );
 }
@@ -214,12 +207,16 @@ export function ChipRow({ children }: { children: ReactNode }) {
 /* -------------------------------------------------------------------------- */
 
 /**
- * The empty state.
+ * The empty state: ONE short left-aligned line.
  *
- * `body` is REQUIRED, deliberately. A bare "No data" is the laziest thing an
- * interface can say; every empty state here has to tell the person what would
- * put something in it. The barn voice is plain and warm — what you'd say
- * leaning on the arena gate, not what a database would say.
+ * It was a dashed box with a centred heading over a centred paragraph — the
+ * icon-over-text stack that every generated dashboard ships. The wording was
+ * already right (warm, specific, says what would fill it), so the words stay
+ * and the stack goes: the title leads the sentence in ink, the body follows in
+ * muted, and it sits where the content would have started.
+ *
+ * `body` is still REQUIRED. A bare "No data" is the laziest thing an
+ * interface can say.
  */
 export function EmptyState({
   title,
@@ -230,11 +227,14 @@ export function EmptyState({
   body: string;
   action?: ReactNode;
 }) {
+  const lead = /[.!?…]$/.test(title.trim()) ? title.trim() : `${title.trim()}.`;
+
   return (
-    <div className="rounded-card border border-dashed border-line bg-surface px-4 py-6 text-center">
-      <p className="font-display text-heading text-ink">{title}</p>
-      <p className="mx-auto mt-1 max-w-[38ch] text-caption text-muted">{body}</p>
-      {action && <div className="mt-3 flex justify-center">{action}</div>}
+    <div className="flex flex-col items-start gap-2 py-1">
+      <p className="text-label text-muted">
+        <span className="font-semibold text-ink">{lead}</span> {body}
+      </p>
+      {action}
     </div>
   );
 }
@@ -244,8 +244,10 @@ export function EmptyState({
 /* -------------------------------------------------------------------------- */
 
 /**
- * A tinted notice. Full border and a tint — never a thick left stripe, which
- * is the tell of a component that wanted to be a card and gave up.
+ * A notice: a full hairline border and a quiet ground — never a thick left
+ * stripe, which is the tell of a component that wanted to be a card and gave
+ * up. The `gold` tone (the default, used for "worth knowing") is neutral now:
+ * it used to be the accent tint, i.e. oxblood on something nobody presses.
  */
 export function Callout({
   tone = "gold",
@@ -257,11 +259,11 @@ export function Callout({
   children: ReactNode;
 }) {
   const tones = {
-    gold: "border-accent/40 bg-accent-tint text-ink",
-    forest: "border-forest/25 bg-forest-soft text-ink",
+    gold: "border-line bg-sunk text-ink",
+    forest: "border-forest/30 bg-forest-soft text-ink",
     danger: "border-danger/30 bg-danger-soft text-ink",
   } as const;
-  const iconTones = { gold: "text-accent-text", forest: "text-forest", danger: "text-danger" } as const;
+  const iconTones = { gold: "text-muted", forest: "text-forest", danger: "text-danger" } as const;
 
   return (
     <div className={`flex gap-2.5 rounded-control border p-3 ${tones[tone]}`}>

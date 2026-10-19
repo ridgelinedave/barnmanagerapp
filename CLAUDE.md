@@ -1,4 +1,4 @@
-# Crouse Barn App — operating file
+# Monarch Barn Management Software — operating file
 
 Read this before writing anything. These are conventions the build has already
 paid for; several exist because the alternative shipped a bug here.
@@ -14,9 +14,17 @@ paid for; several exist because the alternative shipped a bug here.
 
 ## The project
 
-A mobile-first PWA that runs a single dressage barn: announcements, tasks,
-lesson scheduling with cancellation backfill, staff time clock, and later horses,
-shows and invoices. Next.js (App Router) + TypeScript + Tailwind on Supabase.
+**The product is Monarch Barn Management Software.** Crouse Equestrian is a
+white-labelled client of Monarch — the first barn on it — not the product.
+Inside the barn's app the barn leads: Crouse's crest, name and accent, with a
+small "Powered by Monarch" mark at the edges (`design/DESIGN-MASTER.md` §16c).
+Never put the barn's name on a product surface (a table, a route, a component
+name), and never put Monarch's name where the barn's belongs.
+
+A PWA that runs a barn: announcements, tasks, lesson scheduling with
+cancellation backfill, staff time clock, horses, shows, barn ops, and later
+learning modules and invoices. Next.js (App Router) + TypeScript + Tailwind on
+Supabase.
 
 **Standalone for Crouse, duplicatable by design.** One barn, one deployment, one
 Supabase project — but every barn-specific value lives in `/config/barn.ts`, so

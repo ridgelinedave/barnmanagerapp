@@ -41,6 +41,7 @@ export function AppHeader({
   subject,
   bell = true,
   layout = DEFAULT_LAYOUT,
+  tabs,
 }: {
   title: string;
   /** href to return to. Present = drilled-in screen. */
@@ -51,18 +52,31 @@ export function AppHeader({
   bell?: boolean;
   /** The screen's desktop bucket; the row is capped to match. */
   layout?: LayoutBucket;
+  /** Sub-view tabs (Day / Month / Agenda…). Shown under the title on desktop. */
+  tabs?: ReactNode;
 }) {
   return (
-    <header data-plane="deep" className="safe-top sticky top-0 z-30 border-b-2 border-gold bg-deep">
-      {/* lg:min-h-18 pins the bar to one height on the desktop shell (72px +
-          the 2px hairline), the tallest of the three shapes, so it lines up
-          with the sidebar's masthead beside it whichever shape a screen uses. */}
+    /*
+     * TWO REGISTERS. On the phone this is the oxblood masthead under the gold
+     * hairline — the barn's brand plane. From `lg` it is a LIGHT page header:
+     * white, a 1px bottom border, the title left at 20px, the primary action
+     * right, sub-view tabs beneath. On a desk the sidebar's brand block already
+     * carries the barn; a second deep bar across the content was oxblood used
+     * as chrome, and the accent is reserved for buttons and the active nav.
+     */
+    <header
+      data-plane="deep"
+      className="safe-top sticky top-0 z-30 border-b-2 border-gold bg-deep lg:border-b lg:border-line lg:bg-surface"
+    >
+      {/* lg:min-h-18 pins the row to one height on the desktop shell (72px +
+          the 1px border = the sidebar masthead), so the two line up whichever
+          header shape a screen uses. */}
       <div className={`mx-auto flex ${BUCKET_FRAME[layout]} items-center gap-3 py-3 lg:min-h-18`}>
         {back ? (
           <Link
             href={back}
             aria-label="Back"
-            className="-ml-2 flex size-11 shrink-0 items-center justify-center rounded-chip text-white"
+            className="-ml-2 flex size-11 shrink-0 items-center justify-center rounded-control text-white lg:size-9 lg:text-muted lg:hover:bg-sunk lg:hover:text-ink"
           >
             <Icon name="back" className="size-5.5" strokeWidth={2} />
           </Link>
@@ -86,39 +100,50 @@ export function AppHeader({
               <img
                 src={subject.photoUrl}
                 alt=""
-                className="size-12 shrink-0 rounded-full border border-line object-cover"
+                className="size-12 shrink-0 rounded-avatar border border-line object-cover lg:size-10"
               />
             ) : (
               <span
                 aria-hidden="true"
-                className="flex size-12 shrink-0 items-center justify-center rounded-full bg-accent font-display text-title font-bold text-accent-on"
+                className="flex size-12 shrink-0 items-center justify-center rounded-avatar border border-white/30 bg-white/10 font-display text-title font-bold text-white lg:size-10 lg:border-line lg:bg-sunk lg:text-ink"
               >
                 {subject.name.trim().charAt(0).toUpperCase()}
               </span>
             )}
             <div className="min-w-0 flex-1">
-              <h1 className="truncate font-display text-display text-white">{subject.name}</h1>
+              <h1 className="truncate font-display text-display text-white lg:text-[1.25rem] lg:leading-tight lg:text-ink">
+                {subject.name}
+              </h1>
               {subject.meta && (
-                /* white/75 on oxblood is 9.4:1 — quiet without going unreadable,
-                   which is what `muted` would have been on this plane. */
-                <p className="truncate text-caption text-white/75">{subject.meta}</p>
+                /* white/75 on oxblood is 9.4:1; muted on white is 6.34:1. */
+                <p className="truncate text-caption text-white/75 lg:text-muted">{subject.meta}</p>
               )}
             </div>
           </div>
         ) : (
           <div className="min-w-0 flex-1">
             {!back && (
-              <p className="truncate font-display text-eyebrow uppercase text-gold">
+              /* Gold as text is only legible on the oxblood plane (7.22:1), so
+                 the kicker exists only there. The desktop page header has the
+                 sidebar's brand block beside it. */
+              <p className="truncate font-display text-eyebrow uppercase text-gold lg:hidden">
                 {barn.shortName}
               </p>
             )}
-            <h1 className="truncate font-display text-display leading-none text-white">{title}</h1>
+            <h1 className="truncate font-display text-display leading-none text-white lg:text-[1.25rem] lg:font-bold lg:text-ink">
+              {title}
+            </h1>
           </div>
         )}
 
-        {action}
+        {/* shrink-0 so a full-width control handed in as the action (a
+            SheetTrigger) sizes to its label instead of eating the row. */}
+        {action && <div className="flex shrink-0 items-center">{action}</div>}
         {bell && <NotificationBell />}
       </div>
+      {tabs && (
+        <div className={`mx-auto hidden ${BUCKET_FRAME[layout]} lg:block`}>{tabs}</div>
+      )}
     </header>
   );
 }

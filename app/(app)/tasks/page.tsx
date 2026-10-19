@@ -41,8 +41,8 @@ export default async function TasksPage() {
           title="Feed board"
           meta="Who eats what, morning, lunch and evening"
           leading={
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-control bg-sunk text-accent-text">
-              <Icon name="bucket" className="size-5" />
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-control bg-sunk text-muted lg:size-7 lg:bg-transparent">
+              <Icon name="bucket" className="size-5 lg:size-4" />
             </span>
           }
         />
