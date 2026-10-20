@@ -77,7 +77,7 @@ export default async function LearningPage() {
             {module.lessons.length === 0 ? (
               <EmptyState title="No lessons yet" />
             ) : (
-              <ol className="flex flex-col gap-2 lg:gap-0">
+              <ol className="flex flex-col">
                 {module.lessons.map((lesson, index) => (
                   <LessonRow
                     key={lesson.id}

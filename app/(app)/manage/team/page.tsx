@@ -145,7 +145,7 @@ export default async function ManageTeamPage({
   });
 
   return (
-    <TabPage
+    <TabPage density="tight"
       title="Team and access"
       back="/more"
       layout="wide"

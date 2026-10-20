@@ -82,7 +82,7 @@ export function TaskCard({
           )}
         </span>
 
-        <span className="shrink-0 self-center font-display text-eyebrow uppercase text-muted">
+        <span className="shrink-0 self-center font-condensed text-eyebrow uppercase text-muted">
           {pending ? "…" : done ? "Undo" : "Done"}
         </span>
       </button>

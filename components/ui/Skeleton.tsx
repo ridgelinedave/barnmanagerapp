@@ -19,9 +19,9 @@ export function SkeletonRow() {
   return (
     <div
       aria-hidden="true"
-      className="flex min-h-14 items-center gap-3 rounded-card border border-line p-3.5"
+      className="flex min-h-14 items-center gap-3 border-b border-rule py-2.5"
     >
-      <span className="skeleton size-11 shrink-0 rounded-avatar" />
+      <span className="skeleton size-11 shrink-0 rounded-full" />
       <span className="flex min-w-0 flex-1 flex-col gap-2">
         <SkeletonLine w="55%" h="1rem" />
         <SkeletonLine w="35%" h="0.75rem" />
@@ -34,7 +34,7 @@ export function SkeletonRow() {
 /** A stack of rows. `label` is what the screen reader hears instead. */
 export function SkeletonList({ rows = 4, label = "Loading" }: { rows?: number; label?: string }) {
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col">
       <span className="sr-only" role="status">
         {label}
       </span>
@@ -53,7 +53,7 @@ export function SkeletonSection({ rows = 3, label = "Loading" }: { rows?: number
         {label}
       </span>
       <SkeletonLine w="38%" h="1.1875rem" />
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col">
         {Array.from({ length: rows }, (_, i) => (
           <SkeletonRow key={i} />
         ))}

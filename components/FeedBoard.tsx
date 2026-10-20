@@ -29,7 +29,7 @@ function HorseAvatar({ entry }: { entry: HorseFeed }) {
       <img
         src={horse.photo_url}
         alt=""
-        className="size-[3.25rem] shrink-0 rounded-avatar object-cover"
+        className="size-[3.25rem] shrink-0 rounded-full object-cover"
       />
     );
   }
@@ -37,7 +37,7 @@ function HorseAvatar({ entry }: { entry: HorseFeed }) {
   return (
     <span
       aria-hidden="true"
-      className="flex size-[3.25rem] shrink-0 items-center justify-center rounded-avatar border border-line bg-sunk font-display text-[1.375rem] font-bold tracking-[0.04em] text-ink"
+      className="flex size-[3.25rem] shrink-0 items-center justify-center rounded-full bg-accent-tint font-display text-[1.375rem] tracking-[0.04em] text-accent-text"
     >
       {horseInitials(horse)}
     </span>
@@ -66,7 +66,7 @@ export function FeedBoard({ board }: { board: HorseFeed[] }) {
               <HorseAvatar entry={entry} />
 
               <span className="min-w-0 flex-1">
-                <span className="block font-display text-[1.25rem] font-semibold leading-tight tracking-[0.02em] text-ink">
+                <span className="block font-display text-[1.25rem] leading-tight text-ink">
                   {entry.horse.barn_name || entry.horse.name}
                 </span>
                 {subtitle && (
@@ -75,12 +75,12 @@ export function FeedBoard({ board }: { board: HorseFeed[] }) {
               </span>
 
               {cadence ? (
-                <span className="shrink-0 rounded-chip border border-ink/40 px-1.5 py-0.5 font-sans text-micro uppercase text-ink">
+                <span className="shrink-0 rounded-chip border border-ink/40 px-1.5 py-0.5 font-condensed text-micro uppercase text-ink">
                   {cadence}
                 </span>
               ) : (
                 /* No chart is a state worth seeing on the board, not a blank. */
-                <span className="shrink-0 rounded-chip border border-muted/60 px-1.5 py-0.5 font-sans text-micro uppercase text-muted">
+                <span className="shrink-0 rounded-chip border border-muted/60 px-1.5 py-0.5 font-condensed text-micro uppercase text-muted">
                   No chart
                 </span>
               )}

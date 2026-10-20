@@ -28,7 +28,7 @@ export default async function BlanketingPage() {
 
   if (board.length === 0) {
     return (
-      <TabPage title="Blanketing" back="/barn">
+      <TabPage density="tight" title="Blanketing" back="/barn">
         <EmptyState title="No horses yet" />
       </TabPage>
     );
@@ -38,7 +38,7 @@ export default async function BlanketingPage() {
   const missing = board.filter((row) => !row.plan);
 
   return (
-    <TabPage title="Blanketing" back="/barn">
+    <TabPage density="tight" title="Blanketing" back="/barn">
       <section className="flex flex-col gap-3">
         <SectionHeader title="Blanket plans" count={`${planned.length} of ${board.length}`} />
 

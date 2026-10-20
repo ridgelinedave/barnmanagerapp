@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { Chip } from "@/components/ui/primitives";
-import { Avatar } from "@/components/ui/ListRow";
+import { Avatar, ROW, ROW_LINK, ROW_META, ROW_TITLE } from "@/components/ui/ListRow";
 import { Icon } from "@/components/ui/Icon";
 import type { Horse, HorseBasics } from "@/lib/types";
 
 /**
- * A horse, as a card (SPEC §3.4 — never a table on mobile).
+ * A horse, as an editorial row (SPEC §3.4 — never a table on mobile): its
+ * photo in a circle, its name in Marcellus, a rule under it. Not a card.
  *
  * Two shapes on purpose, because the app has two kinds of horse row and they
  * are NOT the same object with different fields filled in:
@@ -24,17 +25,11 @@ function Frame({
   href?: string;
   children: React.ReactNode;
 }) {
-  const className =
-    "flex min-h-16 w-full items-center gap-3 rounded-card border border-line bg-surface p-4 text-left";
-
-  if (!href) return <div className={className}>{children}</div>;
+  if (!href) return <div className={ROW}>{children}</div>;
   return (
-    <Link
-      href={href}
-      className={`${className} transition-transform duration-150 ease-out active:scale-[0.99]`}
-    >
+    <Link href={href} className={`${ROW} ${ROW_LINK}`}>
       {children}
-      <Icon name="chevron" className="size-5 shrink-0 text-muted" />
+      <Icon name="chevron" className="size-4 shrink-0 text-muted" />
     </Link>
   );
 }
@@ -66,8 +61,8 @@ export function HorseCard({
     <Frame href={href}>
       <Avatar name={horse.name} src={horse.photo_url} />
       <span className="min-w-0 flex-1">
-        <span className="block font-display text-heading leading-snug text-ink">{horse.name}</span>
-        {detail && <span className="mt-0.5 block text-caption text-muted">{detail}</span>}
+        <span className={`${ROW_TITLE} text-ink`}>{horse.name}</span>
+        {detail && <span className={ROW_META}>{detail}</span>}
         {!horse.active && (
           <span className="mt-1.5 block">
             <Chip value="Retired" icon="clock" tone="neutral" />
@@ -87,9 +82,9 @@ export function HorseBasicsCard({ horse }: { horse: HorseBasics }) {
     <Frame>
       <Avatar name={horse.name} src={horse.photo_url} />
       <span className="min-w-0 flex-1">
-        <span className="block font-display text-heading leading-snug text-ink">{horse.name}</span>
+        <span className={`${ROW_TITLE} text-ink`}>{horse.name}</span>
         {horse.barn_name && horse.barn_name !== horse.name && (
-          <span className="mt-0.5 block text-caption text-muted">
+          <span className={ROW_META}>
             &ldquo;{horse.barn_name}&rdquo;
           </span>
         )}

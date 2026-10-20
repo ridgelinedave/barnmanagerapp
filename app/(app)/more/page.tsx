@@ -4,9 +4,8 @@ import { PoweredByMonarch } from "@/components/Wordmark";
 import { InstallPrompt } from "@/components/InstallPrompt";
 import { CalendarSubscribe } from "@/components/CalendarSubscribe";
 import { Card, FactList, SectionHeader } from "@/components/ui/primitives";
-import { ListRow } from "@/components/ui/ListRow";
+import { ListRow, RowList } from "@/components/ui/ListRow";
 import { Button } from "@/components/ui/Button";
-import { Icon, type IconName } from "@/components/ui/Icon";
 import { currentRole } from "@/lib/guard";
 import { getViewer } from "@/lib/session";
 import { myCalendarToken } from "@/lib/events";
@@ -49,18 +48,8 @@ async function baseUrl(): Promise<string> {
   return `${protocol}://${host}`;
 }
 
-function Row({ href, title, icon }: { href: string; title: string; icon: IconName }) {
-  return (
-    <ListRow
-      href={href}
-      title={title}
-      leading={
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-control bg-sunk text-muted lg:size-7 lg:bg-transparent">
-          <Icon name={icon} className="size-5 lg:size-4" />
-        </span>
-      }
-    />
-  );
+function Row({ href, title }: { href: string; title: string }) {
+  return <ListRow href={href} title={title} />;
 }
 
 export default async function MorePage() {
@@ -93,14 +82,14 @@ export default async function MorePage() {
   const hasLinks = !hasScheduleTab || yourRows.length > 0;
 
   return (
-    <TabPage title="Settings">
+    <TabPage density="tight" title="Settings">
       {/* Who you are signed in as, first — this is the screen people come to
           when they are not sure. */}
       {(name || email) && (
         <Card className="flex items-center gap-3 p-4">
           <span
             aria-hidden="true"
-            className="flex size-11 shrink-0 items-center justify-center rounded-avatar border border-line bg-sunk font-display text-heading font-bold text-ink"
+            className="flex size-11 shrink-0 items-center justify-center rounded-full bg-accent-tint font-display text-heading text-accent-text"
           >
             {(name ?? email ?? "?").trim().charAt(0).toUpperCase()}
           </span>
@@ -122,25 +111,28 @@ export default async function MorePage() {
       {adminRows.length > 0 && (
         <section className="flex flex-col gap-3">
           <SectionHeader title={SETTINGS_ADMIN_GROUP.title} />
-          {adminRows.map((entry) => (
-            <Row key={entry.href} href={entry.href} title={entry.title} icon={entry.icon} />
-          ))}
+          <RowList>
+            {adminRows.map((entry) => (
+              <Row key={entry.href} href={entry.href} title={entry.title} />
+            ))}
+          </RowList>
         </section>
       )}
 
       {hasLinks && (
         <section className="flex flex-col gap-3">
           <SectionHeader title={SETTINGS_YOURS_GROUP.title} />
+          <RowList>
           {!hasScheduleTab && (
             <Row
               href="/schedule?view=month"
               title="Calendar"
-              icon="calendar"
             />
           )}
           {yourRows.map((entry) => (
-            <Row key={entry.href} href={entry.href} title={entry.title} icon={entry.icon} />
+            <Row key={entry.href} href={entry.href} title={entry.title} />
           ))}
+          </RowList>
         </section>
       )}
 

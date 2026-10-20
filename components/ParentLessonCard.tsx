@@ -51,10 +51,10 @@ export function ParentLessonCard({
             cancelled ? "border-line bg-line/60" : "border-line bg-sunk"
           }`}
         >
-          <span className="font-sans text-micro uppercase text-muted">
+          <span className="font-condensed text-micro uppercase text-muted">
             {formatBarnDayLabel(instance.date).split(",")[0]}
           </span>
-          <span className="font-display text-heading font-bold text-ink">
+          <span className="font-condensed text-heading font-bold text-ink">
             {instance.date.slice(-2)}
           </span>
         </span>

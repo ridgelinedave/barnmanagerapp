@@ -27,7 +27,7 @@ export default async function NotificationsPage() {
   }
 
   return (
-    <TabPage title="Notifications">
+    <TabPage density="tight" title="Notifications">
       {items.length === 0 ? (
         <EmptyState title="No notifications" />
       ) : (

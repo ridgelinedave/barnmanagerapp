@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Icon } from "@/components/ui/Icon";
+import { buttonClass } from "@/components/ui/Button";
 
 /**
  * A bottom sheet, on the native <dialog> element.
@@ -112,25 +113,22 @@ export function SheetTrigger({
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
 
-  const styles =
-    variant === "primary"
-      ? "bg-accent text-accent-on border-transparent"
-      : "bg-surface text-ink border-line hover:bg-sunk";
-  // Default: a full-width 48px block on a phone, a normal-width 36px button on
-  // the desk. `sm` is the table-row control.
-  const sizes =
+  // EXACTLY a Button (buttonClass), not its own look. It used to be a white,
+  // full-width, sentence-case block with a 1.27:1 hairline — on the blush that
+  // is a card, and "New pay period" read as one. Primary stays full width on a
+  // phone (the screen's one main action); a secondary sizes to its label.
+  // self-start: in a flex column, width:auto alone still stretches.
+  const look =
     size === "sm"
-      ? "min-h-8 px-3 text-table"
-      : // self-start: in a flex column (every section here) width:auto alone
-        // still stretches, and a full-width oxblood bar on a desk is a banner.
-        "min-h-12 w-full px-4 text-label lg:min-h-9 lg:w-auto lg:self-start lg:text-table";
+      ? buttonClass(variant, "sm")
+      : `${buttonClass(variant, "default")} self-start ${variant === "primary" ? "w-full lg:w-auto" : ""}`;
 
   return (
     <>
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className={`inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-control border font-semibold transition-transform duration-150 ease-out active:scale-[0.985] ${sizes} ${styles}`}
+        className={`whitespace-nowrap ${look}`}
       >
         {label}
       </button>

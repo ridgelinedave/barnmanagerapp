@@ -4,6 +4,7 @@ import Link from "next/link";
 import { barn } from "@/config/barn";
 import { NotificationBell } from "@/components/NotificationBell";
 import { Icon } from "@/components/ui/Icon";
+import { initialOf } from "@/components/ui/ListRow";
 import { BUCKET_FRAME, DEFAULT_LAYOUT, type LayoutBucket } from "@/components/layout-buckets";
 
 /**
@@ -19,8 +20,14 @@ import { BUCKET_FRAME, DEFAULT_LAYOUT, type LayoutBucket } from "@/components/la
  * blush, the cards are white, and the bottom nav stays light, so this reads as
  * a masthead rather than the chrome closing in from both edges.
  *
- * Contrast on the new pairings: white title on #4A002A is 15.85:1, gold
- * kicker on the same is 7.22:1, and the badge is gold carrying ink at 7.92:1.
+ * Contrast: white title on #4A002A is 15.85:1; the badge is gold carrying ink
+ * at 7.92:1. Gold is the HAIRLINE under the bar and never text — the barn-name
+ * kicker that used to sit over the title in gold is gone (2026-10-19).
+ *
+ * 56px ON A PHONE (2026-10-19). It was crest + kicker + a 31px title, about a
+ * sixth of the screen for two words, and a long title wrapped to two lines.
+ * Now one row: a 28px crest or the 44px back target, the title in Marcellus
+ * at 19px on ONE line (truncated, never wrapped), the bell.
  *
  * Three shapes, one component:
  *   root      the crest, the barn name, the screen title, the bell
@@ -71,7 +78,7 @@ export function AppHeader({
       {/* lg:min-h-18 pins the row to one height on the desktop shell (72px +
           the 1px border = the sidebar masthead), so the two line up whichever
           header shape a screen uses. */}
-      <div className={`mx-auto flex ${BUCKET_FRAME[layout]} items-center gap-3 py-3 lg:min-h-18`}>
+      <div className={`mx-auto flex min-h-14 ${BUCKET_FRAME[layout]} items-center gap-2.5 py-1.5 lg:min-h-18 lg:gap-3 lg:py-3`}>
         {back ? (
           <Link
             href={back}
@@ -84,10 +91,10 @@ export function AppHeader({
           <Image
             src={barn.brand.logoSrc}
             alt=""
-            width={36}
-            height={36}
+            width={28}
+            height={28}
             priority
-            className="size-9 shrink-0 lg:hidden"
+            className="size-7 shrink-0 lg:hidden"
           />
         )}
 
@@ -100,37 +107,29 @@ export function AppHeader({
               <img
                 src={subject.photoUrl}
                 alt=""
-                className="size-12 shrink-0 rounded-avatar border border-line object-cover lg:size-10"
+                className="size-10 shrink-0 rounded-full border border-white/30 object-cover lg:border-rule"
               />
             ) : (
               <span
                 aria-hidden="true"
-                className="flex size-12 shrink-0 items-center justify-center rounded-avatar border border-white/30 bg-white/10 font-display text-title font-bold text-white lg:size-10 lg:border-line lg:bg-sunk lg:text-ink"
+                className="flex size-10 shrink-0 items-center justify-center rounded-full bg-white/15 font-display text-heading text-white lg:bg-accent-tint lg:text-accent-text"
               >
-                {subject.name.trim().charAt(0).toUpperCase()}
+                {initialOf(subject.name)}
               </span>
             )}
             <div className="min-w-0 flex-1">
-              <h1 className="truncate font-display text-display text-white lg:text-[1.25rem] lg:leading-tight lg:text-ink">
+              <h1 className="truncate font-display text-[1.1875rem] leading-tight text-white lg:text-[1.375rem] lg:text-ink">
                 {subject.name}
               </h1>
               {subject.meta && (
                 /* white/75 on oxblood is 9.4:1; muted on white is 6.34:1. */
-                <p className="truncate text-caption text-white/75 lg:text-muted">{subject.meta}</p>
+                <p className="truncate font-condensed text-label font-medium text-white/75 lg:text-muted">{subject.meta}</p>
               )}
             </div>
           </div>
         ) : (
           <div className="min-w-0 flex-1">
-            {!back && (
-              /* Gold as text is only legible on the oxblood plane (7.22:1), so
-                 the kicker exists only there. The desktop page header has the
-                 sidebar's brand block beside it. */
-              <p className="truncate font-display text-eyebrow uppercase text-gold lg:hidden">
-                {barn.shortName}
-              </p>
-            )}
-            <h1 className="truncate font-display text-display leading-none text-white lg:text-[1.25rem] lg:font-bold lg:text-ink">
+            <h1 className="truncate font-display text-[1.1875rem] leading-tight text-white lg:text-[1.375rem] lg:text-ink">
               {title}
             </h1>
           </div>

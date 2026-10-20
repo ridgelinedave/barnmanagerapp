@@ -210,6 +210,18 @@ this (`lessonSegments` in lib/nav.ts). Audit 2026-10-19: the Barn tab is still
 a link-only landing page for every role (admin 13 destinations, staff 8,
 parent 4) — flagged, not yet restructured.
 
+**Three faces, each with one job (2026-10-19).** `font-display` is MARCELLUS
+(screen titles, section headings, and proper nouns — module, horse, rider and
+show names; weight 400 only, never bold). `font-condensed` is Barlow Condensed
+(small-caps labels, table headers, chips, numbers, metadata, button labels —
+scaffolding). `font-sans` is Barlow (body copy and inputs). A list is
+EDITORIAL ROWS on the ground (`ListRow` / `ROW` + `RowList`: rule between rows,
+name in Marcellus, small muted chevron, a circular photo `Avatar` for a horse or
+person, no icon chip, no card). Separators on the ground use `border-rule`
+(brand.rule); `line` is for inside white surfaces. A control that is not a
+<Button> borrows `buttonClass()` so it never looks like a card. The time clock
+is mounted only through `TimeClock` (state from `loadClockState`).
+
 **Two shells, one app** (see `design/DESIGN-MASTER.md` §14b, decided
 2026-10-18). Same routes, same server components, same data functions; a
 breakpoint picks the chrome and the column count. Divergence belongs in layout

@@ -253,8 +253,18 @@ export const barn = {
      */
     muted: "#5D5F6B",
 
-    /** The hairline. Warmed to sit on the blush rather than fight it. */
+    /** The hairline INSIDE a white surface (inputs, table rows, card interiors). */
     line: "#ECE2E4",
+
+    /**
+     * THE RULE — what separates things on the blush ground, now that lists are
+     * not cards (2026-10-19). White on the blush measures only 1.15:1, so a
+     * white card read as a soft, edgeless blob; and `line` on the blush is
+     * 1.10:1, invisible. The rule is 1.42:1 against the ground and 1.63:1
+     * against white: a divider you can see, still quiet. Decorative — it never
+     * carries meaning on its own.
+     */
+    rule: "#D8C6CB",
 
     /** Tinted grounds for chips and callouts. All carry their own deep tone. */
     goldSoft: "#F8F2DC",

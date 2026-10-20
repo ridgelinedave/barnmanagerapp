@@ -32,7 +32,7 @@ export default async function ManageEventsPage() {
 
   if (!featureEnabled("events")) {
     return (
-      <TabPage title="Calendar">
+      <TabPage density="tight" title="Calendar">
         <StubScreen heading="Calendar" phase="Phase 2" />
       </TabPage>
     );
@@ -41,7 +41,7 @@ export default async function ManageEventsPage() {
   const { upcoming, past } = partitionEvents(await listAllEvents());
 
   return (
-    <TabPage title="Calendar" back="/barn">
+    <TabPage density="tight" title="Calendar" back="/barn">
       <section className="flex flex-col gap-3">
         <SectionHeader title="Coming up" count={`${upcoming.length}`} />
 

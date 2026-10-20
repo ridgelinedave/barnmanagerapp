@@ -51,7 +51,7 @@ export default async function WaterPage() {
 
   if (sources.length === 0) {
     return (
-      <TabPage title="Water" back="/barn">
+      <TabPage density="tight" title="Water" back="/barn">
         <EmptyState title="No troughs yet" />
       </TabPage>
     );
@@ -61,7 +61,7 @@ export default async function WaterPage() {
   const fine = sources.filter((s) => !waterIsOverdue(s));
 
   return (
-    <TabPage title="Water" back="/barn">
+    <TabPage density="tight" title="Water" back="/barn">
       {overdue.length > 0 && (
         <section className="flex flex-col gap-3">
           <SectionHeader title="Overdue" count={`${overdue.length}`} />

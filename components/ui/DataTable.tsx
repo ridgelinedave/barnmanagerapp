@@ -108,7 +108,7 @@ export function sortHrefFor(
 }
 
 const HEADER =
-  "border-b border-line px-3 py-2 text-left align-bottom font-sans text-micro uppercase text-muted";
+  "border-b border-line px-3 py-2 text-left align-bottom font-condensed text-micro uppercase text-muted";
 
 export function DataTable({
   caption,

@@ -32,7 +32,7 @@ export default async function MaintenancePage() {
   const [rows, canResolve] = await Promise.all([listMaintenance(), canResolveMaintenance()]);
 
   return (
-    <TabPage
+    <TabPage density="tight"
       title="Maintenance"
       back="/barn"
       action={

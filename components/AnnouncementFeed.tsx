@@ -92,7 +92,7 @@ function Tag({ tone, children }: { tone: "pinned" | "staff"; children: string })
 
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-chip border bg-transparent px-1.5 py-0.5 font-sans text-micro uppercase ${tones[tone]}`}
+      className={`inline-flex items-center gap-1 rounded-chip border bg-transparent px-1.5 py-0.5 font-condensed text-micro uppercase ${tones[tone]}`}
     >
       {tone === "pinned" && <Icon name="pin" className="size-3 shrink-0" strokeWidth={2.5} />}
       {children}

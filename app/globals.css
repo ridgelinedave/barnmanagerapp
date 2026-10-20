@@ -67,6 +67,8 @@
   --brand-page: #f6edef;
   /* Warmed to sit on the blush rather than fight it (was #e7e6e2, cool grey). */
   --brand-line: #ece2e4;
+  /* Fallback only; the live value comes from config/barn.ts (brand.rule). */
+  --brand-rule: #d8c6cb;
   /* The staff-only chip ground — gold's tint, distinct from the blush. */
   --brand-gold-tint: #f0e7da;
   --brand-gold-soft: #f8f2dc;
@@ -125,6 +127,8 @@
   --color-ink: var(--brand-ink);
   --color-muted: var(--brand-muted);
   --color-line: var(--brand-line);
+  /* Divides things ON the ground: list rows, sections, card edges. */
+  --color-rule: var(--brand-rule);
 
   /* --- Type ------------------------------------------------------------- */
   /*
@@ -136,7 +140,8 @@
    * Both are SIL Open Font License, self-hosted by next/font: no network call,
    * no layout shift, works offline in the installed PWA.
    */
-  --font-display: var(--font-barlow-condensed), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-marcellus), ui-serif, Georgia, serif;
+  --font-condensed: var(--font-barlow-condensed), ui-sans-serif, system-ui, sans-serif;
   --font-sans: var(--font-barlow), ui-sans-serif, system-ui, sans-serif;
   /*
    * Cinzel, bound to the MONARCH WORDMARK and nothing else. It is not a
@@ -147,20 +152,20 @@
   --font-wordmark: var(--font-cinzel), ui-serif, Georgia, serif;
 
   /* Screen titles in the header. */
-  --text-display: 1.9375rem;
-  --text-display--line-height: 1.05;
-  --text-display--letter-spacing: -0.02em;
-  --text-display--font-weight: 700;
+  --text-display: 1.5rem;
+  --text-display--line-height: 1.1;
+  --text-display--letter-spacing: 0.01em;
+  --text-display--font-weight: 400;
 
   /* Card and section titles. */
-  --text-title: 1.4375rem;
-  --text-title--line-height: 1.15;
-  --text-title--letter-spacing: -0.01em;
-  --text-title--font-weight: 700;
+  --text-title: 1.3125rem;
+  --text-title--line-height: 1.2;
+  --text-title--letter-spacing: 0.005em;
+  --text-title--font-weight: 400;
 
-  --text-heading: 1.1875rem;
-  --text-heading--line-height: 1.25;
-  --text-heading--font-weight: 600;
+  --text-heading: 1.125rem;
+  --text-heading--line-height: 1.3;
+  --text-heading--font-weight: 400;
 
   /* 16px floor: anything smaller triggers iOS zoom-on-focus in inputs. */
   --text-body: 1rem;
@@ -184,13 +189,13 @@
   --text-eyebrow--font-weight: 700;
 
   /*
-   * THE LABEL — 11px, uppercase, letterspaced, muted. Section labels, table
-   * column headers, sidebar groups and status chips all use it, so the small
-   * structural type is ONE thing rather than four near-misses. Barlow (the
-   * reading face) at 600: the condensed face at 11px loses its counters.
-   * Muted #5D5F6B is 6.34:1 on white and clears AA at this size.
+   * THE LABEL — 12px, uppercase, letterspaced, muted, in BARLOW CONDENSED
+   * (`font-condensed`): table column headers, sidebar groups, status chips,
+   * counts. Scaffolding, so the scaffolding face. 12px rather than 11px
+   * because the condensed face at 11px loses its counters. Muted #5D5F6B is
+   * 6.34:1 on white, 5.51:1 on the ground, and clears AA at this size.
    */
-  --text-micro: 0.6875rem;
+  --text-micro: 0.75rem;
   --text-micro--line-height: 1.2;
   --text-micro--letter-spacing: 0.08em;
   --text-micro--font-weight: 600;
@@ -292,11 +297,30 @@ body {
   top: 0.75rem;
 }
 
-/* Headings take the condensed face by default so no screen has to remember. */
+/*
+ * Headings take Marcellus by default so no screen has to remember. IN
+ * `@layer base`, so a utility on the element wins: an h2 that is a small-caps
+ * label (`font-condensed`) must not be forced into the serif. (Unlayered, this
+ * rule used to beat every font utility on a heading.)
+ */
+@layer base {
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-marcellus), ui-serif, Georgia, serif;
+    font-weight: 400;
+  }
+}
+
+/*
+ * Marcellus has ONE weight. A stray `font-bold` on a serif title must not make
+ * the browser smear a fake bold out of it — it stays the drawn 400.
+ */
+.font-display,
 h1,
 h2,
 h3 {
-  font-family: var(--font-barlow-condensed), ui-sans-serif, system-ui, sans-serif;
+  font-synthesis-weight: none;
 }
 
 /* Even line lengths on titles; fewer orphans in prose. */

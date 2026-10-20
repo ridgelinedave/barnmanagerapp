@@ -191,7 +191,7 @@ export function SignInForm() {
             disabled={busy}
             className="
               mt-2 h-[3.25rem] w-full rounded-[0.3125rem] bg-gold text-ink
-              font-display text-[1.125rem] font-bold uppercase tracking-[0.11em]
+              font-condensed text-[1.125rem] font-bold uppercase tracking-[0.11em]
               shadow-press transition-[transform,background-color,box-shadow] duration-100 ease-out
               active:translate-y-px active:bg-gold-press active:shadow-press-active
               disabled:pointer-events-none disabled:opacity-60

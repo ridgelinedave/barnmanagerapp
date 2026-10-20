@@ -29,7 +29,7 @@ export async function MyLessonsView() {
 
   if (!featureEnabled("lessons")) {
     return (
-      <TabPage title="Lessons" tabs={tabs}>
+      <TabPage density="tight" title="Lessons" tabs={tabs}>
         <StubScreen heading="Upcoming lessons" phase="Phase 1" />
       </TabPage>
     );
@@ -76,7 +76,7 @@ export async function MyLessonsView() {
   const cancelled = cards.filter(({ booking }) => booking.status === "cancelled");
 
   return (
-    <TabPage title="Lessons" tabs={tabs}>
+    <TabPage density="tight" title="Lessons" tabs={tabs}>
       {offerCards.length > 0 && (
         <>
           <SectionHeader title="Makeups" count={`${offerCards.length}`} />

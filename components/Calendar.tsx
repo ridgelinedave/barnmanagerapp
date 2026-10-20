@@ -63,7 +63,7 @@ function ItemRow({ item }: { item: CalendarItem }) {
       </span>
 
       <span
-        className={`inline-flex shrink-0 items-center gap-1 rounded-chip border bg-transparent px-1.5 py-0.5 font-sans text-micro uppercase ${KIND_TONE[item.kind]}`}
+        className={`inline-flex shrink-0 items-center gap-1 rounded-chip border bg-transparent px-1.5 py-0.5 font-condensed text-micro uppercase ${KIND_TONE[item.kind]}`}
       >
         <Icon name={KIND_ICON[item.kind]} className="size-3" strokeWidth={2} />
         {item.label}
@@ -95,7 +95,7 @@ function DayAgenda({ date, items, today }: { date: string; items: CalendarItem[]
       <div className="flex items-baseline gap-2">
         <h2 className="font-display text-heading text-ink">{label}</h2>
         {date === today && (
-          <span className="rounded-chip border border-ink/50 px-1.5 py-0.5 font-sans text-micro uppercase text-ink">
+          <span className="rounded-chip border border-ink/50 px-1.5 py-0.5 font-condensed text-micro uppercase text-ink">
             Today
           </span>
         )}

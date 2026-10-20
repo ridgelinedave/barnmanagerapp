@@ -1,7 +1,6 @@
 import { TabPage } from "@/components/TabPage";
 import { SectionHeader } from "@/components/ui/primitives";
-import { ListRow } from "@/components/ui/ListRow";
-import { Icon } from "@/components/ui/Icon";
+import { ListRow, RowList } from "@/components/ui/ListRow";
 import { EmptyState } from "@/components/ui/primitives";
 import { currentRole } from "@/lib/guard";
 import { featureEnabled } from "@/config/barn";
@@ -41,18 +40,11 @@ function Group({ group, role }: { group: DestinationGroup; role: Role }) {
   return (
     <section className="flex flex-col gap-3">
       <SectionHeader title={group.title} />
-      {live.map((entry) => (
-        <ListRow
-          key={entry.href}
-          href={entry.href}
-          title={entry.title}
-          leading={
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-control bg-sunk text-muted lg:size-7 lg:bg-transparent">
-              <Icon name={entry.icon} className="size-5 lg:size-4" />
-            </span>
-          }
-        />
-      ))}
+      <RowList>
+        {live.map((entry) => (
+          <ListRow key={entry.href} href={entry.href} title={entry.title} />
+        ))}
+      </RowList>
     </section>
   );
 }
@@ -67,7 +59,7 @@ export default async function BarnPage() {
   );
 
   return (
-    <TabPage title="Barn">
+    <TabPage density="tight" title="Barn">
       {anything ? (
         BARN_GROUPS.map((group) => <Group key={group.title} group={group} role={role} />)
       ) : (

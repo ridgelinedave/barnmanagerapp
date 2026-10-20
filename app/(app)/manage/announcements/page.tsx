@@ -46,7 +46,7 @@ export default async function ManageAnnouncementsPage({
   const shown = filterAnnouncements(announcements, filter);
 
   return (
-    <TabPage title="Announcements" back="/barn">
+    <TabPage density="tight" title="Announcements" back="/barn">
       <AnnouncementFilterChips
         active={filter}
         hrefFor={(value) =>

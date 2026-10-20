@@ -1,4 +1,4 @@
-import { Card, Chip, ChipRow, EmptyState } from "@/components/ui/primitives";
+import { Chip, ChipRow, EmptyState } from "@/components/ui/primitives";
 import { DESKTOP_ONLY, DataTable, MOBILE_ONLY, type Row } from "@/components/ui/DataTable";
 import type { Punch } from "@/lib/types";
 import { flagsForPunch, FLAG_LABEL } from "@/lib/timeclock";
@@ -64,25 +64,21 @@ export function PunchList({
 
   return (
     <>
-      <ul className={`flex flex-col gap-2 ${MOBILE_ONLY}`}>
+      {/* A list, so editorial rows on the ground — a rule under each, no
+          card. The time is a number, so it is the condensed face. */}
+      <ul className={`flex flex-col ${MOBILE_ONLY}`}>
         {punches.map((punch) => {
           const flags = flagsForPunch(punch);
           const correction = punch.source === "admin_adjustment";
 
           return (
-            <Card
-              as="li"
-              key={punch.id}
-              // A correction sits on the sunk tile with its chip: different
-              // enough to see, without the accent tint it used to wear.
-              className={`p-3 ${correction ? "bg-sunk" : ""}`}
-            >
+            <li key={punch.id} className="border-b border-rule py-2.5">
               <div className="flex items-baseline gap-2">
                 {/* Direction as a word, not just a colour — this is a pay record. */}
-                <span className="font-display text-heading text-ink">
+                <span className="w-9 font-condensed text-label font-semibold uppercase tracking-[0.06em] text-muted">
                   {punch.direction === "in" ? "In" : "Out"}
                 </span>
-                <span className="text-body tabular-nums text-ink">
+                <span className="font-condensed text-heading font-semibold tabular-nums text-ink">
                   {timeFormatter.format(new Date(punch.punched_at))}
                 </span>
               </div>
@@ -102,7 +98,7 @@ export function PunchList({
               {showNotes && punch.note && (
                 <p className="mt-1.5 text-caption text-muted">{punch.note}</p>
               )}
-            </Card>
+            </li>
           );
         })}
       </ul>

@@ -91,7 +91,7 @@ export function EmployeeTimesheetCard({
     <Card as="article" className="flex flex-col gap-3 p-4">
       <div className="flex items-baseline gap-3">
         <h3 className="min-w-0 flex-1 font-display text-heading text-ink">{name}</h3>
-        <span className="font-display text-title leading-none text-ink">
+        <span className="font-condensed text-title font-semibold leading-none text-ink">
           {formatMinutes(minutes)}
         </span>
       </div>

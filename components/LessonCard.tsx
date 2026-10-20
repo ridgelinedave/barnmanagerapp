@@ -29,7 +29,7 @@ export function LessonCard({
        */}
       <div className="flex items-baseline gap-2">
         <span
-          className={`font-display text-title leading-none ${
+          className={`font-condensed text-title font-semibold leading-none ${
             cancelled ? "text-muted line-through" : "text-ink"
           }`}
         >

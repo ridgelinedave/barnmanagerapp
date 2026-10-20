@@ -3,7 +3,6 @@ import { StubScreen } from "@/components/StubScreen";
 import { TaskCard } from "@/components/TaskCard";
 import { EmptyState, SectionHeader } from "@/components/ui/primitives";
 import { ListRow } from "@/components/ui/ListRow";
-import { Icon } from "@/components/ui/Icon";
 import { requireTab } from "@/lib/guard";
 import { listTasksForDate } from "@/lib/tasks";
 import { barnToday, formatBarnDayLabel } from "@/lib/dates";
@@ -16,7 +15,7 @@ export default async function TasksPage() {
 
   if (!featureEnabled("tasks")) {
     return (
-      <TabPage title="Tasks">
+      <TabPage density="tight" title="Tasks">
         <StubScreen heading="Today's tasks" phase="Phase 1" />
       </TabPage>
     );
@@ -30,16 +29,11 @@ export default async function TasksPage() {
   const done = tasks.filter((t) => t.status === "done");
 
   return (
-    <TabPage title="Tasks">
+    <TabPage density="tight" title="Tasks">
       {featureEnabled("horses") && (
         <ListRow
           href="/tasks/feed"
           title="Feed board"
-          leading={
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-control bg-sunk text-muted lg:size-7 lg:bg-transparent">
-              <Icon name="bucket" className="size-5 lg:size-4" />
-            </span>
-          }
         />
       )}
 

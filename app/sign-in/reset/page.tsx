@@ -17,7 +17,7 @@ export const metadata = { title: "Password reset" };
 export default function ResetPage() {
   return (
     <main className="flex min-h-dvh flex-col justify-center bg-deep px-7 text-white">
-      <h1 className="font-display text-[1.75rem] font-semibold uppercase tracking-[0.08em]">
+      <h1 className="font-display text-[1.75rem] uppercase tracking-[0.08em]">
         Password reset
       </h1>
       <p className="mt-3 text-body text-white/70">
@@ -29,7 +29,7 @@ export default function ResetPage() {
         className="
           mt-8 flex h-[3.25rem] items-center justify-center rounded-[0.3125rem]
           border border-white/[0.16] bg-white/[0.05]
-          font-display text-[1.0625rem] font-bold uppercase tracking-[0.11em] text-white
+          font-condensed text-[1.0625rem] font-bold uppercase tracking-[0.11em] text-white
           transition-colors active:bg-white/[0.1]
         "
       >

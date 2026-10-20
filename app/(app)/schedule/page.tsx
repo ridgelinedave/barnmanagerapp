@@ -172,7 +172,7 @@ async function DayBody({ date, role }: { date: string; role: Role }) {
             {formatBarnDayLabel(date)}
           </span>
           {isToday ? (
-            <span className="font-sans text-micro uppercase text-muted">Today</span>
+            <span className="font-condensed text-micro uppercase text-muted">Today</span>
           ) : (
             <Link href="/schedule" className="text-caption text-ink underline underline-offset-2">
               Back to today

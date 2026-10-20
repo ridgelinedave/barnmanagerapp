@@ -26,7 +26,7 @@ export default async function TurnoutPage() {
 
   if (board.length === 0) {
     return (
-      <TabPage title="Turnout" back="/barn">
+      <TabPage density="tight" title="Turnout" back="/barn">
         <EmptyState title="No horses yet" />
       </TabPage>
     );
@@ -36,7 +36,7 @@ export default async function TurnoutPage() {
   const missing = board.filter((row) => !row.plan);
 
   return (
-    <TabPage title="Turnout" back="/barn">
+    <TabPage density="tight" title="Turnout" back="/barn">
       <section className="flex flex-col gap-3">
         <SectionHeader title="Today" count={`${planned.length} of ${board.length}`} />
 

@@ -11,16 +11,17 @@ import type { Role } from "@/lib/types";
  * It was charcoal to match the old dark header. Both are white now — the app
  * is one continuous light surface, and the accent is the only colour on it.
  *
- * The active tab gets a tinted pill behind the icon AND an accent label AND a
- * weight change — three signals, because "the active one is a slightly
- * different grey" is how people end up unsure which screen they are on.
+ * THE ACTIVE TAB (2026-10-19): a 2px oxblood rule along the TOP edge of the
+ * tab (accent, 11.18:1 on white) plus an oxblood label (accent-text, 15.85:1)
+ * and a heavier icon stroke. The tinted pill behind the icon is gone — a
+ * rounded wash of colour under a glyph was the generated look.
  *
- * THE INACTIVE LABEL IS NOT PALE GREY. The Monarch mockup uses #B7B4AC, which
- * measures 2.07:1 on white; a nav label you cannot read is a nav you navigate
- * by position. It uses `muted` (6.34:1) instead, and the active/inactive
- * distinction is carried by colour, weight and the pill together.
+ * INACTIVE: icons lighter (muted at 75%, 3.57:1 on white — above the 3:1 a
+ * meaningful glyph needs), labels stay `muted` (6.34:1). A label you cannot
+ * read is a nav you navigate by position, so the LABEL is never the light one.
  *
- * Max 5 tabs; every target is 56px tall and a full fifth of the width.
+ * Max 5 tabs; every target is 48px tall (44px floor) and a full fifth of the
+ * width. Icons 20px, labels the condensed face at 12px.
  *
  * MOBILE SHELL ONLY. From the `lg` breakpoint the desktop sidebar takes over
  * (components/Sidebar.tsx) and this bar is not rendered visibly at all.
@@ -42,14 +43,10 @@ export function TabBar({ role }: { role: Role }) {
               <Link
                 href={tab.href}
                 aria-current={active ? "page" : undefined}
-                className="flex min-h-14 flex-col items-center justify-center gap-1 px-1 py-2"
+                className="relative flex min-h-12 flex-col items-center justify-center gap-0.5 px-1 py-1.5"
               >
-                <span
-                  className={`flex h-7 w-12 items-center justify-center rounded-chip transition-colors duration-150 ease-out ${
-                    active ? "bg-accent-tint" : "bg-transparent"
-                  }`}
-                >
-                  <svg
+                {active && <span aria-hidden="true" className="absolute inset-x-3 -top-px h-0.5 bg-accent" />}
+                <svg
                     aria-hidden="true"
                     viewBox="0 0 24 24"
                     fill="none"
@@ -57,13 +54,12 @@ export function TabBar({ role }: { role: Role }) {
                     strokeWidth={active ? 2 : 1.6}
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    className={`size-6 ${active ? "text-accent-text" : "text-muted"}`}
+                    className={`size-5 ${active ? "text-accent-text" : "text-muted/75"}`}
                   >
                     <path d={tab.icon} />
                   </svg>
-                </span>
                 <span
-                  className={`truncate text-[0.6875rem] leading-none ${
+                  className={`truncate font-condensed text-[0.75rem] leading-none ${
                     active ? "font-semibold text-accent-text" : "font-medium text-muted"
                   }`}
                 >

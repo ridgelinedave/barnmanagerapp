@@ -87,7 +87,7 @@ export function BackfillOfferCard({
         </span>
 
         <div className="min-w-0 flex-1">
-          <p className="font-sans text-micro uppercase text-muted">
+          <p className="font-condensed text-micro uppercase text-muted">
             {resolved ? "Backfill spot" : "A spot opened up"}
           </p>
           <h3 className="mt-0.5 font-display text-heading text-ink">{riderName}</h3>

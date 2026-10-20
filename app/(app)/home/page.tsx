@@ -3,6 +3,8 @@ import { StubScreen } from "@/components/StubScreen";
 import { InstallPrompt } from "@/components/InstallPrompt";
 import { AnnouncementFeed } from "@/components/AnnouncementFeed";
 import { BackfillOfferCard } from "@/components/BackfillOfferCard";
+import { TimeClock } from "@/components/TimeClock";
+import { roleCanAccess } from "@/lib/nav";
 import { Board, Chip, ChipRow, EmptyState, SectionHeader } from "@/components/ui/primitives";
 import { currentRole } from "@/lib/guard";
 import { listAnnouncements } from "@/lib/announcements";
@@ -75,15 +77,15 @@ export default async function HomePage() {
                     aria-hidden="true"
                     className="flex size-12 shrink-0 flex-col items-center justify-center gap-0.5 rounded-control border border-line bg-sunk leading-none"
                   >
-                    <span className="font-sans text-micro uppercase text-muted">
+                    <span className="font-condensed text-micro uppercase text-muted">
                       {formatBarnDayLabel(nextLesson.date).split(",")[0]}
                     </span>
-                    <span className="font-display text-heading font-bold text-ink">
+                    <span className="font-condensed text-heading font-bold text-ink">
                       {nextLesson.date.slice(-2)}
                     </span>
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="font-display text-heading text-ink">
+                    <p className="font-condensed text-title font-semibold text-ink">
                       {formatTime(nextLesson.start_time)}
                     </p>
                     <p className="mt-0.5 text-caption text-muted">
@@ -119,6 +121,10 @@ export default async function HomePage() {
         </>
       ) : (
         <>
+          {/* Staff: the time clock is the top card — one tap from launch. The
+              same TimeClock as My timesheet and /clock. */}
+          {featureEnabled("clockIn") && roleCanAccess(role, "/clock") && <TimeClock />}
+
           {featureEnabled("announcements") && (
             <section className="flex flex-col gap-3">
               <SectionHeader

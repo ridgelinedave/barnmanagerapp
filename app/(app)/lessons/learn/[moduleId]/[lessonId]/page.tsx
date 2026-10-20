@@ -58,7 +58,7 @@ export default async function LearningLessonPage({
         <div className="flex min-w-0 flex-col gap-5">
           <VideoPlayer playback={playback} title={lesson.title} />
 
-          <p className="font-sans text-micro uppercase text-muted">
+          <p className="font-condensed text-micro uppercase text-muted">
             Lesson {index + 1} of {lessons.length}
             {duration ? ` · ${duration}` : ""}
           </p>
@@ -121,7 +121,7 @@ export default async function LearningLessonPage({
               {previous && (
                 <Link
                   href={`/lessons/learn/${module.id}/${previous.id}`}
-                  className="flex min-h-11 flex-1 items-center gap-1.5 rounded-control border border-line bg-surface px-3 text-label font-semibold text-ink lg:min-h-9 lg:text-table"
+                  className="flex min-h-11 flex-1 items-center gap-1.5 rounded-control border border-ink/50 px-3 text-label font-semibold text-ink lg:hover:bg-surface lg:min-h-9 lg:text-table"
                 >
                   <Icon name="back" className="size-4 shrink-0" strokeWidth={2} />
                   Previous
@@ -130,7 +130,7 @@ export default async function LearningLessonPage({
               {next && (
                 <Link
                   href={`/lessons/learn/${module.id}/${next.id}`}
-                  className="flex min-h-11 flex-1 items-center justify-end gap-1.5 rounded-control border border-line bg-surface px-3 text-label font-semibold text-ink lg:min-h-9 lg:text-table"
+                  className="flex min-h-11 flex-1 items-center justify-end gap-1.5 rounded-control border border-ink/50 px-3 text-label font-semibold text-ink lg:hover:bg-surface lg:min-h-9 lg:text-table"
                 >
                   Next
                   <Icon name="arrow" className="size-4 shrink-0" strokeWidth={2} />

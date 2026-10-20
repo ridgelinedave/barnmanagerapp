@@ -35,7 +35,7 @@ export async function StudentsView() {
   }));
 
   return (
-    <TabPage title="Lessons" tabs={<LessonsSegments role={role} current="/lessons" />}>
+    <TabPage density="tight" title="Lessons" tabs={<LessonsSegments role={role} current="/lessons" />}>
       {byDay.map((day) => (
         <section key={day.name} className="flex flex-col gap-2">
           <SectionHeader
@@ -51,7 +51,7 @@ export async function StudentsView() {
             day.slots.map((template) => (
               <Card key={template.id} className={`p-4 ${template.active ? "" : "bg-sunk"}`}>
                 <div className="flex items-baseline gap-2">
-                  <span className="font-display text-title leading-none text-ink">
+                  <span className="font-condensed text-title font-semibold leading-none text-ink">
                     {formatTime(template.start_time)}
                   </span>
                   <span className="text-caption text-muted">

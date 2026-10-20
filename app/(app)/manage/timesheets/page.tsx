@@ -14,9 +14,9 @@ import {
   type Row,
 } from "@/components/ui/DataTable";
 import { SubTabs } from "@/components/ui/SubTabs";
-import { Avatar } from "@/components/ui/ListRow";
+import { Avatar, ROW, ROW_META, ROW_TITLE, RowList } from "@/components/ui/ListRow";
 import { Card, Chip, EmptyState, SectionHeader } from "@/components/ui/primitives";
-import { Button } from "@/components/ui/Button";
+import { Button, buttonClass } from "@/components/ui/Button";
 import { SheetTrigger } from "@/components/ui/Sheet";
 import { requireTab } from "@/lib/guard";
 import { listPunchesBetween, listPayPeriods, listApprovals } from "@/lib/punches";
@@ -216,7 +216,7 @@ export default async function ManageTimesheetsPage({
     ) : null;
 
   return (
-    <TabPage
+    <TabPage density="tight"
       title="Clock-ins and timesheets"
       back="/barn"
       layout="wide"
@@ -241,20 +241,20 @@ export default async function ManageTimesheetsPage({
         {onClock.length === 0 ? (
           <EmptyState title="Nobody clocked in" />
         ) : (
-          <Card className="flex flex-col gap-3 p-4">
+          <RowList>
             {onClock.map((person) => (
-              <div key={person.profileId} className="flex items-center gap-3">
-                <Avatar name={person.name} size="sm" />
+              <div key={person.profileId} className={ROW}>
+                <Avatar name={person.name} />
                 <div className="min-w-0 flex-1">
-                  <p className="font-display text-heading leading-snug text-ink">{person.name}</p>
-                  <p className="mt-0.5 text-caption text-muted">
+                  <p className={`${ROW_TITLE} text-ink`}>{person.name}</p>
+                  <p className={ROW_META}>
                     In at {clockFormatter.format(new Date(person.since))}
                   </p>
                 </div>
                 <Chip value={formatMinutes(person.minutes)} icon="clock" tone="forest" />
               </div>
             ))}
-          </Card>
+          </RowList>
         )}
       </section>
 
@@ -281,7 +281,7 @@ export default async function ManageTimesheetsPage({
             <div className="mt-3 flex flex-wrap gap-2">
               <a
                 href={`/manage/timesheets/export?period=${period.id}`}
-                className="inline-flex min-h-12 flex-1 items-center justify-center rounded-control border border-line bg-surface px-4 text-label font-semibold text-ink"
+                className={buttonClass("secondary")}
               >
                 Export CSV
               </a>

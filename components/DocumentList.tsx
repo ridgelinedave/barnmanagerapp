@@ -1,11 +1,11 @@
-import { Card } from "@/components/ui/primitives";
 import { Button } from "@/components/ui/Button";
-import { Icon } from "@/components/ui/Icon";
+import { ROW, ROW_META, ROW_TITLE } from "@/components/ui/ListRow";
 import { deleteHorseDocument } from "@/app/(app)/manage/horses/documents-actions";
 import { formatBytes, type StoredDocument } from "@/lib/documents";
 
 /**
- * The documents on a horse, as cards with a download and (for the barn) a
+ * The documents on a horse, as editorial rows (name in Marcellus, size in the
+ * condensed face, a rule under each) with a download and, for the barn, a
  * delete.
  *
  * There is no role branch deciding what to SHOW: the list itself arrives
@@ -26,41 +26,31 @@ export function DocumentList({
 }) {
   if (documents.length === 0) {
     return (
-      <p className="rounded-card border border-line bg-surface p-4 text-caption text-muted">
-        {emptyMessage}
-      </p>
+      <p className="text-label text-muted">{emptyMessage}</p>
     );
   }
 
   return (
-    <ul className="flex flex-col gap-3">
+    <ul className="flex flex-col">
       {documents.map((doc) => (
-        <Card
-          as="li"
-          key={doc.path}
-          className="flex min-h-16 items-center gap-3 p-4"
-        >
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-control bg-sunk text-muted">
-            <Icon name="document" className="size-5" />
-          </span>
-
+        <li key={doc.path} className={ROW}>
           <span className="min-w-0 flex-1">
             {doc.url ? (
               <a
                 href={doc.url}
                 target="_blank"
                 rel="noreferrer"
-                className="block break-words font-display text-heading leading-snug text-ink underline underline-offset-4"
+                className={`${ROW_TITLE} break-words text-ink underline underline-offset-4`}
               >
                 {doc.name}
               </a>
             ) : (
-              <span className="block break-words font-display text-heading leading-snug text-ink">
+              <span className={`${ROW_TITLE} break-words text-ink`}>
                 {doc.name}
               </span>
             )}
             {formatBytes(doc.sizeBytes) && (
-              <span className="mt-0.5 block text-caption text-muted">
+              <span className={ROW_META}>
                 {formatBytes(doc.sizeBytes)}
               </span>
             )}
@@ -75,7 +65,7 @@ export function DocumentList({
               </Button>
             </form>
           )}
-        </Card>
+        </li>
       ))}
     </ul>
   );

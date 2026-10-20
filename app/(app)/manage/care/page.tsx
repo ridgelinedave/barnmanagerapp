@@ -2,7 +2,7 @@ import { TabPage } from "@/components/TabPage";
 import { StubScreen } from "@/components/StubScreen";
 import { SendCareDigestButton } from "@/components/CareLogForm";
 import { Card, Chip, ChipRow, EmptyState, SectionHeader } from "@/components/ui/primitives";
-import { ListRow } from "@/components/ui/ListRow";
+import { Avatar, ListRow, RowList } from "@/components/ui/ListRow";
 import {
   DESKTOP_ONLY,
   DataTable,
@@ -96,11 +96,13 @@ export default async function ManageCarePage({
           {overdue.length > 0 && (
             <section className="flex flex-col gap-3">
               <SectionHeader title="Overdue" count={`${overdue.length}`} />
+              <RowList>
               {overdue.map(({ event, horse }) => (
                 <ListRow
                   key={event.id}
                   href={`/manage/horses/${horse.id}`}
                   title={horse.name}
+                  leading={<Avatar name={horse.name} src={horse.photo_url} />}
                   meta={`${CARE_TYPE_LABELS[event.type]} · due ${formatBarnDayLabel(event.due_next!)}`}
                   chips={
                     <ChipRow>
@@ -109,17 +111,20 @@ export default async function ManageCarePage({
                   }
                 />
               ))}
+              </RowList>
             </section>
           )}
 
           {soon.length > 0 && (
             <section className="flex flex-col gap-3">
               <SectionHeader title="Coming up" count={`${soon.length}`} />
+              <RowList>
               {soon.map(({ event, horse }) => (
                 <ListRow
                   key={event.id}
                   href={`/manage/horses/${horse.id}`}
                   title={horse.name}
+                  leading={<Avatar name={horse.name} src={horse.photo_url} />}
                   meta={`${CARE_TYPE_LABELS[event.type]} · due ${formatBarnDayLabel(event.due_next!)}`}
                   chips={
                     <ChipRow>
@@ -128,6 +133,7 @@ export default async function ManageCarePage({
                   }
                 />
               ))}
+              </RowList>
             </section>
           )}
           </div>

@@ -30,7 +30,7 @@ function Meal({ plan }: { plan: FeedPlan }) {
   return (
     <section className="pt-4">
       <div className="mb-2 flex items-center gap-2.5">
-        <h2 className="font-display text-[0.9375rem] font-semibold uppercase tracking-[0.14em] text-ink">
+        <h2 className="font-condensed text-[0.9375rem] font-semibold uppercase tracking-[0.14em] text-ink">
           {MEAL_LABELS[plan.meal]}
         </h2>
         <span aria-hidden="true" className="h-px flex-1 bg-line" />
@@ -78,7 +78,7 @@ export function FeedChart({
             <div className="flex size-full items-end p-4">
               <span
                 aria-hidden="true"
-                className="font-display text-[2.5rem] font-bold leading-none tracking-[0.04em] text-ink/20"
+                className="font-display text-[2.5rem] leading-none tracking-[0.04em] text-ink/20"
               >
                 {horseInitials(horse)}
               </span>
@@ -86,7 +86,7 @@ export function FeedChart({
           )}
         </div>
 
-        <h1 className="font-display text-[1.875rem] font-bold uppercase leading-none tracking-[0.03em] text-ink">
+        <h1 className="font-display text-[1.875rem] uppercase leading-none tracking-[0.03em] text-ink">
           {horse.barn_name || horse.name}
         </h1>
         {subtitle && <p className="mt-1.5 text-caption text-muted">{subtitle}</p>}

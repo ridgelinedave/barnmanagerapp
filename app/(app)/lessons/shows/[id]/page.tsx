@@ -200,7 +200,7 @@ export default async function ShowDetailPage({ params }: { params: Promise<{ id:
                 </span>
                 {entry.ride_time && (
                   <span className="shrink-0 text-right">
-                    <span className="block font-display text-heading tabular-nums text-ink">
+                    <span className="block font-condensed text-heading font-semibold tabular-nums text-ink">
                       {rideTimeLabel(entry.ride_time)}
                     </span>
                     {/* The day only earns its line on a show that spans one —
@@ -295,7 +295,7 @@ export default async function ShowDetailPage({ params }: { params: Promise<{ id:
                   )}
                   {/* Placing is the fact people look for, so it is the loud one.
                       An unplaced ride says so in words rather than showing a gap. */}
-                  <span className="shrink-0 font-display text-heading tabular-nums text-ink">
+                  <span className="shrink-0 font-condensed text-heading font-semibold tabular-nums text-ink">
                     {result.placing === null ? "—" : ordinal(result.placing)}
                   </span>
                 </div>

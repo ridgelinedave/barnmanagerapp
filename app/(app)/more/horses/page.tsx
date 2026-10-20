@@ -1,5 +1,6 @@
 import { TabPage } from "@/components/TabPage";
 import { StubScreen } from "@/components/StubScreen";
+import { RowList } from "@/components/ui/ListRow";
 import { HorseBasicsCard, HorseCard } from "@/components/HorseCard";
 import { EmptyState, SectionHeader } from "@/components/ui/primitives";
 import { currentRole } from "@/lib/guard";
@@ -27,7 +28,7 @@ export default async function HorseDirectoryPage() {
 
   if (!featureEnabled("horses")) {
     return (
-      <TabPage title="Horses">
+      <TabPage density="tight" title="Horses">
         <StubScreen heading="Horses" phase="Phase 2" />
       </TabPage>
     );
@@ -37,24 +38,28 @@ export default async function HorseDirectoryPage() {
     const [owned, ridden] = await Promise.all([listHorses(), basicsForFamily()]);
 
     return (
-      <TabPage title="Horses" back="/more">
+      <TabPage density="tight" title="Horses" back="/more">
         {/* Only rendered when the family actually owns one — a section with
             nothing in it does not render. */}
         {owned.length > 0 && (
           <section className="flex flex-col gap-3">
             <SectionHeader title="Your horses" />
-            {owned.map((horse) => (
-              <HorseCard key={horse.id} horse={horse} href={`/more/horses/${horse.id}`} />
-            ))}
+            <RowList>
+              {owned.map((horse) => (
+                <HorseCard key={horse.id} horse={horse} href={`/more/horses/${horse.id}`} />
+              ))}
+            </RowList>
           </section>
         )}
 
         {ridden.length > 0 && (
           <section className="flex flex-col gap-3">
             <SectionHeader title="Horses ridden" />
-            {ridden.map((horse) => (
-              <HorseBasicsCard key={horse.id} horse={horse} />
-            ))}
+            <RowList>
+              {ridden.map((horse) => (
+                <HorseBasicsCard key={horse.id} horse={horse} />
+              ))}
+            </RowList>
             <p className="text-caption text-muted">
               Records stay with each horse&apos;s owner.
             </p>
@@ -75,14 +80,15 @@ export default async function HorseDirectoryPage() {
     role === "admin" ? `/manage/horses/${id}` : `/more/horses/${id}`;
 
   return (
-    <TabPage title="Horses" back="/more">
+    <TabPage density="tight" title="Horses" back="/more">
       <section className="flex flex-col gap-3">
         <SectionHeader title="In work" count={`${inWork.length}`} />
 
         {inWork.length === 0 ? (
           <EmptyState title="No horses yet" />
         ) : (
-          inWork.map((horse) => (
+          <RowList>
+          {inWork.map((horse) => (
             <HorseCard
               key={horse.id}
               horse={horse}
@@ -93,16 +99,19 @@ export default async function HorseDirectoryPage() {
                   : "Barn horse"
               }
             />
-          ))
+          ))}
+          </RowList>
         )}
       </section>
 
       {retired.length > 0 && (
         <section className="flex flex-col gap-3">
           <SectionHeader title="Retired" count={`${retired.length}`} />
-          {retired.map((horse) => (
-            <HorseCard key={horse.id} horse={horse} href={detailHref(horse.id)} />
-          ))}
+          <RowList>
+            {retired.map((horse) => (
+              <HorseCard key={horse.id} horse={horse} href={detailHref(horse.id)} />
+            ))}
+          </RowList>
         </section>
       )}
     </TabPage>

@@ -67,7 +67,7 @@ export function NotificationBell() {
         /* White carrying ink on the oxblood header (17:1), ink carrying white
            on the desktop's light page header. It was gold — gold is decorative
            only in this system, and a count is information. */
-        <span className="absolute right-0.5 top-1 min-w-5 rounded-chip bg-white px-1 text-center font-sans text-micro leading-5 text-ink tabular-nums lg:-right-1 lg:top-0 lg:bg-ink lg:text-white">
+        <span className="absolute right-0.5 top-1 min-w-5 rounded-chip bg-white px-1 text-center font-condensed text-micro leading-5 text-ink tabular-nums lg:-right-1 lg:top-0 lg:bg-ink lg:text-white">
           {unread > 99 ? "99+" : unread}
         </span>
       )}

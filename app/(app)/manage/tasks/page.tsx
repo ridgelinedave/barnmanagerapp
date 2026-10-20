@@ -32,7 +32,7 @@ export default async function ManageTasksPage() {
   const people = assignable.map((p) => ({ id: p.id, name: p.full_name ?? "Unnamed" }));
 
   return (
-    <TabPage title="Task list" back="/barn">
+    <TabPage density="tight" title="Task list" back="/barn">
       <section className="flex flex-col gap-3">
         <SectionHeader title={formatBarnDayLabel(today)} count={`${tasks.length} on the list`} />
         <GenerateTasksButton />

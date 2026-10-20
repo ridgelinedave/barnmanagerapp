@@ -62,7 +62,7 @@ function Banner({ summary }: { summary: ShowSummary }) {
 
       {show.pinned && (
         /* Solid surface under it so the label reads over any photo. */
-        <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-chip border border-line bg-surface px-1.5 py-0.5 font-sans text-micro uppercase text-ink">
+        <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-chip border border-line bg-surface px-1.5 py-0.5 font-condensed text-micro uppercase text-ink">
           <Icon name="pin" className="size-3" strokeWidth={2} />
           Pinned
         </span>
@@ -96,10 +96,10 @@ function DateBlock({ iso }: { iso: string }) {
     new Intl.DateTimeFormat("en-US", opts).format(new Date(`${iso}T12:00:00Z`));
   return (
     <span className="w-11 shrink-0 text-center">
-      <span className="block font-display text-eyebrow uppercase text-muted">
+      <span className="block font-condensed text-eyebrow uppercase text-muted">
         {at({ month: "short", timeZone: "UTC" })}
       </span>
-      <span className="block font-display text-title leading-none tabular-nums text-ink">
+      <span className="block font-condensed text-title font-semibold leading-none tabular-nums text-ink">
         {at({ day: "numeric", timeZone: "UTC" })}
       </span>
     </span>
@@ -138,11 +138,11 @@ function NextUpRow({ summary, isBarn }: { summary: ShowSummary; isBarn: boolean 
        * it reads as an instruction rather than a control.
        */}
       {isBarn ? (
-        <span className="shrink-0 rounded-chip border border-muted/60 px-1.5 py-0.5 font-sans text-micro uppercase text-muted">
+        <span className="shrink-0 rounded-chip border border-muted/60 px-1.5 py-0.5 font-condensed text-micro uppercase text-muted">
           Roster
         </span>
       ) : mine ? (
-        <span className="shrink-0 rounded-chip border border-muted/60 px-1.5 py-0.5 font-sans text-micro uppercase text-muted">
+        <span className="shrink-0 rounded-chip border border-muted/60 px-1.5 py-0.5 font-condensed text-micro uppercase text-muted">
           My rides
         </span>
       ) : (

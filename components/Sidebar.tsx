@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { barn } from "@/config/barn";
 import { Icon } from "@/components/ui/Icon";
+import { initialOf } from "@/components/ui/ListRow";
 import { currentHref, type SidebarIcon, type SidebarLink, type SidebarModel } from "@/lib/nav";
 
 /**
@@ -64,7 +65,7 @@ export function Sidebar({
         {model.sections.map((section, index) => (
           <div key={section.title ?? `section-${index}`} className={index === 0 ? "" : "pt-5"}>
             {section.title && (
-              <h2 className="px-4 pb-1 font-sans text-micro uppercase text-muted">{section.title}</h2>
+              <h2 className="px-4 pb-1 font-condensed text-micro uppercase text-muted">{section.title}</h2>
             )}
             <ul className="flex flex-col">
               {section.links.map((link) => (
@@ -81,13 +82,13 @@ export function Sidebar({
         <div className="flex items-center gap-2.5 px-4 pb-2">
           <span
             aria-hidden="true"
-            className="flex size-8 shrink-0 items-center justify-center rounded-avatar border border-line bg-sunk font-display text-label font-bold text-ink"
+            className="flex size-8 shrink-0 items-center justify-center rounded-full bg-accent-tint font-display text-label text-accent-text"
           >
-            {account.name.trim().charAt(0).toUpperCase() || "?"}
+            {initialOf(account.name)}
           </span>
           <span className="min-w-0 flex-1">
             <span className="block truncate text-table font-semibold text-ink">{account.name}</span>
-            <span className="block truncate text-micro normal-case tracking-normal text-muted">
+            <span className="block truncate font-condensed text-micro normal-case tracking-normal text-muted">
               <span className="capitalize">{account.detail}</span>
             </span>
           </span>

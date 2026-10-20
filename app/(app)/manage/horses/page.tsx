@@ -134,7 +134,7 @@ export default async function ManageHorsesPage({
           <EmptyState title="No horses yet" />
         ) : (
           <>
-            <div className={`flex flex-col gap-3 ${MOBILE_ONLY}`}>
+            <div className={`flex flex-col ${MOBILE_ONLY}`}>
               {inWork.map((horse) => (
                 <HorseCard
                   key={horse.id}
@@ -154,7 +154,7 @@ export default async function ManageHorsesPage({
       {retired.length > 0 && (
         <section className="flex flex-col gap-3">
           <SectionHeader title="Retired" count={`${retired.length}`} />
-          <div className={`flex flex-col gap-3 ${MOBILE_ONLY}`}>
+          <div className={`flex flex-col ${MOBILE_ONLY}`}>
             {retired.map((horse) => (
               <HorseCard
                 key={horse.id}

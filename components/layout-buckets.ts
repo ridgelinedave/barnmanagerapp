@@ -36,24 +36,35 @@ export const BUCKET_FRAME: Record<LayoutBucket, string> = {
 
 /**
  * Density — the vertical rhythm between blocks. Identical padding everywhere
- * is what makes a screen feel machine-made, so a screen says which it is:
+ * is what makes a screen feel machine-made, so a screen says which it is.
  *
- *   tight   a list of things to scan (tables, rosters, supply lists)
- *   normal  the default
- *   airy    a record about one thing (a horse's profile, a show)
+ * THE SCALE (2026-10-19), on a 4px base, used in these steps only:
+ *   4 · 8 · 12 · 16 · 24 · 32 · 40
+ *
+ *   within a row      title → meta 2px; row padding 10px; a row is 56px on a
+ *                     phone, 44px on a desk; rows butt, divided by the rule
+ *   within a section  heading → content 12px (`gap-3`)
+ *   between sections  tight 16px · normal 24px · airy 32px (40px on a desk)
+ *   page              16px under the header (24px on a desk); 96px above the
+ *                     48px tab bar and the home indicator
+ *
+ *   tight   a list of things to scan — every tab landing, rosters, supplies,
+ *           horses, tasks, timesheets, the Academy
+ *   normal  forms and mixed screens
+ *   airy    a record about one thing (a horse's profile, a show, a lesson)
  */
 export type Density = "tight" | "normal" | "airy";
 
 export const DENSITY_GAP: Record<Density, string> = {
-  tight: "gap-3 lg:gap-4",
-  normal: "gap-5",
-  airy: "gap-7 lg:gap-9",
+  tight: "gap-4",
+  normal: "gap-6",
+  airy: "gap-8 lg:gap-10",
 };
 
 /**
- * The page body. `pb-28` clears the 56px tab bar plus the home indicator; on
+ * The page body. `pb-24` clears the 48px tab bar plus the home indicator; on
  * the desktop shell there is no tab bar, so the bottom padding drops back.
  */
 export function bucketMainClass(layout: LayoutBucket): string {
-  return `mx-auto w-full ${BUCKET_FRAME[layout]} flex-1 pb-28 pt-5 lg:pb-12 lg:pt-6`;
+  return `mx-auto w-full ${BUCKET_FRAME[layout]} flex-1 pb-24 pt-4 lg:pb-12 lg:pt-6`;
 }

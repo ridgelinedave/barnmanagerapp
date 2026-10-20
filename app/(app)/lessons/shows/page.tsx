@@ -17,7 +17,7 @@ export default async function ShowsPage() {
 
   if (!featureEnabled("shows")) {
     return (
-      <TabPage title="Lessons" tabs={tabs}>
+      <TabPage density="tight" title="Lessons" tabs={tabs}>
         <StubScreen heading="Shows" phase="Phase 2" />
       </TabPage>
     );
@@ -32,7 +32,7 @@ export default async function ShowsPage() {
 
   if (all.length === 0) {
     return (
-      <TabPage title="Lessons" action={action} tabs={tabs}>
+      <TabPage density="tight" title="Lessons" action={action} tabs={tabs}>
         <EmptyState title="No shows yet" />
       </TabPage>
     );
@@ -41,7 +41,7 @@ export default async function ShowsPage() {
   const { upcoming, results, pinned } = splitShows(all);
 
   return (
-    <TabPage title="Lessons" action={action} tabs={tabs}>
+    <TabPage density="tight" title="Lessons" action={action} tabs={tabs}>
       <ShowsHub
         upcoming={upcoming}
         results={results}

@@ -1,5 +1,7 @@
 import { TabPage } from "@/components/TabPage";
 import { PunchList } from "@/components/PunchList";
+import { TimeClock } from "@/components/TimeClock";
+import { roleCanAccess } from "@/lib/nav";
 import { Card, EmptyState, SectionHeader } from "@/components/ui/primitives";
 import { currentRole } from "@/lib/guard";
 import { redirect } from "next/navigation";
@@ -38,7 +40,11 @@ export default async function TimesheetPage() {
   const days = [...byDay.entries()].sort((a, b) => b[0].localeCompare(a[0]));
 
   return (
-    <TabPage title="My timesheet" back="/more">
+    <TabPage density="tight" title="My timesheet" back="/more">
+      {/* The time clock at the top of your own hours — the same component and
+          state as Home and /clock. Only for a role that punches. */}
+      {roleCanAccess(role, "/clock") && <TimeClock />}
+
       {approvals.length > 0 && (
         <section className="flex flex-col gap-2">
           <SectionHeader title="Approved" />
@@ -51,7 +57,7 @@ export default async function TimesheetPage() {
                     ? `${formatBarnDayLabel(period.start_date)} – ${formatBarnDayLabel(period.end_date)}`
                     : "Pay period"}
                 </span>
-                <span className="font-display text-heading text-ink">
+                <span className="font-condensed text-heading font-semibold text-ink">
                   {formatMinutes(approval.total_minutes)}
                 </span>
               </Card>

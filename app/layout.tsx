@@ -1,15 +1,24 @@
 import type { Metadata, Viewport } from "next";
-import { Barlow, Barlow_Condensed, Cinzel } from "next/font/google";
+import { Barlow, Barlow_Condensed, Cinzel, Marcellus } from "next/font/google";
 import type { CSSProperties } from "react";
 import "./globals.css";
 import { barn, monarch } from "@/config/barn";
 import { ServiceWorkerRegistrar } from "@/components/ServiceWorkerRegistrar";
 
 /**
- * The typefaces.
+ * The typefaces — THREE FACES, EACH WITH ONE JOB (2026-10-19).
  *
- * Barlow Condensed for anything that announces (screen titles, card titles,
- * board labels) and Barlow for anything that is read. Both are SIL Open Font
+ *   Marcellus          screen titles, section headings, and the proper nouns:
+ *                      module, horse, rider and show names. The things read
+ *                      first. The brand is Roman capitals; an app with no
+ *                      serif in it read as a generic sporty app with a nice
+ *                      logo on the sign-in screen.
+ *   Barlow Condensed   scaffolding only: small-caps labels, table headers,
+ *                      chips, numbers, metadata, button labels. It was the
+ *                      heading face, and at heading size it reads athletic.
+ *   Barlow             body copy and form inputs. Nothing else.
+ *
+ * All SIL Open Font
  * License and both are SELF-HOSTED by next/font — the files are served from
  * this origin, so there is no Google request, no third-party cookie, and the
  * installed PWA still renders correctly with no network at all.
@@ -21,6 +30,14 @@ import { ServiceWorkerRegistrar } from "@/components/ServiceWorkerRegistrar";
  * every Next.js app ships with by default, which is most of why this app read
  * as generated rather than made.
  */
+/** One weight: Marcellus is drawn at 400 only. Never ask it for bold. */
+const marcellus = Marcellus({
+  variable: "--font-marcellus",
+  subsets: ["latin"],
+  weight: ["400"],
+  display: "swap",
+});
+
 const barlowCondensed = Barlow_Condensed({
   variable: "--font-barlow-condensed",
   subsets: ["latin"],
@@ -42,7 +59,7 @@ const barlow = Barlow({
  * title someone reads forty times a day: all-caps by design, wide, and slow to
  * scan at small sizes. So it is loaded here but bound to exactly one component
  * (`components/Wordmark.tsx`) and to no heading style anywhere. App UI headings
- * stay Barlow Condensed.
+ * are Marcellus.
  *
  * Self-hosted like the others — no Google request, works offline in the PWA.
  */
@@ -127,6 +144,9 @@ const brandVars = {
   "--brand-danger": barn.brand.danger,
   "--brand-muted": barn.brand.muted,
   "--brand-line": barn.brand.line,
+  "--brand-rule": barn.brand.rule,
+  "--brand-page": barn.brand.page,
+  "--brand-gold-tint": barn.brand.goldTint,
   "--brand-gold-soft": barn.brand.goldSoft,
   "--brand-forest-soft": barn.brand.forestSoft,
   "--brand-danger-soft": barn.brand.dangerSoft,
@@ -137,7 +157,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html
       lang="en"
       style={brandVars}
-      className={`${barlow.variable} ${barlowCondensed.variable} ${cinzel.variable} h-full antialiased`}
+      className={`${barlow.variable} ${barlowCondensed.variable} ${marcellus.variable} ${cinzel.variable} h-full antialiased`}
     >
       <head>
         {APPLE_SPLASH.map((s) => (

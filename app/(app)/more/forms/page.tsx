@@ -13,7 +13,7 @@ export default async function FormsPage() {
 
   if (!featureEnabled("forms")) {
     return (
-      <TabPage title="Forms">
+      <TabPage density="tight" title="Forms">
         <StubScreen heading="Forms" phase="Phase 2" />
       </TabPage>
     );
@@ -22,7 +22,7 @@ export default async function FormsPage() {
   // Staff have no policy on either table, so this screen is not for them.
   if (role === "staff") {
     return (
-      <TabPage title="Forms" back="/more">
+      <TabPage density="tight" title="Forms" back="/more">
         <EmptyState title="No forms for staff" />
       </TabPage>
     );
@@ -35,14 +35,14 @@ export default async function FormsPage() {
 
   if (submissions.length === 0) {
     return (
-      <TabPage title="Forms" back="/more">
+      <TabPage density="tight" title="Forms" back="/more">
         <EmptyState title="No forms to sign" />
       </TabPage>
     );
   }
 
   return (
-    <TabPage title="Forms" back="/more">
+    <TabPage density="tight" title="Forms" back="/more">
       {/* To sign leads, and each is a card with ONE action. A family opening
           this screen wants to know what is left, not to read a list of
           everything they have ever signed. */}

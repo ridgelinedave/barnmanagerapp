@@ -94,7 +94,7 @@ export function ClockButton({ clockedIn }: { clockedIn: boolean }) {
          * failed — a sub-label is still text.
          */}
         <span
-          className={`flex items-center gap-2 font-display text-[1.75rem] font-bold leading-none ${
+          className={`flex items-center gap-2 font-condensed text-[1.75rem] font-bold leading-none ${
             clockedIn ? "text-ink" : "text-accent-on"
           }`}
         >

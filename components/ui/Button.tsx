@@ -29,9 +29,12 @@ const VARIANTS: Record<Variant, string> = {
   primary:
     "bg-accent text-accent-on border-transparent shadow-press " +
     "active:bg-accent/85 active:shadow-press-active active:translate-y-px",
-  // Ghost. A hairline and ink — not a filled grey box pretending to be a button.
+  // Outline. Transparent, ink label, an INK edge at 50% — 3.24:1 on the
+  // ground, 3.34:1 on white, past the 3:1 a control's boundary needs. It was
+  // `border-line`, 1.10:1 on the ground: no edge at all, so a secondary button
+  // read as a stray label, and SheetTrigger's white version read as a card.
   secondary:
-    "bg-transparent text-ink border-line active:bg-sunk active:translate-y-px",
+    "bg-transparent text-ink border-ink/50 active:bg-sunk active:translate-y-px lg:hover:bg-surface",
   // Text with an underline on press. For the third action on a screen.
   ghost:
     "bg-transparent text-ink border-transparent underline underline-offset-4 decoration-line active:decoration-ink",
@@ -64,12 +67,21 @@ const SIZES: Record<Size, string> = {
   // 48px under a thumb; 40px on the desk, where a pointer does not need it.
   default:
     "min-h-12 justify-center px-5 lg:min-h-10 lg:px-4 lg:text-[0.9375rem] " +
-    "font-display text-[1.0625rem] font-bold uppercase tracking-[0.11em] leading-none",
+    "font-condensed text-[1.0625rem] font-bold uppercase tracking-[0.11em] leading-none",
   menu: "min-h-14 justify-start px-4 py-2.5 text-left text-body font-semibold leading-snug",
   // A control inside a desktop table row: 32px, the reading face, sentence
   // case. Only for the desktop register — the phone keeps its 44px+ targets.
   sm: "min-h-8 justify-center px-3 text-table font-semibold leading-none",
 };
+
+/**
+ * The class string for a button of this variant and size — for a control that
+ * cannot BE a <Button> (SheetTrigger's opener, a plain <a> download) but must
+ * look exactly like one. A button looks like a button, everywhere.
+ */
+export function buttonClass(variant: Variant = "secondary", size: Size = "default", block = false): string {
+  return `${BASE} ${SIZES[size]} ${VARIANTS[variant]} ${block ? "w-full" : ""}`;
+}
 
 export function Button({
   children,

@@ -47,7 +47,10 @@ export function Card({
   as?: "section" | "div" | "article" | "li";
 }) {
   return (
-    <Tag className={`rounded-card border border-line bg-surface ${className}`}>{children}</Tag>
+    /* `border-rule`, not `line`: white on the blush is only 1.15:1, so the
+       card's EDGE is what makes it read as an object (rule: 1.42:1 against
+       the ground). Lists are not cards at all — see ListRow. */
+    <Tag className={`rounded-card border border-rule bg-surface ${className}`}>{children}</Tag>
   );
 }
 
@@ -55,8 +58,8 @@ export function Card({
  * A panel with a labelled cap — the barn-board look. Used for the one or two
  * groupings on a screen that are genuinely a *board* rather than a section.
  *
- * The cap is the 11px label over a hairline, not a tinted bar: a wash of the
- * accent under a heading was the accent as decoration.
+ * The cap is a Marcellus heading over a hairline, not a tinted bar: a wash of
+ * the accent under a heading was the accent as decoration.
  */
 export function Board({
   label,
@@ -68,9 +71,9 @@ export function Board({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-card border border-line bg-surface">
+    <section className="rounded-card border border-rule bg-surface">
       <div className="flex items-center gap-2 border-b border-line px-4 py-2.5">
-        <h2 className="font-sans text-micro uppercase text-muted">{label}</h2>
+        <h2 className="font-display text-heading text-ink">{label}</h2>
         {action && (
           /* The hit area is 44px even though the label is small: padding plus a
              negative margin gives the finger a real target without inflating
@@ -116,13 +119,15 @@ export function Sunk({
 /* -------------------------------------------------------------------------- */
 
 /**
- * A section label: 11px uppercase letterspaced muted, LEFT aligned, over a
- * hairline that runs the width of the section.
+ * A section heading: MARCELLUS, ink, left aligned, over the rule that runs the
+ * width of the section. The count beside it is scaffolding, so it is the
+ * condensed small-caps label (2026-10-19, "three faces, each with one job").
+ * It is one step up from a row's name (21px over 18px), so a heading never
+ * reads as another row.
  *
- * It used to be an oxblood heading in the condensed face with a short gold
- * rule — a display treatment on every section, so nothing on a screen was
- * louder than anything else. A section label is structure, and structure is
- * quiet; the screen title is where the display face earns its place.
+ * It has been an oxblood condensed display heading (too loud, on every
+ * section) and then an 11px uppercase label (structure so quiet the screen had
+ * no headings at all). A serif at 18px in ink is a heading without shouting.
  */
 export function SectionHeader({
   title,
@@ -138,9 +143,9 @@ export function SectionHeader({
   action?: { href: string; label: string };
 }) {
   return (
-    <div className="flex items-baseline gap-3 border-b border-line pb-1.5">
-      <h2 id={id} className="font-sans text-micro uppercase text-muted">{title}</h2>
-      {count && <p className="text-micro text-muted tabular-nums">{count}</p>}
+    <div className="flex items-baseline gap-3 border-b border-rule pb-2">
+      <h2 id={id} className="font-display text-title text-ink">{title}</h2>
+      {count && <p className="font-condensed text-micro uppercase text-muted tabular-nums">{count}</p>}
       {action && (
         /* 44px hit area on a phone, by padding and a negative margin. */
         <Link
@@ -191,7 +196,7 @@ export function Chip({
 
   return (
     <span
-      className={`inline-flex max-w-full items-center gap-1 rounded-chip border bg-transparent px-1.5 py-0.5 text-micro uppercase ${tones[tone]}`}
+      className={`inline-flex max-w-full items-center gap-1 rounded-chip border bg-transparent px-1.5 py-0.5 font-condensed text-micro uppercase ${tones[tone]}`}
     >
       {icon && <Icon name={icon} className="size-3 shrink-0" strokeWidth={2} />}
       {label && <span className="opacity-80">{label}</span>}
