@@ -1,6 +1,6 @@
 # Feed board as a whiteboard — layout proposal (2026-10-20)
 
-**Status: PROPOSED, not built.** Needs David's (and Belle's) yes before code.
+**Status: BUILT 2026-10-20** to this proposal plus the addendum in the build brief (no wall mode; meal cut-offs in `config/barn.ts`, PLACEHOLDER). Code: `components/FeedWhiteboard.tsx`, `lib/feed-board.ts`.
 
 The board replaces a physical whiteboard in the aisle. It is read standing,
 often at arm's length, often with a bucket in one hand. Today it is a list of

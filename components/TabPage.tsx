@@ -32,6 +32,8 @@ export function TabPage({
   density = "normal",
   tabs,
   detail,
+  header = "default",
+  headerMeta,
   children,
 }: {
   title: string;
@@ -42,6 +44,9 @@ export function TabPage({
   density?: Density;
   tabs?: ReactNode;
   detail?: ReactNode;
+  /** `board` keeps the oxblood header at every width (the feed board). */
+  header?: "default" | "board";
+  headerMeta?: ReactNode;
   children: ReactNode;
 }) {
   const gap = DENSITY_GAP[density];
@@ -55,6 +60,8 @@ export function TabPage({
         subject={subject}
         layout={layout}
         tabs={tabs}
+        variant={header}
+        meta={headerMeta}
       />
       <main id="main" className={bucketMainClass(layout)}>
         {layout === "split" ? (

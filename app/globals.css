@@ -55,6 +55,7 @@
   --brand-soft: #fafaf9;
   --brand-ink: #16192b;
   --brand-charcoal: #1c1b18;
+  --brand-charcoal-text: #4b4b4b;
   --brand-deep: #4a002a;
   --brand-forest: #2f4a34;
   --brand-danger: #9b2c1f;
@@ -120,6 +121,8 @@
   --color-sunk: var(--brand-soft);
   /* Header, tab bar. */
   --color-chrome: var(--brand-charcoal);
+  /* Belle's charcoal as text on a pale band (feed-board care detail). */
+  --color-charcoal-text: var(--brand-charcoal-text);
   /* Splash and sign-in — the one deliberately deep screen. Belle's oxblood. */
   --color-deep: var(--brand-deep);
 

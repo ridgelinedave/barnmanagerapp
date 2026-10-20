@@ -49,6 +49,8 @@ export function AppHeader({
   bell = true,
   layout = DEFAULT_LAYOUT,
   tabs,
+  variant = "default",
+  meta,
 }: {
   title: string;
   /** href to return to. Present = drilled-in screen. */
@@ -61,7 +63,24 @@ export function AppHeader({
   layout?: LayoutBucket;
   /** Sub-view tabs (Day / Month / Agenda…). Shown under the title on desktop. */
   tabs?: ReactNode;
+  /**
+   * `board`: the feed board's header — oxblood at EVERY width (the desktop
+   * shell's white header would make a wall board read as a web page), 56px,
+   * a 1px gold hairline, the title at 20px from md up with 0.04em tracking.
+   */
+  variant?: "default" | "board";
+  /** A quiet right-hand fact in the header: the board's clock. */
+  meta?: ReactNode;
 }) {
+  const board = variant === "board";
+  const headerClass = board
+    ? "safe-top sticky top-0 z-30 border-b border-gold bg-deep"
+    : "safe-top sticky top-0 z-30 border-b-2 border-gold bg-deep lg:border-b lg:border-line lg:bg-surface";
+  const rowHeight = board ? "min-h-14 py-1.5" : "min-h-14 py-1.5 lg:min-h-18 lg:py-3";
+  const backTone = board ? "text-white lg:hover:bg-white/10" : "text-white lg:text-muted lg:hover:bg-sunk lg:hover:text-ink";
+  const titleClass = board
+    ? "truncate font-display text-[1.1875rem] leading-tight tracking-[0.04em] text-white md:text-[1.25rem]"
+    : "truncate font-display text-[1.1875rem] leading-tight text-white lg:text-[1.375rem] lg:text-ink";
   return (
     /*
      * TWO REGISTERS. On the phone this is the oxblood masthead under the gold
@@ -73,17 +92,17 @@ export function AppHeader({
      */
     <header
       data-plane="deep"
-      className="safe-top sticky top-0 z-30 border-b-2 border-gold bg-deep lg:border-b lg:border-line lg:bg-surface"
+      className={headerClass}
     >
       {/* lg:min-h-18 pins the row to one height on the desktop shell (72px +
           the 1px border = the sidebar masthead), so the two line up whichever
           header shape a screen uses. */}
-      <div className={`mx-auto flex min-h-14 ${BUCKET_FRAME[layout]} items-center gap-2.5 py-1.5 lg:min-h-18 lg:gap-3 lg:py-3`}>
+      <div className={`mx-auto flex ${rowHeight} ${BUCKET_FRAME[layout]} items-center gap-2.5 lg:gap-3`}>
         {back ? (
           <Link
             href={back}
             aria-label="Back"
-            className="-ml-2 flex size-11 shrink-0 items-center justify-center rounded-control text-white lg:size-9 lg:text-muted lg:hover:bg-sunk lg:hover:text-ink"
+            className={`-ml-2 flex size-11 shrink-0 items-center justify-center rounded-control lg:size-9 ${backTone}`}
           >
             <Icon name="back" className="size-5.5" strokeWidth={2} />
           </Link>
@@ -129,11 +148,11 @@ export function AppHeader({
           </div>
         ) : (
           <div className="min-w-0 flex-1">
-            <h1 className="truncate font-display text-[1.1875rem] leading-tight text-white lg:text-[1.375rem] lg:text-ink">
-              {title}
-            </h1>
+            <h1 className={titleClass}>{title}</h1>
           </div>
         )}
+
+        {meta}
 
         {/* shrink-0 so a full-width control handed in as the action (a
             SheetTrigger) sizes to its label instead of eating the row. */}

@@ -225,6 +225,13 @@ export const barn = {
     charcoal: "#1C1B18",
 
     /**
+     * Belle's charcoal, as TEXT on a pale band — the feed board's care detail.
+     * 8.72:1 on white, 7.12:1 on goldTint. Not `charcoal` above, which is a
+     * near-black surface.
+     */
+    charcoalText: "#4B4B4B",
+
+    /**
      * THE DEEP FIELD — the sign-in screen and the splash.
      *
      * Belle's hero oxblood. Was #0F0E0C near-black; this is the one screen in
@@ -430,6 +437,13 @@ export const barn = {
    * chase. There is deliberately no "Keep": that is a daily note, not a plan.
    */
   blanketWeights: ["None", "Sheet", "Light", "Medium", "Heavy"],
+
+  /**
+   * The feed board's meals and when each stops being "now", barn-local 24h.
+   * PLACEHOLDER — pending the barn owner: AM is loud before 10:00, Midday
+   * before 14:00, PM after. Change these two values when she says otherwise.
+   */
+  feedMealCutoffs: { amUntil: "10:00", middayUntil: "14:00" },
 
   /** PWA install-prompt and launch-screen copy. Kept here so a clone can reword it. */
   pwa: {
