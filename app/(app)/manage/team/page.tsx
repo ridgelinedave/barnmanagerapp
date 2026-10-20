@@ -1,4 +1,7 @@
 import { redirect } from "next/navigation";
+import { riderPhotoUrls } from "@/lib/media";
+import { PhotoUploadForm } from "@/components/PhotoUploadForm";
+import { uploadRiderPhoto } from "@/app/(app)/media-actions";
 import { TabPage } from "@/components/TabPage";
 import { Avatar } from "@/components/ui/ListRow";
 import { SheetTrigger } from "@/components/ui/Sheet";
@@ -78,6 +81,7 @@ export default async function ManageTeamPage({
     listLevels(),
     listInvites(),
   ]);
+  const riderPhotos = await riderPhotoUrls(familiesWithRiders.flatMap((f) => f.riders));
 
   const admins = team.filter((person) => person.role === "admin").length;
   const levelName = new Map(levels.map((level) => [level.id, level.name]));
@@ -322,13 +326,27 @@ export default async function ManageTeamPage({
                     return (
                       <li key={rider.id}>
                         <Sunk className="flex flex-col gap-2">
-                          <p
-                            className={`font-display text-heading leading-snug ${
-                              rider.active ? "text-ink" : "text-muted"
-                            }`}
-                          >
-                            {rider.name}
-                          </p>
+                          <div className="flex items-center gap-3">
+                            {featureEnabled("media") ? (
+                              <PhotoUploadForm
+                                action={uploadRiderPhoto}
+                                fields={{ rider_id: rider.id }}
+                                displayName={rider.name}
+                                src={riderPhotos.get(rider.id) ?? null}
+                                label="Rider photo"
+                                size="md"
+                              />
+                            ) : (
+                              <Avatar name={rider.name} src={riderPhotos.get(rider.id) ?? null} />
+                            )}
+                            <p
+                              className={`min-w-0 flex-1 font-display text-heading leading-snug ${
+                                rider.active ? "text-ink" : "text-muted"
+                              }`}
+                            >
+                              {rider.name}
+                            </p>
+                          </div>
 
                           <ChipRow>
                             {level ? (

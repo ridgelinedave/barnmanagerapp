@@ -1,5 +1,7 @@
 "use client";
 
+import { PhotoUpload } from "@/components/PhotoUpload";
+import { featureEnabled } from "@/config/barn";
 import { useActionState } from "react";
 import {
   assignRider,
@@ -52,6 +54,16 @@ export function HorseForm({
   return (
     <form action={formAction} className="flex flex-col gap-3">
       {horse && <input type="hidden" name="id" value={horse.id} />}
+
+      {/* Image at creation: the photo is part of the new horse, not a
+          second step after saving. An existing horse changes its photo on
+          the record screen. */}
+      {!horse && featureEnabled("media") && (
+        <div className="flex items-center gap-3">
+          <PhotoUpload displayName="" label="Horse photo" size="lg" />
+          <span className="text-label font-medium text-ink">Photo <span className="font-normal text-muted">(optional)</span></span>
+        </div>
+      )}
 
       <div className="flex flex-col gap-1.5">
         <label htmlFor="horse-name" className="text-label font-medium text-ink">

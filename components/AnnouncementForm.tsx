@@ -1,6 +1,8 @@
 "use client";
 
 import { useActionState } from "react";
+import { PhotoUpload } from "@/components/PhotoUpload";
+import { featureEnabled } from "@/config/barn";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { CheckRow, Field, FormFeedback, Input, Textarea } from "@/components/ui/Field";
 import type { ActionState } from "@/app/(app)/manage/announcements/actions";
@@ -14,10 +16,13 @@ export function AnnouncementForm({
   action,
   announcement,
   submitLabel,
+  imageSrc,
 }: {
   action: (prev: ActionState, formData: FormData) => Promise<ActionState>;
   announcement?: Announcement;
   submitLabel: string;
+  /** Signed URL of the current image, when editing one that has it. */
+  imageSrc?: string | null;
 }) {
   const [state, formAction, pending] = useActionState<ActionState, FormData>(action, {
     error: null,
@@ -38,6 +43,16 @@ export function AnnouncementForm({
           defaultValue={announcement?.title ?? ""}
         />
       </Field>
+
+      {/* Inline on the compose screen: the image is posted WITH the notice. */}
+      {featureEnabled("media") && (
+        <div className="flex items-center gap-3">
+          <PhotoUpload displayName="" label="Announcement image" size="lg" src={imageSrc ?? null} />
+          <span className="text-label font-medium text-ink">
+            Image <span className="font-normal text-muted">(optional)</span>
+          </span>
+        </div>
+      )}
 
       <Field label="Message" htmlFor="body_md">
         <Textarea id="body_md" name="body_md" rows={6} defaultValue={announcement?.body_md ?? ""} />

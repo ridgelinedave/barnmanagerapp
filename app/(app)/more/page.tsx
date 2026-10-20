@@ -4,7 +4,11 @@ import { PoweredByMonarch } from "@/components/Wordmark";
 import { InstallPrompt } from "@/components/InstallPrompt";
 import { CalendarSubscribe } from "@/components/CalendarSubscribe";
 import { Card, FactList, SectionHeader } from "@/components/ui/primitives";
-import { ListRow, RowList } from "@/components/ui/ListRow";
+import { ListRow, ROW, ROW_TITLE, RowList } from "@/components/ui/ListRow";
+import { PhotoUploadForm } from "@/components/PhotoUploadForm";
+import { uploadRiderPhoto } from "@/app/(app)/media-actions";
+import { riderPhotoUrls } from "@/lib/media";
+import { listVisibleRiders } from "@/lib/lessons";
 import { Button } from "@/components/ui/Button";
 import { currentRole } from "@/lib/guard";
 import { getViewer } from "@/lib/session";
@@ -52,6 +56,9 @@ function Row({ href, title }: { href: string; title: string }) {
   return <ListRow href={href} title={title} />;
 }
 
+/** The role as a person reads it. The database value is still `parent`. */
+const ROLE_NAME = { admin: "Admin", staff: "Staff", parent: "Client" } as const;
+
 export default async function MorePage() {
   const role = await currentRole();
 
@@ -81,6 +88,12 @@ export default async function MorePage() {
 
   const hasLinks = !hasScheduleTab || yourRows.length > 0;
 
+  // A client's own riders, so the family can add their child's photo. RLS
+  // returns their own riders and nobody else's; the upload goes through
+  // set_rider_photo(), which checks the same thing again.
+  const myRiders = role === "parent" && featureEnabled("media") ? await listVisibleRiders() : [];
+  const riderPhotos = myRiders.length ? await riderPhotoUrls(myRiders) : new Map<string, string>();
+
   return (
     <TabPage density="tight" title="Settings">
       {/* Who you are signed in as, first — this is the screen people come to
@@ -96,10 +109,31 @@ export default async function MorePage() {
           <span className="min-w-0 flex-1">
             <span className="block font-display text-heading text-ink">{name ?? "Your account"}</span>
             <span className="block truncate text-caption text-muted">
-              {email} · <span className="capitalize">{role}</span>
+              {email} · <span>{ROLE_NAME[role]}</span>
             </span>
           </span>
         </Card>
+      )}
+
+      {myRiders.length > 0 && (
+        <section className="flex flex-col gap-3">
+          <SectionHeader title={myRiders.length === 1 ? "Rider" : "Riders"} />
+          <RowList>
+            {myRiders.map((rider) => (
+              <div key={rider.id} className={ROW}>
+                <PhotoUploadForm
+                  action={uploadRiderPhoto}
+                  fields={{ rider_id: rider.id }}
+                  displayName={rider.name}
+                  src={riderPhotos.get(rider.id) ?? null}
+                  label={`Photo of ${rider.name}`}
+                  size="md"
+                />
+                <span className={`${ROW_TITLE} min-w-0 flex-1 text-ink`}>{rider.name}</span>
+              </div>
+            ))}
+          </RowList>
+        </section>
       )}
 
       {/*

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { horsePhotoUrls } from "@/lib/media";
 import { notFound } from "next/navigation";
 import { TabPage } from "@/components/TabPage";
 import { CareTimeline } from "@/components/CareTimeline";
@@ -97,11 +98,13 @@ export default async function HorseDetailPage({
     .filter(Boolean)
     .join(" · ");
 
+  const photoSrc = (await horsePhotoUrls([horse])).get(horse.id) ?? null;
+
   return (
     <TabPage
       title={horse.name}
       back="/more/horses"
-      subject={{ name: horse.name, meta: headerMeta || undefined, photoUrl: horse.photo_url }}
+      subject={{ name: horse.name, meta: headerMeta || undefined, photoUrl: photoSrc }}
       density="airy"
     >
       {/* Status at a glance — the things that change, before the things that don't. */}

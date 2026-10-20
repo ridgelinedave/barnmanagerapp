@@ -1,6 +1,7 @@
 import { TabPage } from "@/components/TabPage";
 import { StubScreen } from "@/components/StubScreen";
 import { HorseCard } from "@/components/HorseCard";
+import { horsePhotoUrls } from "@/lib/media";
 import { HorseForm } from "@/components/HorseAdmin";
 import { EmptyState, SectionHeader } from "@/components/ui/primitives";
 import {
@@ -103,6 +104,7 @@ export default async function ManageHorsesPage({
   };
 
   const [horses, families] = await Promise.all([listHorses(), familyNames()]);
+  const photos = await horsePhotoUrls(horses);
 
   const inWork = horses.filter((h) => h.active);
   const retired = horses.filter((h) => !h.active);
@@ -141,6 +143,7 @@ export default async function ManageHorsesPage({
                   horse={horse}
                   href={`/manage/horses/${horse.id}`}
                   ownerLabel={ownerLabel(horse.owner_family_id)}
+                  photoSrc={photos.get(horse.id)}
                 />
               ))}
             </div>
@@ -161,6 +164,7 @@ export default async function ManageHorsesPage({
                 horse={horse}
                 href={`/manage/horses/${horse.id}`}
                 ownerLabel={ownerLabel(horse.owner_family_id)}
+                photoSrc={photos.get(horse.id)}
               />
             ))}
           </div>

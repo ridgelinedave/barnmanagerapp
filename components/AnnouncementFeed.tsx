@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FaceImage } from "@/components/ui/FaceImage";
 import type { Announcement } from "@/lib/types";
 import { Icon } from "@/components/ui/Icon";
 import { barn } from "@/config/barn";
@@ -132,11 +133,13 @@ function FeaturedAnnouncement({
   showAudience,
   href,
   now,
+  image,
 }: {
   announcement: Announcement;
   showAudience: boolean;
   href?: string;
   now: Date;
+  image?: string;
 }) {
   const staffOnly = showAudience && announcement.audience === "staff";
 
@@ -144,6 +147,11 @@ function FeaturedAnnouncement({
     <>
       {/* The lead notice leads by SIZE and position, not by an oxblood block:
           that was the barn colour used as a banner on content. */}
+      {image && (
+        <div className="px-4 pt-4">
+          <FaceImage src={image} className="aspect-[4/3] w-full rounded-control object-cover" fallback={null} />
+        </div>
+      )}
       <div className="px-4 pb-1 pt-4">
         {(announcement.pinned || staffOnly) && (
           <div className="mb-2 flex flex-wrap items-center gap-1.5">
@@ -229,14 +237,21 @@ function AnnouncementRow({
   showAudience,
   href,
   now,
+  image,
 }: {
   announcement: Announcement;
   showAudience: boolean;
   href?: string;
   now: Date;
+  image?: string;
 }) {
   const shell = "flex w-full items-start gap-3 border-b border-line py-3.5 text-left last:border-b-0";
-  const body = <RowBody announcement={announcement} showAudience={showAudience} now={now} clamp />;
+  const body = (
+    <>
+      <RowBody announcement={announcement} showAudience={showAudience} now={now} clamp />
+      {image && <FaceImage src={image} className="size-12 shrink-0 rounded-control object-cover" fallback={null} />}
+    </>
+  );
   const chevron = <Icon name="chevron" className="mt-1 size-4 shrink-0 text-muted" />;
 
   // Somewhere to go (the admin list, where a row opens its editor).
@@ -296,10 +311,13 @@ export function AnnouncementFeed({
   showAudience = false,
   /** Given an announcement id, where its row goes. Omit for a read-only feed. */
   hrefFor,
+  images,
 }: {
   announcements: Announcement[];
   showAudience?: boolean;
   hrefFor?: (id: string) => string;
+  /** Signed image URLs by announcement id (announcementImageUrls). */
+  images?: Map<string, string>;
 }) {
   if (announcements.length === 0) return null;
 
@@ -317,6 +335,7 @@ export function AnnouncementFeed({
         showAudience={showAudience}
         href={hrefFor?.(featured.id)}
         now={now}
+        image={images?.get(featured.id)}
       />
 
       {rest.length > 0 && (
@@ -328,6 +347,7 @@ export function AnnouncementFeed({
               showAudience={showAudience}
               href={hrefFor?.(announcement.id)}
               now={now}
+              image={images?.get(announcement.id)}
             />
           ))}
         </ul>

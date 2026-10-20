@@ -1,4 +1,5 @@
 import { TabPage } from "@/components/TabPage";
+import { horsePhotoUrls } from "@/lib/media";
 import { StubScreen } from "@/components/StubScreen";
 import { RowList } from "@/components/ui/ListRow";
 import { HorseBasicsCard, HorseCard } from "@/components/HorseCard";
@@ -36,6 +37,7 @@ export default async function HorseDirectoryPage() {
 
   if (role === "parent") {
     const [owned, ridden] = await Promise.all([listHorses(), basicsForFamily()]);
+    const photos = await horsePhotoUrls([...owned, ...ridden]);
 
     return (
       <TabPage density="tight" title="Horses" back="/more">
@@ -46,7 +48,7 @@ export default async function HorseDirectoryPage() {
             <SectionHeader title="Your horses" />
             <RowList>
               {owned.map((horse) => (
-                <HorseCard key={horse.id} horse={horse} href={`/more/horses/${horse.id}`} />
+                <HorseCard key={horse.id} horse={horse} href={`/more/horses/${horse.id}`} photoSrc={photos.get(horse.id)} />
               ))}
             </RowList>
           </section>
@@ -57,7 +59,7 @@ export default async function HorseDirectoryPage() {
             <SectionHeader title="Horses ridden" />
             <RowList>
               {ridden.map((horse) => (
-                <HorseBasicsCard key={horse.id} horse={horse} />
+                <HorseBasicsCard key={horse.id} horse={horse} photoSrc={photos.get(horse.id)} />
               ))}
             </RowList>
             <p className="text-caption text-muted">
@@ -74,6 +76,7 @@ export default async function HorseDirectoryPage() {
   }
 
   const [horses, families] = await Promise.all([listHorses(), familyNames()]);
+  const photos = await horsePhotoUrls(horses);
   const inWork = horses.filter((h) => h.active);
   const retired = horses.filter((h) => !h.active);
   const detailHref = (id: string) =>
@@ -93,6 +96,7 @@ export default async function HorseDirectoryPage() {
               key={horse.id}
               horse={horse}
               href={detailHref(horse.id)}
+              photoSrc={photos.get(horse.id)}
               ownerLabel={
                 horse.owner_family_id
                   ? (families.get(horse.owner_family_id) ?? "Owned")
@@ -109,7 +113,7 @@ export default async function HorseDirectoryPage() {
           <SectionHeader title="Retired" count={`${retired.length}`} />
           <RowList>
             {retired.map((horse) => (
-              <HorseCard key={horse.id} horse={horse} href={detailHref(horse.id)} />
+              <HorseCard key={horse.id} horse={horse} href={detailHref(horse.id)} photoSrc={photos.get(horse.id)} />
             ))}
           </RowList>
         </section>

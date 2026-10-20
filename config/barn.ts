@@ -424,8 +424,8 @@ export const barn = {
     lessonSeries: true,
     /** Client status (Active / Inactive / On a break). Migration 0026 audited, applied 2026-10-20, gate green. ON. */
     clientStatus: true,
-    /** Horse, rider and announcement photos. Migration 0027 applied 2026-10-20; OFF until the upload screens are built and verified. */
-    media: false,
+    /** Horse, rider and announcement photos. Migration 0027 audited, applied 2026-10-20, gate green; upload screens verified. ON. */
+    media: true,
   } satisfies Record<BarnFeatureFlag, boolean>,
 
   /**

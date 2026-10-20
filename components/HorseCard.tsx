@@ -39,9 +39,12 @@ export function HorseCard({
   href,
   ownerLabel,
   riderCount,
+  photoSrc,
 }: {
   horse: Horse;
   href?: string;
+  /** A signed URL from horsePhotoUrls(); initials when absent. */
+  photoSrc?: string | null;
   /** "Barn horse" or the owning family's name. Admin and staff surfaces only. */
   ownerLabel?: string;
   riderCount?: number;
@@ -59,7 +62,7 @@ export function HorseCard({
 
   return (
     <Frame href={href}>
-      <Avatar name={horse.name} src={horse.photo_url} />
+      <Avatar name={horse.name} src={photoSrc ?? null} />
       <span className="min-w-0 flex-1">
         <span className={`${ROW_TITLE} text-ink`}>{horse.name}</span>
         {detail && <span className={ROW_META}>{detail}</span>}
@@ -77,10 +80,10 @@ export function HorseCard({
  * The basics tier. Never links anywhere: there is no detail page to show,
  * because there are no further details this family is entitled to.
  */
-export function HorseBasicsCard({ horse }: { horse: HorseBasics }) {
+export function HorseBasicsCard({ horse, photoSrc }: { horse: HorseBasics; photoSrc?: string | null }) {
   return (
     <Frame>
-      <Avatar name={horse.name} src={horse.photo_url} />
+      <Avatar name={horse.name} src={photoSrc ?? null} />
       <span className="min-w-0 flex-1">
         <span className={`${ROW_TITLE} text-ink`}>{horse.name}</span>
         {horse.barn_name && horse.barn_name !== horse.name && (

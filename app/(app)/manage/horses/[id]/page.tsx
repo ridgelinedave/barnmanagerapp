@@ -1,4 +1,7 @@
 import { notFound } from "next/navigation";
+import { horsePhotoUrls } from "@/lib/media";
+import { PhotoUploadForm } from "@/components/PhotoUploadForm";
+import { uploadHorsePhoto } from "@/app/(app)/media-actions";
 import { TabPage } from "@/components/TabPage";
 import { AssignRiderForm, FeedPlanForm, HorseForm } from "@/components/HorseAdmin";
 import { Card, EmptyState, SectionHeader, Sunk } from "@/components/ui/primitives";
@@ -53,6 +56,7 @@ export default async function ManageHorsePage({
     listTrainingLogs(id),
   ]);
 
+  const photoSrc = (await horsePhotoUrls([horse])).get(horse.id) ?? null;
   const assigned = new Set(riders.map((r) => r.id));
   const unassigned = allRiders.filter((r) => !assigned.has(r.id));
   const activePlans = plans.filter((p) => p.active);
@@ -62,9 +66,22 @@ export default async function ManageHorsePage({
     <TabPage
       title={horse.name}
       back="/manage/horses"
-      subject={{ name: horse.name, meta: horse.breed ?? undefined, photoUrl: horse.photo_url }}
+      subject={{ name: horse.name, meta: horse.breed ?? undefined, photoUrl: photoSrc }}
       density="airy"
     >
+      {featureEnabled("media") && (
+        <section aria-label="Photo" className="flex items-center gap-4">
+          <PhotoUploadForm
+            action={uploadHorsePhoto}
+            fields={{ horse_id: horse.id }}
+            displayName={horse.name}
+            src={photoSrc}
+            label="Horse photo"
+            size="xl"
+          />
+        </section>
+      )}
+
       <SheetTrigger label="Edit details" title={`Edit ${horse.name}`}>
         <HorseForm horse={horse} families={[...families].map(([fid, name]) => ({ id: fid, name }))} />
       </SheetTrigger>

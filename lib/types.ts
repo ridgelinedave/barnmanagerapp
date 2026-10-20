@@ -62,7 +62,12 @@ export type Rider = {
   name: string;
   dob: string | null;
   level_id: string | null;
+  /** Legacy free-text URL. Superseded by photo_path (0027); read only as a fallback. */
   photo_url: string | null;
+  /** Object name in the private rider-photos bucket (0027). Set only via set_rider_photo(). */
+  photo_path?: string | null;
+  /** The rider's own login, when they have one (0026). Admin-set. */
+  profile_id?: string | null;
   active: boolean;
   notes: string | null;
   created_at: string;
@@ -86,6 +91,8 @@ export type Announcement = {
   author: string | null;
   posted_at: string;
   notified_at: string | null;
+  /** Object name in the private announcement-images bucket (0027). */
+  image_path?: string | null;
 };
 
 export const RECURRENCES = ["daily", "weekday", "weekly"] as const;
@@ -272,7 +279,10 @@ export type Horse = {
   barn_name: string | null;
   /** Null = barn-owned. Non-null gives that family full read on this row. */
   owner_family_id: string | null;
+  /** Legacy URL. Superseded by photo_path (0027); read only as a fallback. */
   photo_url: string | null;
+  /** Object name in the private horse-photos bucket (0027). */
+  photo_path?: string | null;
   breed: string | null;
   dob: string | null;
   active: boolean;

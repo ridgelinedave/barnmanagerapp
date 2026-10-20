@@ -5,6 +5,14 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getViewer } from "@/lib/session";
 import { isAudience } from "@/lib/types";
+import { featureEnabled } from "@/config/barn";
+import { MEDIA_BUCKETS, photoFromForm, photoProblem, removePhoto, uploadPhoto } from "@/lib/media";
+
+/** The image field, when photos are on. Checked before any write. */
+function imageOf(formData: FormData): { file: File | null; problem: string | null } {
+  const file = featureEnabled("media") ? photoFromForm(formData) : null;
+  return { file, problem: file ? photoProblem(file) : null };
+}
 
 /**
  * Announcement writes.
@@ -56,13 +64,29 @@ export async function createAnnouncement(
     return { error: "Only an admin can post announcements." };
   }
 
+  const image = imageOf(formData);
+  if (image.problem) return { error: image.problem };
+
   const supabase = await createClient();
-  const { error } = await supabase.from("announcements").insert({
-    ...parsed,
-    author: state.viewer.profile?.id ?? null,
-  });
+  const { data, error } = await supabase
+    .from("announcements")
+    .insert({
+      ...parsed,
+      author: state.viewer.profile?.id ?? null,
+    })
+    .select("id")
+    .single();
 
   if (error) return { error: error.message };
+
+  // IMAGE AT CREATION, inline on the compose screen. The object can only be
+  // written under an id that exists, so it follows the insert directly.
+  if (image.file && data?.id) {
+    const uploaded = await uploadPhoto(MEDIA_BUCKETS.announcement, data.id, image.file);
+    if ("path" in uploaded) {
+      await supabase.from("announcements").update({ image_path: uploaded.path }).eq("id", data.id);
+    }
+  }
 
   // Notifications were written by the database trigger inside the same
   // statement, so the bell is already accurate by the time these revalidate.
@@ -86,10 +110,30 @@ export async function updateAnnouncement(
     return { error: "Only an admin can edit announcements." };
   }
 
-  const supabase = await createClient();
-  const { error } = await supabase.from("announcements").update(parsed).eq("id", id);
+  const image = imageOf(formData);
+  if (image.problem) return { error: image.problem };
 
-  if (error) return { error: error.message };
+  const supabase = await createClient();
+  let imagePath: string | undefined;
+  let previous: string | null = null;
+  if (image.file) {
+    const { data: existing } = await supabase.from("announcements").select("image_path").eq("id", id).maybeSingle();
+    previous = existing?.image_path ?? null;
+    const uploaded = await uploadPhoto(MEDIA_BUCKETS.announcement, id, image.file);
+    if ("error" in uploaded) return { error: uploaded.error };
+    imagePath = uploaded.path;
+  }
+
+  const { error } = await supabase
+    .from("announcements")
+    .update(imagePath ? { ...parsed, image_path: imagePath } : parsed)
+    .eq("id", id);
+
+  if (error) {
+    if (imagePath) await removePhoto(MEDIA_BUCKETS.announcement, imagePath);
+    return { error: error.message };
+  }
+  if (imagePath && previous && previous !== imagePath) await removePhoto(MEDIA_BUCKETS.announcement, previous);
 
   revalidatePath("/manage/announcements");
   revalidatePath("/home");

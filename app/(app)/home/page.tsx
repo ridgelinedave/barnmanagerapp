@@ -1,4 +1,5 @@
 import { TabPage } from "@/components/TabPage";
+import { announcementImageUrls } from "@/lib/media";
 import { StubScreen } from "@/components/StubScreen";
 import { InstallPrompt } from "@/components/InstallPrompt";
 import { AnnouncementFeed } from "@/components/AnnouncementFeed";
@@ -31,6 +32,7 @@ export default async function HomePage() {
 
   // Unfiltered on audience by design — RLS scopes it. See lib/announcements.ts.
   const announcements = featureEnabled("announcements") ? await listAnnouncements(10) : [];
+  const images = await announcementImageUrls(announcements);
 
   // An offered seat is time-sensitive and someone else may be about to take it,
   // so it sits above everything else. RLS scopes offers to this family's riders.
@@ -112,7 +114,7 @@ export default async function HomePage() {
               {announcements.length === 0 ? (
                 <EmptyState title="No barn news" />
               ) : (
-                <AnnouncementFeed announcements={announcements} />
+                <AnnouncementFeed announcements={announcements} images={images} />
               )}
             </section>
           )}
@@ -134,7 +136,7 @@ export default async function HomePage() {
               {announcements.length === 0 ? (
                 <EmptyState title="No announcements yet" />
               ) : (
-                <AnnouncementFeed announcements={announcements} showAudience />
+                <AnnouncementFeed announcements={announcements} showAudience images={images} />
               )}
             </section>
           )}

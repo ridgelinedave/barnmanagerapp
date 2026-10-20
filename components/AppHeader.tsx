@@ -4,6 +4,7 @@ import Link from "next/link";
 import { barn } from "@/config/barn";
 import { NotificationBell } from "@/components/NotificationBell";
 import { Icon } from "@/components/ui/Icon";
+import { FaceImage } from "@/components/ui/FaceImage";
 import { initialOf } from "@/components/ui/ListRow";
 import { BUCKET_FRAME, DEFAULT_LAYOUT, type LayoutBucket } from "@/components/layout-buckets";
 
@@ -119,23 +120,26 @@ export function AppHeader({
 
         {subject ? (
           <div className="flex min-w-0 flex-1 items-center gap-3">
-            {subject.photoUrl ? (
-              /* Signed, per-request storage URL — next/image would proxy a
-                 one-time link it cannot cache. */
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img
-                src={subject.photoUrl}
-                alt=""
-                className="size-10 shrink-0 rounded-full border border-white/30 object-cover lg:border-rule"
-              />
-            ) : (
-              <span
-                aria-hidden="true"
-                className="flex size-10 shrink-0 items-center justify-center rounded-full bg-white/15 font-display text-heading text-white lg:bg-accent-tint lg:text-accent-text"
-              >
-                {initialOf(subject.name)}
-              </span>
-            )}
+            {(() => {
+              const initials = (
+                <span
+                  aria-hidden="true"
+                  className="flex size-10 shrink-0 items-center justify-center rounded-full bg-white/15 font-display text-heading text-white lg:bg-accent-tint lg:text-accent-text"
+                >
+                  {initialOf(subject.name)}
+                </span>
+              );
+              // A signed, per-request URL; a dead one falls back to the initial.
+              return subject.photoUrl ? (
+                <FaceImage
+                  src={subject.photoUrl}
+                  className="size-10 shrink-0 rounded-full border border-white/30 object-cover lg:border-rule"
+                  fallback={initials}
+                />
+              ) : (
+                initials
+              );
+            })()}
             <div className="min-w-0 flex-1">
               <h1 className="truncate font-display text-[1.1875rem] leading-tight text-white lg:text-[1.375rem] lg:text-ink">
                 {subject.name}

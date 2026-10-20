@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getViewer } from "@/lib/session";
 import { adminCount } from "@/lib/team";
 import { isPermissionFlag, isRole, type Role } from "@/lib/types";
+import { featureEnabled } from "@/config/barn";
+import { MEDIA_BUCKETS, photoFromForm, photoProblem, removePhoto, uploadPhoto } from "@/lib/media";
 
 /**
  * Team, family, rider and level administration.
@@ -274,18 +276,37 @@ export async function createRider(_prev: TeamState, formData: FormData): Promise
   if (!familyId) return FAIL("Missing family.");
   if (!name) return FAIL("Give the rider a name.");
 
+  // IMAGE AT CREATION. Checked before the insert so a bad file never leaves
+  // a rider half-made.
+  const photo = featureEnabled("media") ? photoFromForm(formData) : null;
+  const problem = photo ? photoProblem(photo) : null;
+  if (problem) return FAIL(problem);
+
   const supabase = await createClient();
-  const { error } = await supabase.from("riders").insert({
-    family_id: familyId,
-    name,
-    dob: optional(formData, "dob"),
-    level_id: optional(formData, "level_id"),
-    photo_url: optional(formData, "photo_url"),
-    notes: optional(formData, "notes"),
-    active: true,
-  });
+  const { data, error } = await supabase
+    .from("riders")
+    .insert({
+      family_id: familyId,
+      name,
+      dob: optional(formData, "dob"),
+      level_id: optional(formData, "level_id"),
+      notes: optional(formData, "notes"),
+      active: true,
+    })
+    .select("id")
+    .single();
 
   if (error) return FAIL(readable(error.message));
+
+  // A child's photo: the path is recorded ONLY through set_rider_photo(),
+  // which checks the folder is this rider's own — never a direct update.
+  if (photo && data?.id) {
+    const uploaded = await uploadPhoto(MEDIA_BUCKETS.rider, data.id, photo);
+    if ("path" in uploaded) {
+      const { error: setError } = await supabase.rpc("set_rider_photo", { rider: data.id, path: uploaded.path });
+      if (setError) await removePhoto(MEDIA_BUCKETS.rider, uploaded.path);
+    }
+  }
 
   revalidate();
   return OK("Rider added.");
@@ -306,7 +327,8 @@ export async function updateRider(_prev: TeamState, formData: FormData): Promise
       name,
       dob: optional(formData, "dob"),
       level_id: optional(formData, "level_id"),
-      photo_url: optional(formData, "photo_url"),
+      // photo_url is legacy and no longer edited here; the photo is 0027's
+      // photo_path, set through set_rider_photo().
       notes: optional(formData, "notes"),
       active: formData.get("active") === "on",
     })

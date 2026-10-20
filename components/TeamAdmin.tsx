@@ -1,6 +1,8 @@
 "use client";
 
 import { useActionState, useId, useState } from "react";
+import { PhotoUpload } from "@/components/PhotoUpload";
+import { featureEnabled } from "@/config/barn";
 import {
   createFamily,
   createLevel,
@@ -352,15 +354,16 @@ export function RiderForm({
         </Select>
       </Field>
 
-      <Field label="Photo URL" htmlFor={`${id}-photo`} optional>
-        <Input
-          id={`${id}-photo`}
-          name="photo_url"
-          type="url"
-          inputMode="url"
-          defaultValue={rider?.photo_url ?? ""}
-        />
-      </Field>
+      {/* Image at creation. An existing rider's photo is changed by tapping
+          their circle on the Team screen (or by their own family). */}
+      {!rider && featureEnabled("media") && (
+        <div className="flex items-center gap-3">
+          <PhotoUpload displayName="" label="Rider photo" size="lg" />
+          <span className="text-label font-medium text-ink">
+            Photo <span className="font-normal text-muted">(optional)</span>
+          </span>
+        </div>
+      )}
 
       <Field label="Notes" htmlFor={`${id}-notes`} optional>
         <Textarea id={`${id}-notes`} name="notes" defaultValue={rider?.notes ?? ""} />

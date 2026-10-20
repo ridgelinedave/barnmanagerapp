@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getViewer } from "@/lib/session";
 import { isHorseSex, isMeal, type HorseSex } from "@/lib/types";
+import { featureEnabled } from "@/config/barn";
+import { MEDIA_BUCKETS, photoFromForm, photoProblem, uploadPhoto } from "@/lib/media";
 
 /**
  * Horse, rider-assignment and feed-plan management.
@@ -92,6 +94,12 @@ export async function createHorse(
   const height = heightOf(formData);
   if (height === undefined) return { error: HEIGHT_HELP, message: null };
 
+  // IMAGE AT CREATION: the photo travels with the new horse. It is checked
+  // before the insert so a bad file never leaves a horse half-made.
+  const photo = featureEnabled("media") ? photoFromForm(formData) : null;
+  const problem = photo ? photoProblem(photo) : null;
+  if (problem) return { error: problem, message: null };
+
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("horses")
@@ -112,6 +120,16 @@ export async function createHorse(
     .single();
 
   if (error) return { error: error.message, message: null };
+
+  // The object can only be written under an id that exists, so it goes up
+  // right after the insert. If it fails, the horse stands and the record
+  // screen offers the photo again — never a horse that silently lost it.
+  if (photo) {
+    const uploaded = await uploadPhoto(MEDIA_BUCKETS.horse, data.id, photo);
+    if ("path" in uploaded) {
+      await supabase.from("horses").update({ photo_path: uploaded.path }).eq("id", data.id);
+    }
+  }
 
   revalidate(data.id);
   redirect(`/manage/horses/${data.id}`);

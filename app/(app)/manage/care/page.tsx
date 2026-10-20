@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/DataTable";
 import { requireTab } from "@/lib/guard";
 import { careDueSoon, CARE_DUE_SOON_DAYS } from "@/lib/care";
+import { horsePhotoUrls } from "@/lib/media";
 import { barnToday, formatBarnDayLabel } from "@/lib/dates";
 import { CARE_TYPE_LABELS } from "@/lib/types";
 import { featureEnabled } from "@/config/barn";
@@ -44,6 +45,7 @@ export default async function ManageCarePage({
 
   const today = barnToday();
   const due = await careDueSoon();
+  const photos = await horsePhotoUrls(due.map(({ horse }) => horse));
 
   const overdue = due.filter((d) => (d.event.due_next ?? "") < today);
   const soon = due.filter((d) => (d.event.due_next ?? "") >= today);
@@ -102,7 +104,7 @@ export default async function ManageCarePage({
                   key={event.id}
                   href={`/manage/horses/${horse.id}`}
                   title={horse.name}
-                  leading={<Avatar name={horse.name} src={horse.photo_url} />}
+                  leading={<Avatar name={horse.name} src={photos.get(horse.id)} />}
                   meta={`${CARE_TYPE_LABELS[event.type]} · due ${formatBarnDayLabel(event.due_next!)}`}
                   chips={
                     <ChipRow>
@@ -124,7 +126,7 @@ export default async function ManageCarePage({
                   key={event.id}
                   href={`/manage/horses/${horse.id}`}
                   title={horse.name}
-                  leading={<Avatar name={horse.name} src={horse.photo_url} />}
+                  leading={<Avatar name={horse.name} src={photos.get(horse.id)} />}
                   meta={`${CARE_TYPE_LABELS[event.type]} · due ${formatBarnDayLabel(event.due_next!)}`}
                   chips={
                     <ChipRow>

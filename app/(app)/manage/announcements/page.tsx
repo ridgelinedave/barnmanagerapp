@@ -1,4 +1,5 @@
 import { TabPage } from "@/components/TabPage";
+import { announcementImageUrls } from "@/lib/media";
 import {
   AnnouncementFeed,
   AnnouncementFilterChips,
@@ -43,6 +44,7 @@ export default async function ManageAnnouncementsPage({
   const filter: AnnouncementFilter = isAnnouncementFilter(params.filter) ? params.filter : "all";
 
   const announcements = await listAnnouncements(50);
+  const images = await announcementImageUrls(announcements);
   const shown = filterAnnouncements(announcements, filter);
 
   return (
@@ -65,6 +67,7 @@ export default async function ManageAnnouncementsPage({
           announcements={shown}
           showAudience
           hrefFor={(id) => `/manage/announcements/${id}`}
+          images={images}
         />
       )}
     </TabPage>
