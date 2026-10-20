@@ -423,6 +423,12 @@ export const barn = {
     media: false,
   } satisfies Record<BarnFeatureFlag, boolean>,
 
+  /**
+   * Blanket weights the barn uses, lightest first — the options for "what
+   * goes on" in a blanket rule. A barn's own vocabulary, so it lives here.
+   */
+  blanketWeights: ["Sheet", "Light", "Medium", "Heavy"],
+
   /** PWA install-prompt and launch-screen copy. Kept here so a clone can reword it. */
   pwa: {
     installTitle: "Add to your home screen",

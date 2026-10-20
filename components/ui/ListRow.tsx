@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { Icon, type IconName } from "@/components/ui/Icon";
+import { FaceImage } from "@/components/ui/FaceImage";
 
 /**
  * THE EDITORIAL ROW (2026-10-19) — the one list row in the app.
@@ -69,20 +70,7 @@ export function Avatar({
   const sizes = { sm: "size-9", md: "size-11", lg: "size-14" } as const;
   const text = { sm: "text-label", md: "text-heading", lg: "text-title" } as const;
 
-  if (src) {
-    /* Storage URLs are signed per request and differ per viewer, so next/image
-       cannot cache or optimise them — it would proxy a one-time URL. */
-    return (
-      /* eslint-disable-next-line @next/next/no-img-element */
-      <img
-        src={src}
-        alt=""
-        className={`${sizes[size]} shrink-0 rounded-full border border-rule object-cover`}
-      />
-    );
-  }
-
-  return (
+  const initials = (
     <span
       aria-hidden="true"
       className={`${sizes[size]} ${text[size]} flex shrink-0 items-center justify-center rounded-full bg-accent-tint font-display text-accent-text`}
@@ -90,6 +78,19 @@ export function Avatar({
       {initialOf(name)}
     </span>
   );
+
+  // A dead photo URL falls back to the initial instead of a broken-image glyph.
+  if (src) {
+    return (
+      <FaceImage
+        src={src}
+        className={`${sizes[size]} shrink-0 rounded-full border border-rule object-cover`}
+        fallback={initials}
+      />
+    );
+  }
+
+  return initials;
 }
 
 export function ListRow({

@@ -1198,3 +1198,27 @@ npm run demo:seed        # walkthrough data  (-- --clean to remove)
 Fixture logins are `phase0.admin@`, `phase0.staff@`, `phase0.parent@` and
 `phase0.parent2@example.com`; the shared password is printed by `db:seed` and
 written to the gitignored `supabase/seed/seed-output.json`.
+
+---
+
+## Build pass 2026-10-20 (commits e3fb055 → Phase 5)
+
+One commit per phase. Full detail is in each commit message.
+
+**SQL printed for audit, NOT applied — all in `supabase/pending/`:**
+
+| File | What | Flag it unlocks |
+|---|---|---|
+| `20261020000100_barn_ops_delete_gate.sql` (0024) | Ops DELETE → admin or manage_horses on all five tables | — (the UI already asks this) |
+| `20261020000200_lesson_series.sql` (0025) | `lesson_riders.horse_id` + `enrolment_id`, `lesson_enrolments`, `book_enrolments()`, end/inactive clean-up, widened parent guard | `lessonSeries` |
+| `20261020000300_people_model.sql` (0026) | `families.status`, `riders.profile_id` (admin-set, guard + own-row policy) | `clientStatus` |
+| `20261020000400_media.sql` (0027) | Private buckets + policies for horse, rider (children) and announcement photos; `set_rider_photo()` | `media` |
+
+Apply order: 0024, 0025, 0026, 0027. Each file lists the suite changes that
+land with it. They live outside `supabase/migrations/` because the suite
+inventories every `.sql` there (see `supabase/pending/README.md`).
+
+**Not built, deliberately:** the feed-board whiteboard layout (proposed in
+`design/FEED-BOARD-WHITEBOARD-PROPOSAL.md`, awaiting a yes); photo upload UI
+(5.3–5.6), which writes to buckets that do not exist until 0027 is applied;
+the Barn tab restructure (fails the no-menu-screens rule, flagged).

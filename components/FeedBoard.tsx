@@ -3,6 +3,10 @@ import { EmptyState } from "@/components/ui/primitives";
 import { Icon } from "@/components/ui/Icon";
 import { feedCadence, horseInitials, horseSubtitle } from "@/lib/horse-display";
 import type { HorseFeed } from "@/lib/horses";
+import type { RecentCare } from "@/lib/care";
+import { FaceImage } from "@/components/ui/FaceImage";
+import { formatBarnDayLabel } from "@/lib/dates";
+import { CARE_TYPE_LABELS } from "@/lib/types";
 
 /**
  * The feed board, by horse.
@@ -20,21 +24,7 @@ import type { HorseFeed } from "@/lib/horses";
  */
 function HorseAvatar({ entry }: { entry: HorseFeed }) {
   const { horse } = entry;
-
-  if (horse.photo_url) {
-    return (
-      /* Storage URLs are signed per request and differ per viewer, so
-         next/image cannot cache them — it would proxy a one-time URL. */
-      /* eslint-disable-next-line @next/next/no-img-element */
-      <img
-        src={horse.photo_url}
-        alt=""
-        className="size-[3.25rem] shrink-0 rounded-full object-cover"
-      />
-    );
-  }
-
-  return (
+  const initials = (
     <span
       aria-hidden="true"
       className="flex size-[3.25rem] shrink-0 items-center justify-center rounded-full bg-accent-tint font-display text-[1.375rem] tracking-[0.04em] text-accent-text"
@@ -42,9 +32,39 @@ function HorseAvatar({ entry }: { entry: HorseFeed }) {
       {horseInitials(horse)}
     </span>
   );
+
+  if (!horse.photo_url) return initials;
+  return (
+    <FaceImage
+      src={horse.photo_url}
+      className="size-[3.25rem] shrink-0 rounded-full object-cover"
+      fallback={initials}
+    />
+  );
 }
 
-export function FeedBoard({ board }: { board: HorseFeed[] }) {
+/**
+ * "Had something specific in the last three days, and when it is due again."
+ * One quiet line under the horse's name: "Dewormer yesterday · due Jan 12".
+ */
+function recentLine(recent: RecentCare[]): string {
+  return recent
+    .map(({ event, daysAgo }) => {
+      const when = daysAgo <= 0 ? "today" : daysAgo === 1 ? "yesterday" : `${daysAgo} days ago`;
+      const due = event.due_next ? ` · due ${formatBarnDayLabel(event.due_next)}` : "";
+      return `${CARE_TYPE_LABELS[event.type]} ${when}${due}`;
+    })
+    .join("; ");
+}
+
+export function FeedBoard({
+  board,
+  recent = new Map(),
+}: {
+  board: HorseFeed[];
+  /** Care in the last three days, by horse id (lib/care careRecentByHorse). */
+  recent?: Map<string, RecentCare[]>;
+}) {
   if (board.length === 0) {
     return (
       <EmptyState title="No horses yet" />
@@ -72,6 +92,11 @@ export function FeedBoard({ board }: { board: HorseFeed[] }) {
                 {subtitle && (
                   <span className="mt-0.5 block truncate text-caption text-muted">{subtitle}</span>
                 )}
+                {recent.get(entry.horse.id)?.length ? (
+                  <span className="mt-1 block font-condensed text-label font-semibold text-accent-text">
+                    {recentLine(recent.get(entry.horse.id)!)}
+                  </span>
+                ) : null}
               </span>
 
               {cadence ? (

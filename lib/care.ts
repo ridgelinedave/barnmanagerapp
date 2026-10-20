@@ -148,3 +148,41 @@ export async function loggerNames(): Promise<Map<string, string>> {
   if (error) return new Map();
   return new Map((data ?? []).map((p) => [p.id as string, (p.full_name as string) ?? "The barn"]));
 }
+
+/** How far back the feed board looks for "had something specific". */
+export const CARE_RECENT_DAYS = 3;
+
+export type RecentCare = { event: CareEvent; daysAgo: number };
+
+/**
+ * Care given in the last three days, by horse — for the feed board.
+ *
+ * The same care_events rows and the same due_next the due-soon list and the
+ * calendar read; this only changes the window (performed in the last three
+ * days rather than due in the next thirty), so the board's "due again" date
+ * can never disagree with the barn's due list. RLS scopes it as everywhere.
+ */
+export async function careRecentByHorse(): Promise<Map<string, RecentCare[]>> {
+  const byHorse = new Map<string, RecentCare[]>();
+  if (!supabaseConfigured()) return byHorse;
+
+  const today = barnToday();
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("care_events")
+    .select("*")
+    .gte("performed_at", addBarnDays(today, -CARE_RECENT_DAYS))
+    .lte("performed_at", today)
+    .order("performed_at", { ascending: false });
+
+  if (error) return byHorse;
+
+  const dayMs = 86_400_000;
+  for (const event of (data ?? []) as CareEvent[]) {
+    const daysAgo = Math.round(
+      (Date.parse(`${today}T12:00:00Z`) - Date.parse(`${event.performed_at}T12:00:00Z`)) / dayMs,
+    );
+    byHorse.set(event.horse_id, [...(byHorse.get(event.horse_id) ?? []), { event, daysAgo }]);
+  }
+  return byHorse;
+}

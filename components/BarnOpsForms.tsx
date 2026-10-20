@@ -336,13 +336,26 @@ export function BlanketPlanForm({
               <label htmlFor={`${id}-layer-${index}`} className="text-label font-medium text-ink">
                 What goes on
               </label>
-              <Input
+              <Select
                 id={`${id}-layer-${index}`}
                 value={rule.layer}
                 onChange={(e) => patch(index, { layer: e.target.value })}
-                placeholder="Medium blanket"
                 className="mt-1.5"
-              />
+              >
+                <option value="" disabled>
+                  Choose a weight
+                </option>
+                {/* A rule saved before the weights were fixed keeps its own
+                    words as an option, so editing it never silently blanks it. */}
+                {rule.layer && !(barn.blanketWeights as readonly string[]).includes(rule.layer) && (
+                  <option value={rule.layer}>{rule.layer}</option>
+                )}
+                {barn.blanketWeights.map((weight) => (
+                  <option key={weight} value={weight}>
+                    {weight}
+                  </option>
+                ))}
+              </Select>
             </div>
 
             <button
