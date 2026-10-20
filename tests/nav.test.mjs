@@ -164,6 +164,64 @@ console.log("\nevery management screen is one click from the admin sidebar\n");
   }
 }
 
+console.log("\nevery page guards on the route it lives at\n");
+{
+  // The gap the feed board fell through: /tasks/feed guarded itself with
+  // requireTab("/tasks"). Every link to it was accepted by the gate, so every
+  // check above passed — but /tasks is staff-only, so the page bounced admin
+  // to Home. A page's own guard must admit exactly the roles the gate admits
+  // for the route the page is served at, no more and no fewer.
+  const root = APP.pathname.replace(/^\/([A-Za-z]:)/, "$1");
+  const pages = [];
+  const walk = (dir) => {
+    for (const d of readdirSync(dir, { withFileTypes: true })) {
+      const full = join(dir, d.name);
+      if (d.isDirectory()) walk(full);
+      else if (d.name === "page.tsx") pages.push(full);
+    }
+  };
+  walk(root);
+
+  /** app/(app)/tasks/feed/[horseId]/page.tsx → /tasks/feed/x */
+  const routeOf = (file) =>
+    "/" +
+    file
+      .slice(root.length)
+      .split(/[\\/]/)
+      .filter((seg) => seg && seg !== "page.tsx" && !/^\(.*\)$/.test(seg))
+      .map((seg) => (/^\[.*\]$/.test(seg) ? "x" : seg))
+      .join("/");
+
+  const guarded = pages
+    .map((file) => {
+      const calls = [...readFileSync(file, "utf8").matchAll(/requireTab\(\s*"([^"]+)"\s*\)/g)].map((m) => m[1]);
+      return { file, route: routeOf(file), calls };
+    })
+    .filter((page) => page.calls.length > 0);
+
+  // Positive control: the walk found guarded pages, including the one that broke.
+  check("control: guarded pages were found", guarded.length > 10, `found ${guarded.length}`);
+  check(
+    "control: the feed board is among them",
+    guarded.some((page) => page.route === "/tasks/feed"),
+  );
+
+  for (const page of guarded) {
+    for (const prefix of page.calls) {
+      const mismatched = ROLES.filter(
+        (role) => roleCanAccess(role, prefix) !== roleCanAccess(role, page.route),
+      );
+      check(
+        `${page.route} guards with requireTab("${prefix}")`,
+        mismatched.length === 0,
+        mismatched
+          .map((role) => `${role}: route ${roleCanAccess(role, page.route) ? "allows" : "denies"}, guard ${roleCanAccess(role, prefix) ? "allows" : "denies"}`)
+          .join("; "),
+      );
+    }
+  }
+}
+
 console.log("\nexactly one link is current, and it is the right one\n");
 for (const role of ROLES) {
   const hrefs = sidebarHrefs(sidebarFor(role, () => true));

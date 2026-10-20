@@ -15,7 +15,7 @@ async function Board() {
 }
 
 export default async function FeedBoardPage() {
-  await requireTab("/tasks");
+  await requireTab("/tasks/feed");
 
   if (!featureEnabled("horses")) {
     return (

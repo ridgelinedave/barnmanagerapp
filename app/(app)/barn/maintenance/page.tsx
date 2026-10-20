@@ -3,6 +3,7 @@ import { TabPage } from "@/components/TabPage";
 import { Card, Chip, ChipRow, EmptyState, SectionHeader } from "@/components/ui/primitives";
 import { SheetTrigger } from "@/components/ui/Sheet";
 import { MaintenanceAddForm, MaintenanceStatusButton } from "@/components/BarnOpsForms";
+import { ConfirmDelete } from "@/components/ConfirmDelete";
 import { canResolveMaintenance, isBarnSide, listMaintenance } from "@/lib/barn-ops";
 import { MAINTENANCE_STATUS_LABELS, type MaintenanceStatus } from "@/lib/types";
 
@@ -75,6 +76,7 @@ export default async function MaintenancePage() {
                       <MaintenanceStatusButton id={row.id} next="done" label="Mark done" />
                     </div>
                   )}
+                  {canResolve && <ConfirmDelete table="maintenance_requests" id={row.id} name={row.title} />}
                 </Card>
               ))}
             </section>

@@ -2,8 +2,9 @@ import { TabPage } from "@/components/TabPage";
 import { Card, Chip, ChipRow, EmptyState, SectionHeader } from "@/components/ui/primitives";
 import { SheetTrigger } from "@/components/ui/Sheet";
 import { BlanketPlanForm } from "@/components/BarnOpsForms";
+import { ConfirmDelete } from "@/components/ConfirmDelete";
 import { currentRole } from "@/lib/guard";
-import { blanketSummary, flySummary, listBlanketBoard } from "@/lib/barn-ops";
+import { blanketSummary, canManageBarnOps, flySummary, listBlanketBoard } from "@/lib/barn-ops";
 
 export const metadata = { title: "Blanketing" };
 
@@ -24,7 +25,10 @@ export const metadata = { title: "Blanketing" };
 export default async function BlanketingPage() {
   const role = await currentRole();
   const isBarn = role === "admin" || role === "staff";
-  const board = await listBlanketBoard();
+  const [board, canDelete] = await Promise.all([
+    listBlanketBoard(),
+    isBarn ? canManageBarnOps() : Promise.resolve(false),
+  ]);
 
   if (board.length === 0) {
     return (
@@ -66,6 +70,9 @@ export default async function BlanketingPage() {
                   <SheetTrigger label="Edit" title={`${horse.name} — blanket and fly`}>
                     <BlanketPlanForm horseId={horse.id} plan={plan} />
                   </SheetTrigger>
+                )}
+                {canDelete && plan && (
+                  <ConfirmDelete table="blanket_plans" id={plan.id} name={`${horse.name}'s blanket plan`} />
                 )}
               </Card>
             );

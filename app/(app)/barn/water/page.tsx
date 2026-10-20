@@ -2,7 +2,8 @@ import { notFound } from "next/navigation";
 import { TabPage } from "@/components/TabPage";
 import { Card, Chip, EmptyState, SectionHeader } from "@/components/ui/primitives";
 import { CheckedNowButton } from "@/components/BarnOpsForms";
-import { isBarnSide, listWaterSources, sinceLabel, waterIsOverdue } from "@/lib/barn-ops";
+import { ConfirmDelete } from "@/components/ConfirmDelete";
+import { canManageBarnOps, isBarnSide, listWaterSources, sinceLabel, waterIsOverdue } from "@/lib/barn-ops";
 import type { WaterSource } from "@/lib/types";
 
 export const metadata = { title: "Water" };
@@ -18,7 +19,7 @@ export const metadata = { title: "Water" };
  * "Never checked" counts as overdue. A trough someone added and forgot is
  * exactly the one worth surfacing.
  */
-function TroughCard({ source, overdue }: { source: WaterSource; overdue: boolean }) {
+function TroughCard({ source, overdue, canDelete }: { source: WaterSource; overdue: boolean; canDelete: boolean }) {
   return (
     <Card className="flex flex-col gap-3 p-4">
       <div className="flex items-baseline gap-3">
@@ -40,6 +41,8 @@ function TroughCard({ source, overdue }: { source: WaterSource; overdue: boolean
         </span>
         <CheckedNowButton id={source.id} />
       </div>
+
+      {canDelete && <ConfirmDelete table="water_sources" id={source.id} name={source.name} />}
     </Card>
   );
 }
@@ -47,7 +50,7 @@ function TroughCard({ source, overdue }: { source: WaterSource; overdue: boolean
 export default async function WaterPage() {
   if (!(await isBarnSide())) notFound();
 
-  const sources = await listWaterSources();
+  const [sources, canDelete] = await Promise.all([listWaterSources(), canManageBarnOps()]);
 
   if (sources.length === 0) {
     return (
@@ -66,7 +69,7 @@ export default async function WaterPage() {
         <section className="flex flex-col gap-3">
           <SectionHeader title="Overdue" count={`${overdue.length}`} />
           {overdue.map((s) => (
-            <TroughCard key={s.id} source={s} overdue />
+            <TroughCard key={s.id} source={s} overdue canDelete={canDelete} />
           ))}
         </section>
       )}
@@ -75,7 +78,7 @@ export default async function WaterPage() {
         <section className="flex flex-col gap-3">
           <SectionHeader title="Up to date" count={`${fine.length}`} />
           {fine.map((s) => (
-            <TroughCard key={s.id} source={s} overdue={false} />
+            <TroughCard key={s.id} source={s} overdue={false} canDelete={canDelete} />
           ))}
         </section>
       )}

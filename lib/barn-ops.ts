@@ -243,6 +243,15 @@ export async function listMaintenance(): Promise<MaintenanceRow[]> {
   }));
 }
 
+/**
+ * Can this caller delete on an operations screen? Admin, or the
+ * manage_horses flag — the same question canResolveMaintenance asks, and the
+ * one the DELETE policies ask once migration 0024 is applied.
+ */
+export async function canManageBarnOps(): Promise<boolean> {
+  return canResolveMaintenance();
+}
+
 /** Can this caller close a request? Mirrors the UPDATE policy exactly. */
 export async function canResolveMaintenance(): Promise<boolean> {
   if (!supabaseConfigured()) return false;

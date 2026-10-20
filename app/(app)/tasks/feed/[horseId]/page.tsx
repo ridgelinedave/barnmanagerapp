@@ -20,7 +20,7 @@ export default async function FeedChartPage({
 }: {
   params: Promise<{ horseId: string }>;
 }) {
-  await requireTab("/tasks");
+  await requireTab("/tasks/feed");
   if (!featureEnabled("horses")) notFound();
 
   const { horseId } = await params;

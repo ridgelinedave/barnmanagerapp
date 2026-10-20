@@ -13,8 +13,9 @@ import {
 import { barn as barnConfig } from "@/config/barn";
 import { SheetTrigger } from "@/components/ui/Sheet";
 import { SupplyAddForm, SupplyStatusButton } from "@/components/BarnOpsForms";
+import { ConfirmDelete } from "@/components/ConfirmDelete";
 import { currentRole } from "@/lib/guard";
-import { isRunningLow, listSupplies, type SupplyRow } from "@/lib/barn-ops";
+import { canManageBarnOps, isRunningLow, listSupplies, type SupplyRow } from "@/lib/barn-ops";
 import { listFamilies } from "@/lib/team";
 import { SUPPLY_STATUS_LABELS } from "@/lib/types";
 
@@ -38,7 +39,7 @@ function amount(item: SupplyRow): string | null {
   return `${Number.isInteger(n) ? n : n.toFixed(2).replace(/\.?0+$/, "")}${item.unit ? ` ${item.unit}` : ""}`;
 }
 
-function SupplyCard({ item, isBarn }: { item: SupplyRow; isBarn: boolean }) {
+function SupplyCard({ item, isBarn, canDelete }: { item: SupplyRow; isBarn: boolean; canDelete: boolean }) {
   const low = isRunningLow(item);
   const qty = amount(item);
 
@@ -69,6 +70,8 @@ function SupplyCard({ item, isBarn }: { item: SupplyRow; isBarn: boolean }) {
           <SupplyStatusButton id={item.id} next="received" label="Mark received" />
         </div>
       )}
+
+      {canDelete && <ConfirmDelete table="supply_items" id={item.id} name={item.name} />}
     </Card>
   );
 }
@@ -82,11 +85,13 @@ function SupplyTable({
   caption,
   items,
   isBarn,
+  canDelete,
   sort,
 }: {
   caption: string;
   items: SupplyRow[];
   isBarn: boolean;
+  canDelete: boolean;
   sort: Parameters<typeof DataTable>[0]["sort"];
 }) {
   const columns: Column[] = [
@@ -126,15 +131,17 @@ function SupplyTable({
         family: item.familyName ?? "—",
         horse: item.horseName ?? "—",
         notes: item.notes ? <span className="line-clamp-1">{item.notes}</span> : "",
-        actions:
-          isBarn && item.status !== "received" ? (
-            <span className="flex gap-1.5">
-              {item.status === "needed" && (
-                <SupplyStatusButton id={item.id} next="ordered" label="Mark ordered" />
-              )}
+        actions: isBarn ? (
+          <span className="flex items-start gap-1.5">
+            {item.status === "needed" && (
+              <SupplyStatusButton id={item.id} next="ordered" label="Mark ordered" />
+            )}
+            {item.status !== "received" && (
               <SupplyStatusButton id={item.id} next="received" label="Mark received" />
-            </span>
-          ) : null,
+            )}
+            {canDelete && <ConfirmDelete table="supply_items" id={item.id} name={item.name} />}
+          </span>
+        ) : null,
       },
     };
   });
@@ -158,9 +165,10 @@ export default async function SuppliesPage({
   );
   const sort = { ...sortState, href: sortHrefFor("/barn/supplies", params) };
 
-  const [items, families] = await Promise.all([
+  const [items, families, canDelete] = await Promise.all([
     listSupplies(),
     isBarn ? listFamilies() : Promise.resolve([]),
+    isBarn ? canManageBarnOps() : Promise.resolve(false),
   ]);
 
   const barn = items.filter((i) => i.scope === "barn");
@@ -193,11 +201,11 @@ export default async function SuppliesPage({
           <SectionHeader title={barnGroup} count={`${barn.length}`} />
           <div className={`flex flex-col gap-3 ${MOBILE_ONLY}`}>
             {barn.map((item) => (
-              <SupplyCard key={item.id} item={item} isBarn={isBarn} />
+              <SupplyCard key={item.id} item={item} isBarn={isBarn} canDelete={canDelete} />
             ))}
           </div>
           <div className={DESKTOP_ONLY}>
-            <SupplyTable caption={barnGroup} items={barn} isBarn={isBarn} sort={sort} />
+            <SupplyTable caption={barnGroup} items={barn} isBarn={isBarn} canDelete={canDelete} sort={sort} />
           </div>
         </section>
       )}
@@ -207,11 +215,11 @@ export default async function SuppliesPage({
           <SectionHeader title={boarderGroup} count={`${boarder.length}`} />
           <div className={`flex flex-col gap-3 ${MOBILE_ONLY}`}>
             {boarder.map((item) => (
-              <SupplyCard key={item.id} item={item} isBarn={isBarn} />
+              <SupplyCard key={item.id} item={item} isBarn={isBarn} canDelete={canDelete} />
             ))}
           </div>
           <div className={DESKTOP_ONLY}>
-            <SupplyTable caption={boarderGroup} items={boarder} isBarn={isBarn} sort={sort} />
+            <SupplyTable caption={boarderGroup} items={boarder} isBarn={isBarn} canDelete={canDelete} sort={sort} />
           </div>
         </section>
       )}

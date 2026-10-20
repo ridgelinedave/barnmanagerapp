@@ -2,8 +2,9 @@ import { TabPage } from "@/components/TabPage";
 import { Card, Chip, ChipRow, EmptyState, SectionHeader } from "@/components/ui/primitives";
 import { SheetTrigger } from "@/components/ui/Sheet";
 import { TurnoutPlanForm } from "@/components/BarnOpsForms";
+import { ConfirmDelete } from "@/components/ConfirmDelete";
 import { currentRole } from "@/lib/guard";
-import { listTurnoutBoard } from "@/lib/barn-ops";
+import { canManageBarnOps, listTurnoutBoard } from "@/lib/barn-ops";
 import { TURNOUT_PATTERN_LABELS } from "@/lib/types";
 
 export const metadata = { title: "Turnout" };
@@ -22,7 +23,10 @@ export const metadata = { title: "Turnout" };
 export default async function TurnoutPage() {
   const role = await currentRole();
   const isBarn = role === "admin" || role === "staff";
-  const board = await listTurnoutBoard();
+  const [board, canDelete] = await Promise.all([
+    listTurnoutBoard(),
+    isBarn ? canManageBarnOps() : Promise.resolve(false),
+  ]);
 
   if (board.length === 0) {
     return (
@@ -68,6 +72,9 @@ export default async function TurnoutPage() {
                 <SheetTrigger label="Edit" title={`${horse.name} — turnout`}>
                   <TurnoutPlanForm horseId={horse.id} plan={plan} />
                 </SheetTrigger>
+              )}
+              {canDelete && plan && (
+                <ConfirmDelete table="turnout_plans" id={plan.id} name={`${horse.name}'s turnout plan`} />
               )}
             </Card>
           ))

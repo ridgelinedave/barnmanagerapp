@@ -1,5 +1,5 @@
 import { TabPage } from "@/components/TabPage";
-import { SectionHeader } from "@/components/ui/primitives";
+import { BarnGroup } from "@/components/BarnGroup";
 import { ListRow, RowList } from "@/components/ui/ListRow";
 import { EmptyState } from "@/components/ui/primitives";
 import { currentRole } from "@/lib/guard";
@@ -38,14 +38,13 @@ function Group({ group, role }: { group: DestinationGroup; role: Role }) {
   if (live.length === 0) return null;
 
   return (
-    <section className="flex flex-col gap-3">
-      <SectionHeader title={group.title} />
+    <BarnGroup title={group.title} storageKey={`barn-group:${role}:${group.title}`}>
       <RowList>
         {live.map((entry) => (
           <ListRow key={entry.href} href={entry.href} title={entry.title} />
         ))}
       </RowList>
-    </section>
+    </BarnGroup>
   );
 }
 
