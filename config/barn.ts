@@ -424,8 +424,12 @@ export const barn = {
   /**
    * Blanket weights the barn uses, lightest first — the options for "what
    * goes on" in a blanket rule. A barn's own vocabulary, so it lives here.
+   *
+   * "None" IS AN INSTRUCTION, not a gap: "no blanket tonight" has to be
+   * sayable, because an absent plan means "nobody set one" — an oversight to
+   * chase. There is deliberately no "Keep": that is a daily note, not a plan.
    */
-  blanketWeights: ["Sheet", "Light", "Medium", "Heavy"],
+  blanketWeights: ["None", "Sheet", "Light", "Medium", "Heavy"],
 
   /** PWA install-prompt and launch-screen copy. Kept here so a clone can reword it. */
   pwa: {

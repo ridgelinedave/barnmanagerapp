@@ -635,9 +635,11 @@ export const TURNOUT_PATTERNS = ["am", "pm", "daily", "none"] as const;
 export type TurnoutPattern = (typeof TURNOUT_PATTERNS)[number];
 
 export const TURNOUT_PATTERN_LABELS: Record<TurnoutPattern, string> = {
-  // Turnout runs MORNING and EVENING only (2026-10-20): 'pm' is the evening
-  // turnout, never "afternoon". The stored values are unchanged.
-  am: "Mornings",
+  // DECIDED 2026-10-20: Morning, Evenings, All day. The barn owner dropped
+  // AFTERNOON, not all-day — plenty of horses live out round the clock. 'pm'
+  // is the evening turnout, never "afternoon". Stored values are unchanged.
+  // "Staying in" is not a turnout time but a plan (stall rest), so it stays.
+  am: "Morning",
   pm: "Evenings",
   daily: "All day",
   none: "Staying in",
