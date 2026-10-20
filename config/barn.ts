@@ -411,15 +411,13 @@ export const barn = {
     shop: false,
     /**
      * A horse per lesson occurrence, and recurring (weekly / biweekly /
-     * custom) enrolment. Needs migration 0025 — PRINTED FOR AUDIT, NOT
-     * APPLIED. The UI reads lesson_riders.horse_id and lesson_enrolments, which
-     * do not exist until then, so this stays false until 0025 is applied, the
-     * gate is green and it has been audited.
+     * custom) enrolment. Migration 0025 audited, applied 2026-10-20, gate
+     * green (series assertions in the suite). ON.
      */
-    lessonSeries: false,
-    /** Client status (Active / Inactive / On a break). Needs migration 0026 — PRINTED, NOT APPLIED. */
-    clientStatus: false,
-    /** Horse, rider and announcement photos. Needs migration 0027 — PRINTED, NOT APPLIED. */
+    lessonSeries: true,
+    /** Client status (Active / Inactive / On a break). Migration 0026 audited, applied 2026-10-20, gate green. ON. */
+    clientStatus: true,
+    /** Horse, rider and announcement photos. Migration 0027 applied 2026-10-20; OFF until the upload screens are built and verified. */
     media: false,
   } satisfies Record<BarnFeatureFlag, boolean>,
 

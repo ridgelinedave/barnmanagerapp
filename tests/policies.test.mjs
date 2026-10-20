@@ -5963,6 +5963,592 @@ async function main() {
   }
 
   // ===========================================================================
+  // OPS DELETE GATE (migration 0024). Delete on supplies, troughs, blanket and
+  // turnout plans is admin or the manage_horses flag — no longer any staff.
+  // Each table: control (the row exists), deny (unflagged staff, client),
+  // re-read unchanged, then the flagged staff member and admin CAN delete.
+  // The flag is granted to the fixture staff profile and ALWAYS revoked.
+  // ===========================================================================
+  console.log("\n\n═══ ops delete gate (0024) — admin or manage_horses only ═══\n");
+  {
+    const staffProfileId = users.staff.profileId;
+    const ownedHorse = fixtures.horses?.owned?.id ?? null;
+    const TAG = "[policytest-0024]";
+    const setFlag = (on) =>
+      admin.from("profiles").update({ manage_horses: on }).eq("id", staffProfileId);
+    const exists = async (table, id) =>
+      ((await admin.from(table).select("id").eq("id", id)).data ?? []).length === 1;
+
+    // Each maker returns a fresh row id, created by admin under RLS.
+    const makers = {
+      supply_items: async () =>
+        (await admin.from("supply_items")
+          .insert({ name: `${TAG} item`, scope: "boarder", family_id: users.parent.familyId, status: "needed" })
+          .select("id").single()).data?.id,
+      water_sources: async () =>
+        (await admin.from("water_sources").insert({ name: `${TAG} trough` }).select("id").single()).data?.id,
+      blanket_plans: async () =>
+        (await admin.from("blanket_plans")
+          .upsert({ horse_id: ownedHorse, notes: TAG }, { onConflict: "horse_id" })
+          .select("id").single()).data?.id,
+      turnout_plans: async () =>
+        (await admin.from("turnout_plans")
+          .upsert({ horse_id: ownedHorse, notes: TAG }, { onConflict: "horse_id" })
+          .select("id").single()).data?.id,
+    };
+
+    try {
+      await setFlag(false);
+      for (const [table, make] of Object.entries(makers)) {
+        const id = await make();
+        check(`control: admin created a ${table} row`, Boolean(id));
+        if (!id) continue;
+
+        check(
+          `unflagged staff CANNOT delete ${table}`,
+          await writeRefused(staff.from(table).delete().eq("id", id).select()),
+        );
+        check(
+          `client CANNOT delete ${table} (their own boarder item / horse plan)`,
+          await writeRefused(parent.from(table).delete().eq("id", id).select()),
+        );
+        check(`…the ${table} row is unchanged`, await exists(table, id));
+
+        await setFlag(true);
+        check(
+          `staff WITH manage_horses CAN delete ${table}`,
+          !(await writeRefused(staff.from(table).delete().eq("id", id).select())),
+        );
+        check(`…and it is gone`, !(await exists(table, id)));
+        await setFlag(false);
+
+        const second = await make();
+        check(
+          `admin CAN delete ${table}`,
+          Boolean(second) && !(await writeRefused(admin.from(table).delete().eq("id", second).select())),
+        );
+      }
+    } finally {
+      await setFlag(false);
+      await admin.from("supply_items").delete().like("name", `${TAG}%`);
+      await admin.from("water_sources").delete().like("name", `${TAG}%`);
+      if (ownedHorse) {
+        await admin.from("blanket_plans").delete().eq("horse_id", ownedHorse).eq("notes", TAG);
+        await admin.from("turnout_plans").delete().eq("horse_id", ownedHorse).eq("notes", TAG);
+      }
+    }
+  }
+
+  // ===========================================================================
+  // LESSON SERIES (migration 0025) — a horse per occurrence, and recurring
+  // enrolment. Everything lives in 2099 on an INACTIVE template of this
+  // section's own, with instances inserted by hand: generate_lesson_instances
+  // is never called here, because it would materialise the barn's REAL
+  // templates. book_enrolments only books enrolments into instances of their
+  // own template, so it touches nothing but these rows.
+  // Cancellation is done AS ADMIN: a client cancelling notifies every admin,
+  // the barn owner included, and "does a cancelled week detach" does not
+  // depend on who cancelled it.
+  // ===========================================================================
+  console.log("\n\n═══ lesson series (0025) — enrolment, cadence, horse per occurrence ═══\n");
+  {
+    const TAG = "[policytest-0025]";
+    const ownedHorse = fixtures.horses?.owned?.id ?? null;
+    const riderA = riderId; // the parent family's rider
+    const riderB = controlRiderId; // the control family's rider
+    const made = { template: null, instances: [], riderC: null };
+
+    // Six consecutive Mondays in 2099 (isodow 1).
+    const weeks = ["2099-01-05", "2099-01-12", "2099-01-19", "2099-01-26", "2099-02-02", "2099-02-09"];
+    const rowsFor = async (rider) =>
+      (
+        await admin
+          .from("lesson_riders")
+          .select("id, instance_id, status, horse_id, enrolment_id")
+          .eq("rider_id", rider)
+          .in("instance_id", made.instances)
+      ).data ?? [];
+    const weekOf = (row) => weeks[made.instances.indexOf(row.instance_id)];
+    const book = () => admin.rpc("book_enrolments", { from_date: "2099-01-01", through_date: "2099-03-31" });
+    const enrolRow = (rider, interval, extra = {}) => ({
+      template_id: made.template,
+      rider_id: rider,
+      interval_weeks: interval,
+      anchor_date: weeks[0],
+      ...extra,
+    });
+
+    try {
+      const tpl = await admin
+        .from("lesson_templates")
+        .insert({ weekday: 1, start_time: "05:15", duration_min: 45, type: "group", max_riders: 2, active: false })
+        .select("id")
+        .single();
+      made.template = tpl.data?.id ?? null;
+      check("control: admin created this section's (inactive) slot", Boolean(made.template), tpl.error?.message);
+
+      for (const date of weeks) {
+        const ins = await admin
+          .from("lesson_instances")
+          .insert({
+            template_id: made.template,
+            date,
+            start_time: "05:15",
+            duration_min: 45,
+            type: "group",
+            max_riders: 2,
+            notes: TAG,
+          })
+          .select("id")
+          .single();
+        if (ins.data?.id) made.instances.push(ins.data.id);
+      }
+      check("control: six weekly instances exist", made.instances.length === 6, `made ${made.instances.length}`);
+
+      // --- writes are admin-only ---------------------------------------------
+      for (const [label, client] of [["staff", staff], ["client", parent]]) {
+        check(
+          `${label} CANNOT create an enrolment`,
+          await writeRefused(client.from("lesson_enrolments").insert(enrolRow(riderA, 1)).select()),
+        );
+      }
+      const wrongDay = await admin
+        .from("lesson_enrolments")
+        .insert(enrolRow(riderA, 1, { anchor_date: "2099-01-06" }))
+        .select();
+      check(
+        "an anchor off the slot's weekday is refused (23514)",
+        wrongDay.error?.code === "23514",
+        wrongDay.error?.code ?? "accepted",
+      );
+
+      const e1 = (await admin.from("lesson_enrolments").insert(enrolRow(riderA, 1)).select("id").single()).data?.id;
+      const e2 = (
+        await admin
+          .from("lesson_enrolments")
+          .insert(enrolRow(riderB, 2, { horse_id: ownedHorse }))
+          .select("id")
+          .single()
+      ).data?.id;
+      check("control: admin enrolled A weekly and B every two weeks", Boolean(e1 && e2));
+
+      for (const [label, client] of [["staff", staff], ["client", parent]]) {
+        check(
+          `${label} CANNOT update an enrolment`,
+          await writeRefused(client.from("lesson_enrolments").update({ interval_weeks: 3 }).eq("id", e1).select()),
+        );
+        check(
+          `${label} CANNOT delete an enrolment`,
+          await writeRefused(client.from("lesson_enrolments").delete().eq("id", e1).select()),
+        );
+      }
+      {
+        const { data } = await admin.from("lesson_enrolments").select("interval_weeks").eq("id", e1).single();
+        check("…the enrolment is unchanged", data?.interval_weeks === 1);
+      }
+      {
+        const { error } = await parent.rpc("book_enrolments", { from_date: "2099-01-01", through_date: "2099-03-31" });
+        check("client CANNOT call book_enrolments", Boolean(error), "no error raised");
+      }
+
+      // --- cadence ------------------------------------------------------------
+      const booked = await book();
+      check(
+        "control: admin CAN book enrolments (6 weekly + 3 fortnightly)",
+        !booked.error && booked.data === 9,
+        `booked ${booked.data} ${booked.error?.message ?? ""}`,
+      );
+      const a = await rowsFor(riderA);
+      const b = await rowsFor(riderB);
+      check("weekly: A is in all six weeks", a.length === 6, `A in ${a.length}`);
+      check(
+        "every two weeks: B is in weeks 1, 3 and 5 only",
+        JSON.stringify(b.map(weekOf).sort()) === JSON.stringify([weeks[0], weeks[2], weeks[4]]),
+        b.map(weekOf).sort().join(","),
+      );
+      check("B's rows carry the series' usual horse", b.length > 0 && b.every((r) => r.horse_id === ownedHorse));
+      check("every series row names its enrolment", [...a, ...b].every((r) => r.enrolment_id));
+      check("booking again books nothing", (await book()).data === 0);
+
+      // --- visibility -----------------------------------------------------------
+      check(
+        "control: client reads their own rider's enrolment",
+        (await visibleIds(parent, "lesson_enrolments")).ids.includes(e1),
+      );
+      await assertCannotSee("client CANNOT read the control family's enrolment", parent, "lesson_enrolments", e2);
+
+      // --- horse per occurrence ------------------------------------------------
+      const aWeek2 = a.find((r) => weekOf(r) === weeks[1]);
+      const aWeek3 = a.find((r) => weekOf(r) === weeks[2]);
+      const setHorse = await admin
+        .from("lesson_riders")
+        .update({ horse_id: ownedHorse })
+        .eq("id", aWeek2.id)
+        .select("id");
+      check(
+        "control: admin sets a horse on ONE occurrence",
+        !setHorse.error && setHorse.data?.length === 1,
+        setHorse.error?.message,
+      );
+      {
+        const after = await rowsFor(riderA);
+        const withHorse = after.filter((r) => r.horse_id === ownedHorse).map((r) => r.id);
+        check("…only that row has it", withHorse.length === 1 && withHorse[0] === aWeek2.id, withHorse.join(","));
+        const { data } = await admin.from("lesson_enrolments").select("horse_id").eq("id", e1).single();
+        check("…the series' usual horse is untouched", data?.horse_id === null);
+      }
+      {
+        const attempt = await parent.from("lesson_riders").update({ horse_id: null }).eq("id", aWeek2.id).select();
+        check(
+          "client CANNOT change the horse on their own rider's booking (42501)",
+          attempt.error?.code === "42501",
+          attempt.error?.code ?? "accepted",
+        );
+        const { data } = await admin.from("lesson_riders").select("horse_id").eq("id", aWeek2.id).single();
+        check("…the horse is unchanged", data?.horse_id === ownedHorse);
+      }
+
+      // --- a cancelled week stays cancelled and stays in the series -------------
+      await admin
+        .from("lesson_riders")
+        .update({ status: "cancelled", cancelled_at: new Date().toISOString() })
+        .eq("id", aWeek3.id);
+      await book();
+      {
+        const { data } = await admin.from("lesson_riders").select("status, enrolment_id").eq("id", aWeek3.id).single();
+        check("a cancelled week is NOT re-booked by the series", data?.status === "cancelled");
+        check("…and keeps its enrolment (it does not detach)", data?.enrolment_id === e1);
+        const week4 = (await rowsFor(riderA)).find((r) => weekOf(r) === weeks[3]);
+        check("…the next week is still booked", week4?.status === "booked");
+      }
+
+      // --- capacity: a third rider into a two-seat slot -------------------------
+      const c = await admin
+        .from("riders")
+        .insert({ family_id: users.parent.familyId, name: `${TAG} rider C` })
+        .select("id")
+        .single();
+      made.riderC = c.data?.id ?? null;
+      await admin.from("lesson_enrolments").insert(enrolRow(made.riderC, 1));
+      await book();
+      {
+        const cWeeks = (await rowsFor(made.riderC)).map(weekOf);
+        check("capacity: C is NOT forced into week 1 (A and B fill it)", !cWeeks.includes(weeks[0]), cWeeks.join(","));
+        check("capacity: C IS booked into week 2 (one seat free)", cWeeks.includes(weeks[1]), cWeeks.join(","));
+        check("capacity: C takes week 3, the seat A cancelled", cWeeks.includes(weeks[2]), cWeeks.join(","));
+      }
+
+      // --- ending a series clears its later bookings only -----------------------
+      const end = await admin.from("lesson_enrolments").update({ ends_on: weeks[3] }).eq("id", e1).select("id");
+      check("control: admin ends A's series after week 4", !end.error && end.data?.length === 1, end.error?.message);
+      {
+        const left = await rowsFor(riderA);
+        check(
+          "weeks 5 and 6 are gone",
+          !left.some((r) => [weeks[4], weeks[5]].includes(weekOf(r))),
+          left.map(weekOf).join(","),
+        );
+        check("weeks 1, 2 and 4 stay", [weeks[0], weeks[1], weeks[3]].every((w) => left.some((r) => weekOf(r) === w)));
+        check("the cancelled week stays as history", left.some((r) => weekOf(r) === weeks[2] && r.status === "cancelled"));
+      }
+
+      // --- a rider going inactive clears future SERIES rows, not hand bookings --
+      const hand = await admin
+        .from("lesson_riders")
+        .insert({ instance_id: made.instances[1], rider_id: riderB, status: "booked" })
+        .select("id")
+        .single();
+      check("control: admin hand-books B into week 2", Boolean(hand.data?.id), hand.error?.message);
+      await admin.from("riders").update({ active: false }).eq("id", riderB);
+      {
+        const left = await rowsFor(riderB);
+        check("inactive: B's series rows are gone", !left.some((r) => r.enrolment_id), `${left.length} left`);
+        check("inactive: the hand-added booking stays", left.some((r) => r.id === hand.data?.id));
+      }
+    } finally {
+      await admin.from("riders").update({ active: true }).eq("id", riderB);
+      if (made.instances.length) await admin.from("lesson_instances").delete().in("id", made.instances);
+      if (made.template) {
+        await admin.from("lesson_enrolments").delete().eq("template_id", made.template);
+        await admin.from("lesson_templates").delete().eq("id", made.template);
+      }
+      if (made.riderC) await admin.from("riders").delete().eq("id", made.riderC);
+      const { data: active } = await admin.from("riders").select("active").eq("id", riderB).single();
+      check("cleanup: the control rider is active again", active?.active === true);
+    }
+  }
+
+  // ===========================================================================
+  // PEOPLE MODEL (migration 0026) — client status, and a rider linked to a
+  // login. The link is ADMIN-SET ONLY (riders UPDATE is admin-only, plus the
+  // riders_guard_profile_link trigger), and a linked login reads its own rider
+  // row and nothing else. The family path must be exactly as before.
+  // Every change here is reverted in the finally block.
+  // ===========================================================================
+  console.log("\n\n═══ people model (0026) — client status, rider linked to a login ═══\n");
+  {
+    const TAG = "[policytest-0026]";
+    const parentFamily = users.parent.familyId;
+    const made = { rider: null, rider2: null, template: null, instance: null };
+
+    try {
+      // --- the family path is unchanged ---------------------------------------
+      const expected = ((await admin.from("riders").select("id").eq("family_id", parentFamily)).data ?? [])
+        .map((r) => r.id)
+        .sort();
+      const seen = (await visibleIds(parent, "riders")).ids.sort();
+      check("control: the client fixture has riders", expected.length > 0, `${expected.length}`);
+      check(
+        "the family path is unchanged: a client sees exactly their own riders",
+        JSON.stringify(seen) === JSON.stringify(expected),
+        `saw ${seen.length}, expected ${expected.length}`,
+      );
+
+      // --- a rider in the PARENT family, linked to the PARENT2 login ----------
+      const r = await admin
+        .from("riders")
+        .insert({ family_id: parentFamily, name: `${TAG} adult rider` })
+        .select("id")
+        .single();
+      made.rider = r.data?.id ?? null;
+      check("control: admin created an unlinked rider", Boolean(made.rider), r.error?.message);
+      await assertCannotSee("before linking, parent2 cannot see it", parent2, "riders", made.rider);
+
+      const link = await admin
+        .from("riders")
+        .update({ profile_id: users.parent2.profileId })
+        .eq("id", made.rider)
+        .select("id");
+      check("control: admin CAN link a rider to a login", !link.error && link.data?.length === 1, link.error?.message);
+      check(
+        "the linked login reads its own rider row",
+        (await visibleIds(parent2, "riders")).ids.includes(made.rider),
+      );
+      await assertCannotSee("…and NOT the other riders in that family", parent2, "riders", riderId);
+      await assertCannotSee("…and NOT that family's row", parent2, "families", parentFamily);
+
+      const r2 = await admin
+        .from("riders")
+        .insert({ family_id: parentFamily, name: `${TAG} second`, profile_id: users.parent2.profileId })
+        .select("id");
+      check("one login links to at most one rider (23505)", r2.error?.code === "23505", r2.error?.code ?? "accepted");
+      if (r2.data?.[0]?.id) made.rider2 = r2.data[0].id;
+
+      // --- nobody but admin may set the link ---------------------------------
+      const linkOf = async (id) => (await admin.from("riders").select("profile_id").eq("id", id).single()).data?.profile_id ?? null;
+      const before = await linkOf(riderId);
+      check(
+        "client CANNOT link their own rider to their login",
+        await writeRefused(parent.from("riders").update({ profile_id: users.parent.profileId }).eq("id", riderId).select()),
+      );
+      check(
+        "client CANNOT link another family's rider",
+        await writeRefused(parent.from("riders").update({ profile_id: users.parent.profileId }).eq("id", controlRiderId).select()),
+      );
+      check(
+        "staff CANNOT set a rider's link",
+        await writeRefused(staff.from("riders").update({ profile_id: users.staff.profileId }).eq("id", riderId).select()),
+      );
+      check("…the links are unchanged", (await linkOf(riderId)) === before && (await linkOf(made.rider)) === users.parent2.profileId);
+
+      // --- client status ------------------------------------------------------
+      const statusOf = async () => (await admin.from("families").select("status").eq("id", parentFamily).single()).data?.status;
+      check("control: a client is active by default", (await statusOf()) === "active");
+      check(
+        "client CANNOT change their own status",
+        await writeRefused(parent.from("families").update({ status: "inactive" }).eq("id", parentFamily).select()),
+      );
+      check("…the status is unchanged", (await statusOf()) === "active");
+      const bad = await admin.from("families").update({ status: "paused" }).eq("id", parentFamily).select();
+      check("a status outside the three is refused (23514)", bad.error?.code === "23514", bad.error?.code ?? "accepted");
+
+      // On a break: book_enrolments skips that client's rider. 2099, inactive slot.
+      const tpl = await admin
+        .from("lesson_templates")
+        .insert({ weekday: 1, start_time: "05:30", duration_min: 45, type: "group", max_riders: 4, active: false })
+        .select("id")
+        .single();
+      made.template = tpl.data?.id ?? null;
+      const ins = await admin
+        .from("lesson_instances")
+        .insert({ template_id: made.template, date: "2099-03-02", start_time: "05:30", duration_min: 45, type: "group", max_riders: 4, notes: TAG })
+        .select("id")
+        .single();
+      made.instance = ins.data?.id ?? null;
+      await admin
+        .from("lesson_enrolments")
+        .insert({ template_id: made.template, rider_id: riderId, interval_weeks: 1, anchor_date: "2099-03-02" });
+
+      const onBreak = await admin.from("families").update({ status: "on_break" }).eq("id", parentFamily).select("id");
+      check("control: admin CAN set a client on a break", !onBreak.error && onBreak.data?.length === 1, onBreak.error?.message);
+      const skipped = await admin.rpc("book_enrolments", { from_date: "2099-03-01", through_date: "2099-03-08" });
+      check("on a break: the series books nothing", !skipped.error && skipped.data === 0, `${skipped.data} ${skipped.error?.message ?? ""}`);
+      await admin.from("families").update({ status: "active" }).eq("id", parentFamily);
+      const resumed = await admin.rpc("book_enrolments", { from_date: "2099-03-01", through_date: "2099-03-08" });
+      check("control: back to active, the same series books its lesson", resumed.data === 1, `${resumed.data}`);
+    } finally {
+      await admin.from("families").update({ status: "active" }).eq("id", parentFamily);
+      if (made.instance) await admin.from("lesson_instances").delete().eq("id", made.instance);
+      if (made.template) {
+        await admin.from("lesson_enrolments").delete().eq("template_id", made.template);
+        await admin.from("lesson_templates").delete().eq("id", made.template);
+      }
+      for (const id of [made.rider, made.rider2].filter(Boolean)) await admin.from("riders").delete().eq("id", id);
+    }
+  }
+
+  // ===========================================================================
+  // MEDIA (migration 0027) — horse photos, rider photos (CHILDREN), and
+  // announcement images. Private buckets, signed URLs, object names
+  // '<owner id>/<file>'. A tiny PNG is uploaded per case and removed after.
+  // Privacy is proved BEHAVIOURALLY: a real object's public URL, fetched with
+  // no session, must not serve — after a control proving it exists and a
+  // permitted viewer can read it.
+  // ===========================================================================
+  console.log("\n\n═══ media (0027) — private photo buckets ═══\n");
+  {
+    // 1x1 transparent PNG.
+    const PNG = Uint8Array.from(
+      atob("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="),
+      (ch) => ch.charCodeAt(0),
+    );
+    const png = () => new Blob([PNG], { type: "image/png" });
+    const put = (client, bucket, path) =>
+      client.storage.from(bucket).upload(path, png(), { upsert: true, contentType: "image/png" });
+    const canRead = async (client, bucket, path) => {
+      const { data, error } = await client.storage.from(bucket).download(path);
+      return !error && Boolean(data) && data.size > 0;
+    };
+    const sizeOf = async (bucket, path) => (await admin.storage.from(bucket).download(path)).data?.size ?? null;
+    const cleanup = [];
+    const made = { announcement: null };
+
+    try {
+      // --- rider photos: the child's own family, the barn, nobody else -------
+      const mine = `${riderId}/policytest.png`;
+      const theirs = `${controlRiderId}/policytest.png`;
+      {
+        const { error } = await put(parent, "rider-photos", mine);
+        check("control: a client CAN upload their own rider's photo", !error, error?.message);
+        if (!error) cleanup.push(["rider-photos", mine]);
+      }
+      check("control: the client reads it back", await canRead(parent, "rider-photos", mine));
+      {
+        const { data } = await parent.storage.from("rider-photos").createSignedUrl(mine, 60);
+        const res = data?.signedUrl ? await fetch(data.signedUrl) : null;
+        check("control: their signed URL serves the photo", res?.ok === true, `status ${res?.status}`);
+      }
+      check("admin CAN read it", await canRead(admin, "rider-photos", mine));
+      check("staff CAN read it", await canRead(staff, "rider-photos", mine));
+      {
+        const { data } = admin.storage.from("rider-photos").getPublicUrl(mine);
+        const res = await fetch(data.publicUrl, { redirect: "manual" });
+        check("rider-photos is PRIVATE — the public URL serves nothing without a session", !res.ok, `status ${res.status}`);
+      }
+      check("another client CANNOT download it", !(await canRead(parent2, "rider-photos", mine)));
+      {
+        const { data, error } = await parent2.storage.from("rider-photos").createSignedUrl(mine, 60);
+        check("another client CANNOT mint a signed URL for it", Boolean(error) || !data?.signedUrl, "a URL was minted");
+      }
+      {
+        const { data } = await parent2.storage.from("rider-photos").list(riderId);
+        check("another client CANNOT list that rider's folder", (data ?? []).length === 0, `${(data ?? []).length} listed`);
+      }
+      {
+        const { error } = await put(parent2, "rider-photos", mine);
+        check("another client CANNOT overwrite it", Boolean(error), "the upload was accepted");
+      }
+      {
+        const { error } = await put(parent2, "rider-photos", `${riderId}/planted.png`);
+        check("another client CANNOT upload into that rider's folder", Boolean(error), "the upload was accepted");
+      }
+      {
+        const { data } = await parent2.storage.from("rider-photos").remove([mine]);
+        check("another client CANNOT delete it", (data ?? []).length === 0, "a removal was reported");
+      }
+      check("staff CANNOT upload a rider photo", Boolean((await put(staff, "rider-photos", `${riderId}/staff.png`)).error));
+      check("anon CANNOT read it", !(await canRead(anon, "rider-photos", mine)));
+      check("…the photo is unchanged", (await sizeOf("rider-photos", mine)) === PNG.length);
+
+      {
+        const { error } = await put(admin, "rider-photos", theirs);
+        check("control: admin uploads the control family's rider photo", !error, error?.message);
+        if (!error) cleanup.push(["rider-photos", theirs]);
+      }
+      check("…and that family CAN read it", await canRead(parent2, "rider-photos", theirs));
+      check("a client CANNOT read another family's rider photo (symmetry)", !(await canRead(parent, "rider-photos", theirs)));
+      check(
+        "a malformed object name answers no, even for admin",
+        Boolean((await put(admin, "rider-photos", "not-a-uuid/x.png")).error),
+      );
+
+      // set_rider_photo: the only way a client records the path.
+      {
+        const ok = await parent.rpc("set_rider_photo", { rider: riderId, path: mine });
+        check("control: a client CAN record their own rider's photo path", !ok.error, ok.error?.message);
+        const wrong = await parent.rpc("set_rider_photo", { rider: riderId, path: theirs });
+        check("a client CANNOT point their rider at another child's photo (22023)", wrong.error?.code === "22023", wrong.error?.code ?? "accepted");
+        const other = await parent2.rpc("set_rider_photo", { rider: riderId, path: null });
+        check("another client CANNOT set this rider's photo (42501)", other.error?.code === "42501", other.error?.code ?? "accepted");
+        const { data } = await admin.from("riders").select("photo_path").eq("id", riderId).single();
+        check("…the path is the client's own", data?.photo_path === mine);
+        check(
+          "a client CANNOT write photo_path directly",
+          await writeRefused(parent.from("riders").update({ photo_path: theirs }).eq("id", riderId).select()),
+        );
+        await admin.rpc("set_rider_photo", { rider: riderId, path: null });
+      }
+
+      // --- horse photos -------------------------------------------------------
+      const owned = fixtures.horses.owned.id;
+      const ridden = fixtures.horses.ridden.id;
+      const unrelated = fixtures.horses.unrelated.id;
+      for (const id of [owned, ridden, unrelated]) {
+        const path = `${id}/policytest.png`;
+        const { error } = await put(admin, "horse-photos", path);
+        if (!error) cleanup.push(["horse-photos", path]);
+      }
+      check("control: admin uploaded three horse photos", cleanup.filter(([b]) => b === "horse-photos").length === 3);
+      check("unflagged staff CANNOT upload a horse photo", Boolean((await put(staff, "horse-photos", `${owned}/staff.png`)).error));
+      check("staff CAN read every horse photo", await canRead(staff, "horse-photos", `${unrelated}/policytest.png`));
+      check("the owning client CAN read their horse's photo", await canRead(parent, "horse-photos", `${owned}/policytest.png`));
+      check("a client whose rider rides the horse CAN read its photo", await canRead(parent, "horse-photos", `${ridden}/policytest.png`));
+      check("a client CANNOT read an unrelated horse's photo", !(await canRead(parent, "horse-photos", `${unrelated}/policytest.png`)));
+      check("a client CANNOT upload a horse photo", Boolean((await put(parent, "horse-photos", `${owned}/client.png`)).error));
+      {
+        const { data } = admin.storage.from("horse-photos").getPublicUrl(`${owned}/policytest.png`);
+        const res = await fetch(data.publicUrl, { redirect: "manual" });
+        check("horse-photos is PRIVATE — the public URL serves nothing", !res.ok, `status ${res.status}`);
+      }
+
+      // --- announcement images follow their announcement's audience -----------
+      const ann = await admin
+        .from("announcements")
+        .insert({ title: "[policytest-0027] staff only", body_md: "x", audience: "staff" })
+        .select("id")
+        .single();
+      made.announcement = ann.data?.id ?? null;
+      const annPath = `${made.announcement}/policytest.png`;
+      {
+        const { error } = await put(admin, "announcement-images", annPath);
+        check("control: admin uploads an image for a staff-only post", !error, error?.message);
+        if (!error) cleanup.push(["announcement-images", annPath]);
+      }
+      check("staff CAN read the staff-only post's image", await canRead(staff, "announcement-images", annPath));
+      check("a client CANNOT read the staff-only post's image", !(await canRead(parent, "announcement-images", annPath)));
+      check("staff CANNOT upload an announcement image", Boolean((await put(staff, "announcement-images", `${made.announcement}/s.png`)).error));
+      {
+        const { data } = admin.storage.from("announcement-images").getPublicUrl(annPath);
+        const res = await fetch(data.publicUrl, { redirect: "manual" });
+        check("announcement-images is PRIVATE — the public URL serves nothing", !res.ok, `status ${res.status}`);
+      }
+    } finally {
+      for (const [bucket, path] of cleanup) await admin.storage.from(bucket).remove([path]);
+      if (made.announcement) await admin.from("announcements").delete().eq("id", made.announcement);
+    }
+  }
+
+  // ===========================================================================
   // THE STAFF BOUNDARY (2026-10-20). The barn owner is explicit: anything
   // gated to staff must be invisible to clients and boarders. Each table gets
   // a positive control first — the row exists and the barn CAN read it — then

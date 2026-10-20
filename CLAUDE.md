@@ -70,6 +70,17 @@ rest. Without the second half, "a parent may edit their own profile" also means
 "a parent may make themselves an admin". Live examples: `profiles`, `tasks`,
 `lesson_riders`, `punches`.
 
+**A guard trigger that early-returns on `auth.uid() is null` does NOT bind the
+service role.** RLS is bypassed by the service role; triggers are not — a
+trigger fires for everyone, so a guard only spares the service role when it
+chooses to. Guards that skip a null caller (`riders_guard_profile_link`,
+`lesson_riders_guard_parent_updates`, ...) do so on purpose, for `db:seed` and
+migration backfills — which means **any server-side path that writes a guarded
+column is UNGUARDED and must validate its own caller.** Contrast
+`enforce_at_least_one_admin` (0016), which refuses for everyone. Never justify
+the early return as "service-role calls already bypass RLS": that is true of
+RLS and false of triggers.
+
 **Three-role revoke on every internal function.**
 
 ```sql
@@ -298,7 +309,7 @@ in this app. Accessibility outranks the design system.
 | `npm run db:apply -- <file>` | Apply a migration over the pooler |
 | `npm run db:verify` | Introspect the live schema (RLS, policies, grants) |
 | `npm run db:seed` | Test fixtures — resets the fixtures' ledger rows and generated notifications, never anyone else's |
-| `npm run test:policies` | The RLS suite (628 assertions) |
+| `npm run test:policies` | The RLS suite (838 assertions) |
 | `npm run db:gate` | The green gate: seed → test:policies → test:policies (no re-seed) → db:advisor |
 | `npm run db:advisor` | Supabase Security Advisor lints (splinter) against the live schema |
 | `npm run test:pdf` | Signed-form PDF rendering tests |

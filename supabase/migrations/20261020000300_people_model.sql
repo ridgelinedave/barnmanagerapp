@@ -107,7 +107,12 @@ security definer
 set search_path = ''
 as $$
 begin
-  -- Service-role / server-side calls already bypass RLS.
+  -- No caller identity: db:seed and migration backfills write riders this way,
+  -- so this early return stays.
+  -- This trigger does NOT bind the service role, unlike
+  -- enforce_at_least_one_admin (0016), which refuses for everyone. Any
+  -- server-side path that sets riders.profile_id is UNGUARDED and must
+  -- validate its own caller.
   if auth.uid() is null then
     return new;
   end if;

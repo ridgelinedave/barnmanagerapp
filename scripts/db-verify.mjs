@@ -88,6 +88,8 @@ const EXPECTED_TABLES = [
   // 0023 — learning modules (a Monarch capability; each barn names it).
   "learning_modules",
   "learning_lessons",
+  // 0025 — recurring enrolment.
+  "lesson_enrolments",
 ];
 
 /**
@@ -330,6 +332,10 @@ console.log("\nStorage");
   const BUCKETS = [
     { id: "documents", migration: "0012" },
     { id: "shows", migration: "0021" },
+    // 0027 — photos. rider-photos holds photographs of children.
+    { id: "horse-photos", migration: "0027" },
+    { id: "rider-photos", migration: "0027" },
+    { id: "announcement-images", migration: "0027" },
   ];
 
   for (const bucket of BUCKETS) {

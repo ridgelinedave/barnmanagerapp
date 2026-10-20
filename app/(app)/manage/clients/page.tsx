@@ -11,6 +11,8 @@ import {
   type Column,
   type Row,
 } from "@/components/ui/DataTable";
+import { SheetTrigger } from "@/components/ui/Sheet";
+import { ClientStatusForm } from "@/components/ClientStatusForm";
 import { requireTab } from "@/lib/guard";
 import { barnToday, formatBarnDayLabel, formatTime } from "@/lib/dates";
 import { CLIENT_STATUS_LABELS, listClients, type ClientRow, type ClientStatus } from "@/lib/clients";
@@ -63,7 +65,14 @@ export default async function ClientsPage({
     { key: "horses", label: "Horses", sortable: true },
     { key: "next", label: "Next lesson", sortable: true },
     { key: "forms", label: "Forms owed", numeric: true, sortable: true },
+    ...(withStatus ? [{ key: "actions", label: "Actions", hideLabel: true, className: "w-px whitespace-nowrap" }] : []),
   ];
+  const statusControl = (c: ClientRow, size: "default" | "sm") =>
+    c.status ? (
+      <SheetTrigger label="Status" title={`Status — ${c.name}`} size={size}>
+        <ClientStatusForm familyId={c.id} status={c.status} />
+      </SheetTrigger>
+    ) : null;
 
   const rows: Row[] = clients.map((c) => ({
     key: c.id,
@@ -85,6 +94,7 @@ export default async function ClientsPage({
       horses: c.horses.join(", ") || "—",
       next: nextLabel(c) ?? "—",
       forms: c.pendingForms || "—",
+      actions: statusControl(c, "sm"),
     },
   }));
 
@@ -99,6 +109,7 @@ export default async function ClientsPage({
               {clients.map((c) => (
                 <ListRow
                   key={c.id}
+                  trailing={statusControl(c, "default") ?? undefined}
                   title={c.name}
                   muted={c.status === "inactive"}
                   meta={[

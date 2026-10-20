@@ -71,6 +71,12 @@
 -- functions are revoked from everyone.
 --
 -- Idempotent throughout: if-not-exists, create-or-replace, drop-if-exists.
+--
+-- RE-RUN WARNING (applied 2026-10-20). 0026 redefines book_enrolments() to
+-- skip clients who are not active. Re-applying THIS file on its own puts back
+-- the version below, which does not check client status — so after any
+-- re-run of 0025, re-run 0026 too. The suite's "on a break: the series books
+-- nothing" assertion fails if this is forgotten.
 -- =============================================================================
 
 begin;

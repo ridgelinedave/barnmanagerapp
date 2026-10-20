@@ -1222,3 +1222,14 @@ inventories every `.sql` there (see `supabase/pending/README.md`).
 `design/FEED-BOARD-WHITEBOARD-PROPOSAL.md`, awaiting a yes); photo upload UI
 (5.3–5.6), which writes to buckets that do not exist until 0027 is applied;
 the Barn tab restructure (fails the no-menu-screens rule, flagged).
+
+### Applied 2026-10-20 (approved after audit)
+
+0024 → 0025 → 0026 → 0027 applied in order, each moved from
+`supabase/pending/` into `supabase/migrations/`, each landing its own suite
+section, `db:gate` green between each (724 → 768 → 789 → 838, advisor clean).
+Before 0024 its assertions were run against the old policies and failed 11
+times, as they should. Live `book_enrolments` body confirmed to contain
+`f.status = 'active'` after 0026. `db:verify` now checks `lesson_enrolments`
+and the three photo buckets. Flags: `lessonSeries` and `clientStatus` ON;
+`media` OFF until the upload screens are built.
