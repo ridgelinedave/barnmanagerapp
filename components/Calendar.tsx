@@ -48,7 +48,8 @@ const KIND_TONE: Record<CalendarKind, string> = {
   care: "border-danger/70 text-danger",
 };
 
-function ItemRow({ item }: { item: CalendarItem }) {
+/** One row: time, title, kind. Also used by the day view for events and care. */
+export function CalendarItemRow({ item }: { item: CalendarItem }) {
   const body = (
     <>
       {/* The time column is fixed-width so a day's rows line up on the clock,
@@ -106,7 +107,7 @@ function DayAgenda({ date, items, today }: { date: string; items: CalendarItem[]
       ) : (
         <ul>
           {items.map((item) => (
-            <ItemRow key={item.id} item={item} />
+            <CalendarItemRow key={item.id} item={item} />
           ))}
         </ul>
       )}

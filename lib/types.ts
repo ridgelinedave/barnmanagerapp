@@ -194,6 +194,23 @@ export type LessonRider = {
   rider_id: string;
   status: LessonRiderStatus;
   cancelled_at: string | null;
+  /** Migration 0025 (pending): the horse for this occurrence only. */
+  horse_id?: string | null;
+  /** Migration 0025 (pending): the series that made this booking, if any. */
+  enrolment_id?: string | null;
+};
+
+/** Migration 0025 (pending): a rider enrolled in a weekly slot every N weeks. */
+export type LessonEnrolment = {
+  id: string;
+  created_at: string;
+  template_id: string;
+  rider_id: string;
+  horse_id: string | null;
+  interval_weeks: number;
+  /** The first lesson, on the slot's weekday. */
+  anchor_date: string;
+  ends_on: string | null;
 };
 
 export type PunchDirection = "in" | "out";

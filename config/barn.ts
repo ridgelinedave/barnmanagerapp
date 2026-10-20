@@ -25,7 +25,8 @@ export type BarnFeatureFlag =
   | "shows"
   | "learning"
   | "invoices"
-  | "shop";
+  | "shop"
+  | "lessonSeries";
 
 /**
  * THE PRODUCT. Monarch is what this software is; a barn is a skin on it.
@@ -406,6 +407,14 @@ export const barn = {
     learning: true,
     invoices: false,
     shop: false,
+    /**
+     * A horse per lesson occurrence, and recurring (weekly / biweekly /
+     * custom) enrolment. Needs migration 0025 — PRINTED FOR AUDIT, NOT
+     * APPLIED. The UI reads lesson_riders.horse_id and lesson_enrolments, which
+     * do not exist until then, so this stays false until 0025 is applied, the
+     * gate is green and it has been audited.
+     */
+    lessonSeries: false,
   } satisfies Record<BarnFeatureFlag, boolean>,
 
   /** PWA install-prompt and launch-screen copy. Kept here so a clone can reword it. */

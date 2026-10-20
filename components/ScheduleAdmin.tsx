@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import { Button } from "@/components/ui/Button";
-import { FormFeedback } from "@/components/ui/Field";
+import { FormFeedback, Select } from "@/components/ui/Field";
 import {
   generateInstances,
   bookRider,
@@ -43,42 +43,59 @@ export function GenerateInstancesButton() {
   );
 }
 
+/**
+ * Add a rider to this lesson — on the lesson itself, admin only.
+ *
+ * The list holds only riders who could actually take the seat: active, at the
+ * lesson's level when it has one, and not already in it. A full lesson says so
+ * and offers nothing. The server action re-checks every one of these against
+ * fresh rows, so this list is a convenience, never the rule.
+ */
 export function BookRiderForm({
   instanceId,
   riders,
+  openSeats,
 }: {
   instanceId: string;
+  /** Already filtered to riders eligible for this lesson. */
   riders: Option[];
+  openSeats: number;
 }) {
   const [state, formAction, pending] = useActionState(bookRider, EMPTY);
+  const id = `book-${instanceId}`;
+
+  if (openSeats <= 0) {
+    return <p className="font-condensed text-label font-semibold uppercase tracking-[0.08em] text-muted">Full</p>;
+  }
 
   return (
-    <form action={formAction} className="flex flex-col gap-2">
+    <form action={formAction} className="flex flex-col gap-1.5">
       <input type="hidden" name="instance_id" value={instanceId} />
-      <div className="flex items-center gap-2">
-        <label htmlFor={`book-${instanceId}`} className="sr-only">
-          Book a rider into this lesson
-        </label>
-        <select
-          id={`book-${instanceId}`}
-          name="rider_id"
-          required
-          defaultValue=""
-          className="min-h-12 min-w-0 flex-1 rounded-control border border-line bg-surface px-3 text-body text-ink"
-        >
-          <option value="" disabled>
-            Add a rider…
-          </option>
-          {riders.map((rider) => (
-            <option key={rider.id} value={rider.id}>
-              {rider.name}
+      <label htmlFor={id} className="flex items-baseline gap-2 text-label font-medium text-ink">
+        Add a rider
+        <span className="font-condensed text-micro uppercase text-muted tabular-nums">
+          {openSeats} {openSeats === 1 ? "seat" : "seats"} open
+        </span>
+      </label>
+      {riders.length === 0 ? (
+        <p className="text-caption text-muted">No eligible riders.</p>
+      ) : (
+        <div className="flex items-center gap-2">
+          <Select id={id} name="rider_id" required defaultValue="" className="min-w-0 flex-1">
+            <option value="" disabled>
+              Choose a rider
             </option>
-          ))}
-        </select>
-        <Button type="submit" variant="secondary" disabled={pending}>
-          {pending ? "…" : "Book"}
-        </Button>
-      </div>
+            {riders.map((rider) => (
+              <option key={rider.id} value={rider.id}>
+                {rider.name}
+              </option>
+            ))}
+          </Select>
+          <Button type="submit" variant="secondary" arrow={false} disabled={pending}>
+            {pending ? "Adding" : "Add"}
+          </Button>
+        </div>
+      )}
       <Feedback state={state} />
     </form>
   );

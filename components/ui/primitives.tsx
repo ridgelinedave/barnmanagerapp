@@ -41,16 +41,19 @@ export function Card({
   children,
   className = "",
   as: Tag = "section",
+  id,
 }: {
   children: ReactNode;
   className?: string;
   as?: "section" | "div" | "article" | "li";
+  /** An anchor, e.g. a lesson linked to from the calendar. */
+  id?: string;
 }) {
   return (
     /* `border-rule`, not `line`: white on the blush is only 1.15:1, so the
        card's EDGE is what makes it read as an object (rule: 1.42:1 against
        the ground). Lists are not cards at all — see ListRow. */
-    <Tag className={`rounded-card border border-rule bg-surface ${className}`}>{children}</Tag>
+    <Tag id={id} className={`rounded-card border border-rule bg-surface ${className}`}>{children}</Tag>
   );
 }
 

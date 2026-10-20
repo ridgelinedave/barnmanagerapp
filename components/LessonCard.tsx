@@ -22,7 +22,7 @@ export function LessonCard({
   const released = (riders ?? []).filter((r) => r.status === "cancelled");
 
   return (
-    <Card as="article" className={`p-4 ${cancelled ? "bg-sunk" : ""}`}>
+    <Card as="article" id={`lesson-${instance.id}`} className={`scroll-mt-24 p-4 ${cancelled ? "bg-sunk" : ""}`}>
       {/*
        * The time is the loudest thing on the card — a day view is read by
        * scanning down the times, and everything else is qualifier.

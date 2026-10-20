@@ -1,7 +1,7 @@
 import "server-only";
 
 import { listEventsBetween } from "@/lib/events";
-import { listUpcomingInstances } from "@/lib/lessons";
+import { listLessonRidersForInstances, listUpcomingInstances, listVisibleRiders } from "@/lib/lessons";
 import { careDueBetween } from "@/lib/care";
 import { formatBarnDate } from "@/lib/dates";
 import { addMonths, endOfMonth, startOfMonth } from "@/lib/month";
@@ -59,26 +59,61 @@ export function calendarWindow(today: string): { from: string; through: string }
 
 export async function loadCalendar(today: string): Promise<CalendarItem[]> {
   const { from, through } = calendarWindow(today);
+  return loadCalendarBetween(from, through);
+}
 
+/**
+ * Everything on one day except its lessons — the day view renders lessons as
+ * full cards with their admin controls, and the events and care due beside
+ * them from here, so the three views agree on what a day holds.
+ */
+export async function loadCalendarExtrasForDay(date: string): Promise<CalendarItem[]> {
+  const items = await loadCalendarBetween(date, date, { lessons: false });
+  return items.filter((item) => item.date === date);
+}
+
+async function loadCalendarBetween(
+  from: string,
+  through: string,
+  { lessons = true }: { lessons?: boolean } = {},
+): Promise<CalendarItem[]> {
   const [instances, events, care] = await Promise.all([
-    listUpcomingInstances(from, through),
+    lessons ? listUpcomingInstances(from, through) : Promise.resolve([]),
     listEventsBetween(from, through),
     careDueBetween(from, through),
   ]);
 
+  // Who is in each lesson, as far as THIS viewer may know: lesson_riders and
+  // riders are both RLS-scoped, so a client sees their own riders' names and
+  // nobody else's, and the barn sees everyone.
+  const scheduled = instances.filter((instance) => instance.status === "scheduled");
+  const [bookings, riders] = scheduled.length
+    ? await Promise.all([listLessonRidersForInstances(scheduled.map((i) => i.id)), listVisibleRiders()])
+    : [[], []];
+  const riderName = new Map(riders.map((r) => [r.id, r.name]));
+  const namesByInstance = new Map<string, string[]>();
+  for (const booking of bookings) {
+    if (booking.status === "cancelled") continue;
+    const name = riderName.get(booking.rider_id);
+    if (!name) continue;
+    namesByInstance.set(booking.instance_id, [...(namesByInstance.get(booking.instance_id) ?? []), name]);
+  }
+
   const items: CalendarItem[] = [];
 
-  for (const instance of instances) {
-    if (instance.status !== "scheduled") continue;
+  for (const instance of scheduled) {
+    const kindLabel = instance.type === "group" ? "Group lesson" : "Private lesson";
+    const names = namesByInstance.get(instance.id) ?? [];
     items.push({
       id: `lesson-${instance.id}`,
       date: instance.date,
       time: instance.start_time,
       kind: "lesson",
-      label: instance.type === "group" ? "Group lesson" : "Private lesson",
-      title: instance.type === "group" ? "Group lesson" : "Private lesson",
+      label: kindLabel,
+      title: names.length > 0 ? names.join(", ") : kindLabel,
       meta: `${instance.duration_min} min`,
-      href: "/lessons",
+      // To the lesson itself, on its day — where the admin's controls are.
+      href: `/schedule?date=${instance.date}#lesson-${instance.id}`,
     });
   }
 
@@ -113,7 +148,8 @@ export async function loadCalendar(today: string): Promise<CalendarItem[]> {
       label: CARE_TYPE_LABELS[event.type],
       title: horse.barn_name || horse.name,
       meta: event.description || undefined,
-      href: `/manage/horses/${horse.id}`,
+      // /more/horses works for staff and the owning family; admin links on to Manage.
+      href: `/more/horses/${horse.id}`,
     });
   }
 

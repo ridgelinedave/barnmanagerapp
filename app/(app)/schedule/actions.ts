@@ -57,29 +57,69 @@ export async function generateInstances(
   };
 }
 
+/**
+ * Add a rider to ONE lesson. The barn owner's control for makeups, backfill by
+ * hand and one-off bookings — the schedule is decorative without it.
+ *
+ * The insert policy already allows admin and nothing else; what RLS cannot
+ * know is the lesson's own rules, so they are checked here, against fresh
+ * rows, at the moment of the write:
+ *   - the lesson is scheduled, not cancelled;
+ *   - there is a seat (booked + backfilled < max_riders, the instance's own
+ *     copy of the template's capacity);
+ *   - a level-restricted lesson takes only a rider at that level;
+ *   - the rider is active.
+ * A rider who cancelled out of this lesson and is being put back gets their
+ * row restored rather than a second one — the unique constraint allows one
+ * row per rider per lesson.
+ */
 export async function bookRider(_prev: ScheduleState, formData: FormData): Promise<ScheduleState> {
-  if (!(await requireAdmin())) return { error: "Only an admin can book riders.", message: null };
+  if (!(await requireAdmin())) return { error: "Only an admin can add riders.", message: null };
 
   const instanceId = String(formData.get("instance_id") ?? "");
   const riderId = String(formData.get("rider_id") ?? "");
   if (!instanceId || !riderId) return { error: "Pick a rider.", message: null };
 
   const supabase = await createClient();
-  const { error } = await supabase
-    .from("lesson_riders")
-    .insert({ instance_id: instanceId, rider_id: riderId, status: "booked" });
+  const [{ data: instance }, { data: rider }, { data: seats }] = await Promise.all([
+    supabase.from("lesson_instances").select("id, status, max_riders, level_id").eq("id", instanceId).maybeSingle(),
+    supabase.from("riders").select("id, name, active, level_id").eq("id", riderId).maybeSingle(),
+    supabase.from("lesson_riders").select("id, rider_id, status").eq("instance_id", instanceId),
+  ]);
+
+  if (!instance) return { error: "That lesson could not be found.", message: null };
+  if (!rider) return { error: "That rider could not be found.", message: null };
+  if (instance.status !== "scheduled") return { error: "That lesson is cancelled.", message: null };
+  if (!rider.active) return { error: `${rider.name} is inactive.`, message: null };
+  if (instance.level_id && rider.level_id !== instance.level_id) {
+    return { error: `${rider.name} is not at this lesson's level.`, message: null };
+  }
+
+  const rows = seats ?? [];
+  const existing = rows.find((row) => row.rider_id === riderId);
+  if (existing && existing.status !== "cancelled") {
+    return { error: `${rider.name} is already in this lesson.`, message: null };
+  }
+  const taken = rows.filter((row) => row.status === "booked" || row.status === "backfilled").length;
+  if (taken >= instance.max_riders) return { error: "This lesson is full.", message: null };
+
+  const { error } = existing
+    ? await supabase
+        .from("lesson_riders")
+        .update({ status: "booked", cancelled_at: null })
+        .eq("id", existing.id)
+    : await supabase
+        .from("lesson_riders")
+        .insert({ instance_id: instanceId, rider_id: riderId, status: "booked" });
 
   if (error) {
-    // The unique constraint is the real guard against double-booking; this just
-    // turns it into something readable.
-    if (error.code === "23505") {
-      return { error: "That rider is already in this lesson.", message: null };
-    }
+    // The unique constraint is the real guard against a double tap.
+    if (error.code === "23505") return { error: `${rider.name} is already in this lesson.`, message: null };
     return { error: error.message, message: null };
   }
 
   revalidate();
-  return { error: null, message: "Rider booked." };
+  return { error: null, message: `${rider.name} added.` };
 }
 
 export async function cancelInstance(formData: FormData): Promise<void> {

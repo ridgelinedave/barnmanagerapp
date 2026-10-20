@@ -2,7 +2,9 @@ import Link from "next/link";
 import { TabPage } from "@/components/TabPage";
 import { StubScreen } from "@/components/StubScreen";
 import { LessonCard } from "@/components/LessonCard";
-import { Calendar, type CalendarView } from "@/components/Calendar";
+import { Calendar, CalendarItemRow, type CalendarView } from "@/components/Calendar";
+import { OccurrenceHorseForm } from "@/components/LessonSeriesForms";
+import { listHorses } from "@/lib/horses";
 import { ScheduleAdminMenu } from "@/components/ScheduleAdminMenu";
 import { BookRiderForm, OneOffLessonForm } from "@/components/ScheduleAdmin";
 import { FillSlotForm } from "@/components/FillSlotForm";
@@ -21,7 +23,7 @@ import {
   listLevels,
 } from "@/lib/lessons";
 import { listAssignableProfiles, nameMap } from "@/lib/tasks";
-import { calendarWindow, loadCalendar } from "@/lib/calendar";
+import { calendarWindow, loadCalendar, loadCalendarExtrasForDay } from "@/lib/calendar";
 import { addBarnDays, barnToday, formatBarnDayLabel } from "@/lib/dates";
 import { featureEnabled } from "@/config/barn";
 import type { Role } from "@/lib/types";
@@ -107,12 +109,22 @@ async function DayBody({ date, role }: { date: string; role: Role }) {
   // Instructor names are worth a round trip for the barn's own people; a
   // family sees their rider's lesson and has no use for the staff directory.
   const people = role === "parent" ? [] : await listAssignableProfiles();
-  const [riders, levels] = await Promise.all([listVisibleRiders(), listLevels()]);
+  const series = isAdmin && featureEnabled("lessonSeries");
+  const [riders, levels, extras, horses] = await Promise.all([
+    listVisibleRiders(),
+    listLevels(),
+    // Events and care due on this day, beside its lessons — the same items the
+    // month and agenda views show for it.
+    loadCalendarExtrasForDay(date),
+    series ? listHorses() : Promise.resolve([]),
+  ]);
+  const horseOptions = horses
+    .filter((h) => h.active)
+    .map((h) => ({ id: h.id, name: h.barn_name || h.name }));
 
   const levelOptions = levels.map((l) => ({ id: l.id, name: l.name }));
   const instructorNames = nameMap(people);
   const riderNames = new Map(riders.map((r) => [r.id, r.name]));
-  const riderOptions = riders.map((r) => ({ id: r.id, name: r.name }));
   const instructorOptions = people.map((p) => ({ id: p.id, name: p.full_name ?? "Unnamed" }));
 
   const bookingsByInstance = new Map<string, typeof bookings>();
@@ -200,6 +212,14 @@ async function DayBody({ date, role }: { date: string; role: Role }) {
         )}
       </ChipRow>
 
+      {extras.length > 0 && (
+        <ul aria-label="Also on this day" className="flex flex-col">
+          {extras.map((item) => (
+            <CalendarItemRow key={item.id} item={item} />
+          ))}
+        </ul>
+      )}
+
       {instances.length === 0 ? (
         <EmptyState title={isToday ? "No lessons today" : "No lessons this day"} />
       ) : (
@@ -215,6 +235,18 @@ async function DayBody({ date, role }: { date: string; role: Role }) {
           >
             {isAdmin && (
               <div className="flex flex-col gap-2">
+                {series &&
+                  (bookingsByInstance.get(instance.id) ?? [])
+                    .filter((b) => b.status !== "cancelled")
+                    .map((b) => (
+                      <OccurrenceHorseForm
+                        key={b.id}
+                        bookingId={b.id}
+                        riderName={riderNames.get(b.rider_id) ?? "Rider"}
+                        horseId={b.horse_id ?? null}
+                        horses={horseOptions}
+                      />
+                    ))}
                 {eligibleByInstance.has(instance.id) && (
                   <FillSlotForm
                     instanceId={instance.id}
@@ -224,7 +256,23 @@ async function DayBody({ date, role }: { date: string; role: Role }) {
                     riderNames={riderNames}
                   />
                 )}
-                <BookRiderForm instanceId={instance.id} riders={riderOptions} />
+                {instance.status === "scheduled" && (
+                  <BookRiderForm
+                    instanceId={instance.id}
+                    openSeats={instance.max_riders - takenSeats(instance.id)}
+                    riders={riders
+                      .filter(
+                        (r) =>
+                          r.active &&
+                          (!instance.level_id || r.level_id === instance.level_id) &&
+                          !(bookingsByInstance.get(instance.id) ?? []).some(
+                            (b) => b.rider_id === r.id && b.status !== "cancelled",
+                          ),
+                      )
+                      .map((r) => ({ id: r.id, name: r.name }))
+                      .sort((a, b) => a.name.localeCompare(b.name))}
+                  />
+                )}
                 <form action={instance.status === "cancelled" ? restoreInstance : cancelInstance}>
                   <input type="hidden" name="id" value={instance.id} />
                   {/* Cancelling is destructive and reads as such; restoring is

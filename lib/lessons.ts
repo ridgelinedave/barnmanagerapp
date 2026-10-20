@@ -2,10 +2,12 @@ import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
 import { supabaseConfigured } from "@/lib/env";
+import { featureEnabled } from "@/config/barn";
 import type {
   Level,
   BackfillOffer,
   EligibleRider,
+  LessonEnrolment,
   LessonInstance,
   LessonRider,
   LessonTemplate,
@@ -169,4 +171,22 @@ export async function listVisibleRiders(): Promise<Rider[]> {
 
   if (error) return [];
   return (data ?? []) as Rider[];
+}
+
+/**
+ * Recurring enrolments still running (no end, or ending today or later).
+ * Empty while `lessonSeries` is off: the table does not exist before 0025.
+ */
+export async function listOpenEnrolments(today: string): Promise<LessonEnrolment[]> {
+  if (!supabaseConfigured() || !featureEnabled("lessonSeries")) return [];
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("lesson_enrolments")
+    .select("*")
+    .or(`ends_on.is.null,ends_on.gte.${today}`)
+    .order("anchor_date");
+
+  if (error) return [];
+  return (data ?? []) as LessonEnrolment[];
 }
