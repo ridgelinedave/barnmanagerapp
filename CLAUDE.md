@@ -206,9 +206,13 @@ a role, they are a segmented control (`SubTabs`, via `TabPage`'s `tabs`) at the
 top of the tab, and the tab opens on the first one — not cards on a menu
 screen. Old routes keep working (redirect, never 404). Count taps: the thing a
 tab exists for should be no more than two taps from the tab. Lessons follows
-this (`lessonSegments` in lib/nav.ts). Audit 2026-10-19: the Barn tab is still
-a link-only landing page for every role (admin 13 destinations, staff 8,
-parent 4) — flagged, not yet restructured.
+this (`lessonSegments` in lib/nav.ts). Audit 2026-10-20: Lessons passes (two
+taps from the Lessons tab to a playing video: the Academy segment, then the
+lesson). More passes — it carries the account card and the calendar
+subscription, not only links. The Barn tab still fails for every role: a
+link-only landing page (admin 13 destinations, staff 8, client 4), too many
+for a segmented control; its groups now collapse on a phone. Flagged, not
+restructured.
 
 **Three faces, each with one job (2026-10-19).** `font-display` is MARCELLUS
 (screen titles, section headings, and proper nouns — module, horse, rider and
@@ -221,6 +225,18 @@ person, no icon chip, no card). Separators on the ground use `border-rule`
 (brand.rule); `line` is for inside white surfaces. A control that is not a
 <Button> borrows `buttonClass()` so it never looks like a card. The time clock
 is mounted only through `TimeClock` (state from `loadClockState`).
+
+**"Time clock" is a MONARCH name, not a barn's (2026-10-20).** The staff
+screen, its nav row and its page metadata say "Time clock", never "Clock"; the
+admin review screen stays "Clock-ins and timesheets". It is the same for every
+barn, so it lives in code, not `config/barn.ts`. `TimeClock` is mounted in
+exactly three places — staff Home (top card), /more/timesheet (top), /clock —
+and never for admin, who does not punch.
+
+**Delete has one pattern: `ConfirmDelete` (2026-10-20).** An inline second
+step, Keep first and focused, the destructive answer a danger ghost — never
+`window.confirm()`. Operations deletes go through one whitelisted server action
+(`app/(app)/barn/delete-actions.ts`) gated on `has_permission('manage_horses')`.
 
 **Two shells, one app** (see `design/DESIGN-MASTER.md` §14b, decided
 2026-10-18). Same routes, same server components, same data functions; a

@@ -438,7 +438,7 @@ export function LevelOrder({
               type="submit"
               disabled={disabled}
               aria-label={`Move ${level.name} ${direction}`}
-              className="flex size-11 items-center justify-center rounded-control border border-line bg-surface text-ink disabled:opacity-35"
+              className="flex size-11 items-center justify-center rounded-control border border-ink/50 bg-transparent text-ink lg:hover:bg-surface disabled:opacity-35"
             >
               <Icon
                 name="chevron"

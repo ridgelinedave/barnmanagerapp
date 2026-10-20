@@ -162,7 +162,7 @@ async function DayBody({ date, role }: { date: string; role: Role }) {
         <Link
           href={`/schedule?date=${addBarnDays(date, -1)}`}
           aria-label="Previous day"
-          className="flex min-h-12 w-12 shrink-0 items-center justify-center rounded-control border border-line bg-surface text-ink"
+          className="flex min-h-12 w-12 shrink-0 items-center justify-center rounded-control border border-ink/50 bg-transparent text-ink lg:hover:bg-surface"
         >
           <Icon name="chevron" className="size-5 rotate-180" strokeWidth={2} />
         </Link>
@@ -183,7 +183,7 @@ async function DayBody({ date, role }: { date: string; role: Role }) {
         <Link
           href={`/schedule?date=${addBarnDays(date, 1)}`}
           aria-label="Next day"
-          className="flex min-h-12 w-12 shrink-0 items-center justify-center rounded-control border border-line bg-surface text-ink"
+          className="flex min-h-12 w-12 shrink-0 items-center justify-center rounded-control border border-ink/50 bg-transparent text-ink lg:hover:bg-surface"
         >
           <Icon name="chevron" className="size-5" strokeWidth={2} />
         </Link>

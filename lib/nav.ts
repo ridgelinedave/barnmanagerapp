@@ -183,7 +183,7 @@ const BARN_TODAY: DestinationGroup = {
     {
       flag: "clockIn",
       href: "/clock",
-      title: "Clock",
+      title: "Time clock",
       icon: "clock",
       roles: ["staff"],
     },

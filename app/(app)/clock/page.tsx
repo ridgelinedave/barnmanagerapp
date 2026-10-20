@@ -9,15 +9,15 @@ import { formatBarnDayLabel } from "@/lib/dates";
 import { pairPunches, totalMinutes, formatMinutes } from "@/lib/timeclock";
 import { featureEnabled } from "@/config/barn";
 
-export const metadata = { title: "Clock" };
+export const metadata = { title: "Time clock" };
 
 export default async function ClockPage() {
   await requireTab("/clock");
 
   if (!featureEnabled("clockIn")) {
     return (
-      <TabPage title="Clock">
-        <StubScreen heading="Clock in and out" phase="Phase 1" />
+      <TabPage title="Time clock">
+        <StubScreen heading="Time clock" phase="Phase 1" />
       </TabPage>
     );
   }
@@ -29,7 +29,7 @@ export default async function ClockPage() {
   const week = totalMinutes(pairPunches(weekPunches));
 
   return (
-    <TabPage title="Clock">
+    <TabPage title="Time clock">
       <TimeClock />
 
       <Card className="flex items-baseline gap-3 p-4">
