@@ -29,7 +29,7 @@ import {
 
 const EMPTY: InviteState = { error: null, message: null };
 
-const ROLE_LABELS: Record<Role, string> = { admin: "Admin", staff: "Staff", parent: "Parent" };
+const ROLE_LABELS: Record<Role, string> = { admin: "Admin", staff: "Staff", parent: "Client" };
 
 /**
  * Inviting someone.

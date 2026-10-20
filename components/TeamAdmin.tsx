@@ -35,7 +35,7 @@ const EMPTY: TeamState = { error: null, message: null };
 const ROLE_LABELS: Record<Role, string> = {
   admin: "Admin",
   staff: "Staff",
-  parent: "Parent",
+  parent: "Client",
 };
 
 /** What each role actually gets, said in one line so a role change is an informed one. */
@@ -180,7 +180,7 @@ function PersonRoleForm({
           label="Family"
           htmlFor={`${id}-family`}
           optional
-          hint="Without it a parent sees an empty app."
+          hint="Without it a client sees an empty app."
         >
           <Select id={`${id}-family`} name="family_id" defaultValue={person.family_id ?? ""}>
             <option value="">Not set yet</option>

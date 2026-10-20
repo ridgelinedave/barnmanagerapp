@@ -233,6 +233,15 @@ barn, so it lives in code, not `config/barn.ts`. `TimeClock` is mounted in
 exactly three places — staff Home (top card), /more/timesheet (top), /clock —
 and never for admin, who does not punch.
 
+**"Client", never "parent", on every screen (2026-10-20).** A CLIENT is a
+`families` row — the account that pays; a RIDER takes lessons and may be
+linked to a login (`riders.profile_id`, migration 0026); a HORSE is optionally
+owned by a client. Boarder, lesson family and adult amateur are DERIVED from
+what a client has, never stored. The database keeps the role value `parent`
+and the table name `families` — renaming them means rewriting ~40 policies
+and functions against a live barn — so `role === "parent"` in code is correct,
+and only user-facing strings say "client".
+
 **Delete has one pattern: `ConfirmDelete` (2026-10-20).** An inline second
 step, Keep first and focused, the destructive answer a danger ghost — never
 `window.confirm()`. Operations deletes go through one whitelisted server action

@@ -61,10 +61,10 @@ function text(formData: FormData, key: string): string {
  */
 function readable(message: string): string {
   if (message.includes("profiles_family_only_for_parents")) {
-    return "Only parents belong to a family. Clear the family before making this person staff or an admin.";
+    return "Only clients belong to a family. Clear the family before making this person staff or an admin.";
   }
   if (message.includes("profiles_flags_only_for_staff")) {
-    return "Parents hold no permissions. Untick what this person manages before making them a parent.";
+    return "Clients hold no permissions. Untick what this person manages before making them a client.";
   }
   if (message.includes("levels_name_key")) {
     return "There is already a level with that name.";

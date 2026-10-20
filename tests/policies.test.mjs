@@ -5962,6 +5962,90 @@ async function main() {
     }
   }
 
+  // ===========================================================================
+  // THE STAFF BOUNDARY (2026-10-20). The barn owner is explicit: anything
+  // gated to staff must be invisible to clients and boarders. Each table gets
+  // a positive control first — the row exists and the barn CAN read it — then
+  // the client's read, by list and by id. A client login is role 'parent' in
+  // the database; a boarder is the same login with horses and no riders, so
+  // the same assertions cover both.
+  console.log("\n\nthe staff boundary — a client reads none of it\n");
+  {
+    const made = { announcement: null, task: null, period: null, approval: null };
+    try {
+      // --- staff-only announcement ------------------------------------------
+      const ann = await admin
+        .from("announcements")
+        .insert({ title: "Boundary check: staff only", body_md: "internal", audience: "staff" })
+        .select("id")
+        .single();
+      made.announcement = ann.data?.id ?? null;
+      check("control: admin created a staff-only announcement", Boolean(made.announcement), ann.error?.message);
+      check(
+        "control: staff CAN read it",
+        (await visibleIds(staff, "announcements")).ids.includes(made.announcement),
+      );
+      await assertCannotSee("client CANNOT read the staff-only announcement by id", parent, "announcements", made.announcement);
+      {
+        const { data } = await parent.from("announcements").select("id").eq("audience", "staff");
+        check("client sees NO staff-only announcement at all", (data ?? []).length === 0, `saw ${(data ?? []).length}`);
+      }
+
+      // --- the task list ------------------------------------------------------
+      const task = await admin
+        .from("tasks")
+        .insert({ title: "Boundary check task", assignee: users.staff.profileId })
+        .select("id")
+        .single();
+      made.task = task.data?.id ?? null;
+      check("control: admin created a task", Boolean(made.task), task.error?.message);
+      check("control: the assigned staff member CAN read it", (await visibleIds(staff, "tasks")).ids.includes(made.task));
+      await assertCannotSee("client CANNOT read the task by id", parent, "tasks", made.task);
+      check("client sees 0 tasks", (await visibleIds(parent, "tasks")).ids.length === 0);
+
+      // --- timesheets: pay periods and approvals -----------------------------
+      const period = await admin
+        .from("pay_periods")
+        .insert({ start_date: "2099-01-01", end_date: "2099-01-14" })
+        .select("id")
+        .single();
+      made.period = period.data?.id ?? null;
+      check("control: admin created a pay period", Boolean(made.period), period.error?.message);
+      check("control: staff CAN read pay periods", (await visibleIds(staff, "pay_periods")).ids.includes(made.period));
+      await assertCannotSee("client CANNOT read the pay period", parent, "pay_periods", made.period);
+      check("client sees 0 pay periods", (await visibleIds(parent, "pay_periods")).ids.length === 0);
+
+      const approval = made.period
+        ? await admin
+            .from("timesheet_approvals")
+            .insert({ period_id: made.period, profile_id: users.staff.profileId, total_minutes: 60 })
+            .select("id")
+            .single()
+        : { data: null, error: { message: "no period" } };
+      made.approval = approval.data?.id ?? null;
+      check("control: admin created a timesheet approval", Boolean(made.approval), approval.error?.message);
+      check(
+        "control: staff CAN read their own approval",
+        (await visibleIds(staff, "timesheet_approvals")).ids.includes(made.approval),
+      );
+      await assertCannotSee("client CANNOT read the timesheet approval", parent, "timesheet_approvals", made.approval);
+      check("client sees 0 timesheet approvals", (await visibleIds(parent, "timesheet_approvals")).ids.length === 0);
+
+      // --- punches (append-only: read what the earlier section wrote) --------
+      const punches = await visibleIds(admin, "punches");
+      check("control: admin CAN read punches, and there are some", punches.ids.length > 0, `saw ${punches.ids.length}`);
+      if (punches.ids[0]) {
+        await assertCannotSee("client CANNOT read a punch by id", parent, "punches", punches.ids[0]);
+      }
+      check("client sees 0 punches", (await visibleIds(parent, "punches")).ids.length === 0);
+    } finally {
+      if (made.approval) await admin.from("timesheet_approvals").delete().eq("id", made.approval);
+      if (made.period) await admin.from("pay_periods").delete().eq("id", made.period);
+      if (made.task) await admin.from("tasks").delete().eq("id", made.task);
+      if (made.announcement) await admin.from("announcements").delete().eq("id", made.announcement);
+    }
+  }
+
   // ---------------------------------------------------------------------------
   console.log(`\n\n${passed} passed, ${failures.length} failed${skipped ? `, ${skipped} section(s) skipped` : ""}`);
   if (failures.length > 0) {

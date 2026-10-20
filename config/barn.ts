@@ -26,7 +26,9 @@ export type BarnFeatureFlag =
   | "learning"
   | "invoices"
   | "shop"
-  | "lessonSeries";
+  | "lessonSeries"
+  | "clientStatus"
+  | "media";
 
 /**
  * THE PRODUCT. Monarch is what this software is; a barn is a skin on it.
@@ -415,6 +417,10 @@ export const barn = {
      * gate is green and it has been audited.
      */
     lessonSeries: false,
+    /** Client status (Active / Inactive / On a break). Needs migration 0026 — PRINTED, NOT APPLIED. */
+    clientStatus: false,
+    /** Horse, rider and announcement photos. Needs migration 0027 — PRINTED, NOT APPLIED. */
+    media: false,
   } satisfies Record<BarnFeatureFlag, boolean>,
 
   /** PWA install-prompt and launch-screen copy. Kept here so a clone can reword it. */

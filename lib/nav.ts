@@ -281,6 +281,15 @@ const BARN_RECORDS: DestinationGroup = {
   title: "Records",
   entries: [
     {
+      // The barn owner's CRM: every client, their riders, horses, next lesson
+      // and forms owed. A "client" is a families row (role 'parent' in the
+      // database) — see migration 0026's header for the model.
+      href: "/manage/clients",
+      title: "Clients",
+      icon: "people",
+      roles: ADMIN,
+    },
+    {
       flag: "announcements",
       href: "/manage/announcements",
       title: "Announcements",

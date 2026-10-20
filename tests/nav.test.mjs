@@ -157,6 +157,19 @@ console.log("\nevery management screen is one click from the admin sidebar\n");
     check(`${screen} is in the admin sidebar`, admin.has(screen));
   }
 
+  // THE STAFF BOUNDARY, at the gate (2026-10-20): a client (role 'parent')
+  // and a boarder (the same login) are refused every /manage screen, and
+  // staff are too. Positive control first: admin is admitted to each.
+  for (const screen of screens) {
+    check(`control: admin is admitted to ${screen}`, roleCanAccess("admin", screen));
+    check(`client is refused ${screen}`, !roleCanAccess("parent", screen));
+    check(`staff is refused ${screen}`, !roleCanAccess("staff", screen));
+  }
+  for (const path of ["/tasks", "/clock"]) {
+    check(`control: staff is admitted to ${path}`, roleCanAccess("staff", path));
+    check(`client is refused ${path}`, !roleCanAccess("parent", path));
+  }
+
   // And the other direction: nobody else is offered a management screen.
   for (const role of ["parent", "staff"]) {
     const manage = sidebarHrefs(sidebarFor(role, () => true)).filter((h) => h.startsWith("/manage"));

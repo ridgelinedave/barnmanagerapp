@@ -50,7 +50,7 @@ function missingRequired(answers: Record<string, unknown>, template: FormTemplat
 }
 
 export async function saveFormAnswers(_prev: FormState, formData: FormData): Promise<FormState> {
-  if (!(await requireParent())) return { error: "Only a parent can fill in this form.", message: null };
+  if (!(await requireParent())) return { error: "Only a client can fill in this form.", message: null };
 
   const id = String(formData.get("id") ?? "");
   if (!id) return { error: "Missing form.", message: null };
@@ -102,7 +102,7 @@ export async function saveFormAnswers(_prev: FormState, formData: FormData): Pro
  */
 export async function signForm(_prev: FormState, formData: FormData): Promise<FormState> {
   const viewer = await requireParent();
-  if (!viewer) return { error: "Only a parent can sign this form.", message: null };
+  if (!viewer) return { error: "Only a client can sign this form.", message: null };
 
   const id = String(formData.get("id") ?? "");
   const signedName = String(formData.get("signed_name") ?? "").trim();

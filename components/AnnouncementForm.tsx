@@ -53,7 +53,7 @@ export function AnnouncementForm({
         {(
           [
             ["all", "Everyone", "Families and staff."],
-            ["staff", "Staff only", "Internal. Parents never see it."],
+            ["staff", "Staff only", "Internal. Clients never see it."],
           ] as const
         ).map(([value, label, hint]) => (
           <label

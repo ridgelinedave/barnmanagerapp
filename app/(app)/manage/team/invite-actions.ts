@@ -50,10 +50,10 @@ function optional(formData: FormData, key: string): string | null {
 
 function readable(message: string): string {
   if (message.includes("invites_family_only_for_parents")) {
-    return "Only a parent invite can carry a family. Clear the family for a staff or admin invite.";
+    return "Only a client invite can carry a family. Clear the family for a staff or admin invite.";
   }
   if (message.includes("invites_flags_only_for_staff")) {
-    return "Parents do not hold permission flags.";
+    return "Clients do not hold permission flags.";
   }
   if (message.includes("invites_full_name_not_blank")) {
     return "Give the person a name — it is what they will see on the invite.";

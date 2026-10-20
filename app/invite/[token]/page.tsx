@@ -24,7 +24,7 @@ export const dynamic = "force-dynamic";
 const ROLE_SENTENCE: Record<Role, string> = {
   admin: "an admin — you'll be able to run the whole barn from the app",
   staff: "staff — you'll see the daily jobs, the schedule and the horses",
-  parent: "a parent — you'll see your riders' lessons, paperwork and horses",
+  parent: "a client — you'll see your riders' lessons, paperwork and horses",
 };
 
 function Shell({ children }: { children: React.ReactNode }) {
@@ -94,7 +94,7 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
         <ChipRow>
           <Chip
             label="Role"
-            value={invite.role === "parent" ? "Parent" : invite.role === "staff" ? "Staff" : "Admin"}
+            value={invite.role === "parent" ? "Client" : invite.role === "staff" ? "Staff" : "Admin"}
             tone={invite.role === "parent" ? "neutral" : "gold"}
           />
           {invite.familyName && <Chip label="Family" value={invite.familyName} />}

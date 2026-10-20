@@ -45,7 +45,7 @@ import type { Role } from "@/lib/types";
 
 export const metadata = { title: "Team and access" };
 
-const ROLE_LABELS: Record<Role, string> = { admin: "Admin", staff: "Staff", parent: "Parent" };
+const ROLE_LABELS: Record<Role, string> = { admin: "Admin", staff: "Staff", parent: "Client" };
 const ROLE_TONES = { admin: "gold", staff: "forest", parent: "neutral" } as const;
 
 /**
