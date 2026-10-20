@@ -8,21 +8,11 @@ import { requireTab } from "@/lib/guard";
 import { feedBoardByHorse } from "@/lib/horses";
 import { careDueBetween, careRecentByHorse } from "@/lib/care";
 import { barnToday } from "@/lib/dates";
-import { buildBoard, currentMeal, formatBoardClock } from "@/lib/feed-board";
+import { barnClockHHMM, buildBoard, currentMeal, formatBoardClock } from "@/lib/feed-board";
 import { barn, featureEnabled } from "@/config/barn";
 import type { CareEvent } from "@/lib/types";
 
 export const metadata = { title: "Feed board" };
-
-/** The barn's "HH:MM" right now, for picking the current meal. */
-function barnClock(now: Date): string {
-  return new Intl.DateTimeFormat("en-GB", {
-    timeZone: barn.timezone,
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  }).format(now);
-}
 
 /**
  * Streamed behind a skeleton so the board's shape is there before its data.
@@ -40,7 +30,7 @@ async function Board({ now }: { now: Date }) {
   for (const { event } of due) dueToday.set(event.horse_id, [...(dueToday.get(event.horse_id) ?? []), event]);
 
   const rows = buildBoard({ board, recent, dueToday, today, timezone: barn.timezone });
-  return <FeedWhiteboard rows={rows} now={currentMeal(barnClock(now), barn.feedMealCutoffs)} />;
+  return <FeedWhiteboard rows={rows} now={currentMeal(barnClockHHMM(now, barn.timezone), barn.feedMealCutoffs)} />;
 }
 
 export default async function FeedBoardPage() {

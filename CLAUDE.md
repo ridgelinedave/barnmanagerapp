@@ -220,10 +220,12 @@ tab exists for should be no more than two taps from the tab. Lessons follows
 this (`lessonSegments` in lib/nav.ts). Audit 2026-10-20: Lessons passes (two
 taps from the Lessons tab to a playing video: the Academy segment, then the
 lesson). More passes — it carries the account card and the calendar
-subscription, not only links. The Barn tab still fails for every role: a
-link-only landing page (admin 13 destinations, staff 8, client 4), too many
-for a segmented control; its groups now collapse on a phone. Flagged, not
-restructured.
+subscription, not only links. Barn passes since 2026-10-20: too many
+destinations for a segmented control (admin 13, staff 8, client 4), so the
+landing page carries the day itself — the feed board now, care due this
+week, open maintenance (a client: supplies the barn needs from them) — with
+every other screen in the collapsible groups beneath. A new screen in Barn
+adds a summary there only if it is something people open the tab to check.
 
 **Three faces, each with one job (2026-10-19).** `font-display` is MARCELLUS
 (screen titles, section headings, and proper nouns — module, horse, rider and

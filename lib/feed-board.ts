@@ -146,3 +146,8 @@ export function formatBoardClock(now: Date, timezone: string): string {
   return `${part({ weekday: "short" })} ${part({ day: "numeric" })} ${part({ month: "short" })} · ${time}`;
 }
 
+
+/** The barn's "HH:MM" (24h) right now — for picking the current meal. */
+export function barnClockHHMM(now: Date, timezone: string): string {
+  return new Intl.DateTimeFormat("en-GB", { timeZone: timezone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(now);
+}
