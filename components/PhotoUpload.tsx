@@ -26,6 +26,9 @@ import { initialOf } from "@/components/ui/ListRow";
  * the initial (FaceImage). The target is at least 56px.
  */
 const OUT = 1024;
+/** 16:9 for course covers ("wide"): 1600 x 900, a landscape card on any screen. */
+const OUT_WIDE = { w: 1600, h: 900 };
+export type PhotoAspect = "square" | "wide";
 
 type Size = "md" | "lg" | "xl";
 const SIZES: Record<Size, { box: string; text: string }> = {
@@ -34,14 +37,18 @@ const SIZES: Record<Size, { box: string; text: string }> = {
   xl: { box: "size-28", text: "text-[2.25rem]" },
 };
 
-async function encodeSquare(img: HTMLImageElement, sx: number, sy: number, side: number): Promise<File> {
+async function encodeCrop(
+  img: HTMLImageElement,
+  rect: { sx: number; sy: number; sw: number; sh: number },
+  out: { w: number; h: number },
+): Promise<File> {
   const canvas = document.createElement("canvas");
-  canvas.width = OUT;
-  canvas.height = OUT;
+  canvas.width = out.w;
+  canvas.height = out.h;
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("This browser cannot crop images.");
   ctx.imageSmoothingQuality = "high";
-  ctx.drawImage(img, sx, sy, side, side, 0, 0, OUT, OUT);
+  ctx.drawImage(img, rect.sx, rect.sy, rect.sw, rect.sh, 0, 0, out.w, out.h);
 
   const toBlob = (type: string, quality: number) =>
     new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, type, quality));
@@ -57,11 +64,15 @@ function Cropper({
   file,
   onCancel,
   onDone,
+  aspect = "square",
 }: {
   file: File;
   onCancel: () => void;
   onDone: (cropped: File) => void;
+  aspect?: PhotoAspect;
 }) {
+  // The frame's height as a fraction of its width: 1 for a square, 9/16 wide.
+  const ratio = aspect === "wide" ? 9 / 16 : 1;
   // Created and revoked in ONE effect. Creating it in state and revoking it in
   // a cleanup broke in development: React runs mount → cleanup → mount, so the
   // URL was revoked before the image loaded and the frame stayed empty.
@@ -90,13 +101,15 @@ function Cropper({
     return () => window.removeEventListener("resize", measure);
   }, []);
 
-  const scale = natural && box ? (box / Math.min(natural.w, natural.h)) * zoom : 1;
+  const boxH = box * ratio;
+  // "Cover" the frame: the image is never smaller than it in either direction.
+  const scale = natural && box ? Math.max(box / natural.w, boxH / natural.h) * zoom : 1;
   const shown = natural ? { w: natural.w * scale, h: natural.h * scale } : { w: 0, h: 0 };
 
   // Keep the image covering the square: no empty edge can be cropped in.
   const clamp = (x: number, y: number) => ({
     x: Math.min(0, Math.max(box - shown.w, x)),
-    y: Math.min(0, Math.max(box - shown.h, y)),
+    y: Math.min(0, Math.max(boxH - shown.h, y)),
   });
 
   // Centre on load and re-clamp whenever the zoom or the box changes.
@@ -119,8 +132,9 @@ function Cropper({
     const h = img.naturalHeight;
     setBox(side);
     setNatural({ w, h });
-    const s = side / Math.min(w, h);
-    setPos({ x: (side - w * s) / 2, y: (side - h * s) / 2 });
+    const sideH = side * ratio;
+    const s = Math.max(side / w, sideH / h);
+    setPos({ x: (side - w * s) / 2, y: (sideH - h * s) / 2 });
   };
 
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
@@ -159,7 +173,13 @@ function Cropper({
     setBusy(true);
     setError(null);
     try {
-      onDone(await encodeSquare(img, -pos.x / scale, -pos.y / scale, box / scale));
+      onDone(
+        await encodeCrop(
+          img,
+          { sx: -pos.x / scale, sy: -pos.y / scale, sw: box / scale, sh: boxH / scale },
+          aspect === "wide" ? OUT_WIDE : { w: OUT, h: OUT },
+        ),
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "The photo could not be prepared.");
       setBusy(false);
@@ -174,7 +194,7 @@ function Cropper({
       onKeyDown={(e) => e.key === "Escape" && onCancel()}
       className="fixed inset-0 z-50 flex items-end justify-center bg-ink/70 p-4 sm:items-center"
     >
-      <div className="flex w-full max-w-sm flex-col gap-4 rounded-card bg-surface p-4">
+      <div className={`flex w-full flex-col gap-4 rounded-card bg-surface p-4 ${aspect === "wide" ? "max-w-lg" : "max-w-sm"}`}>
         <h2 id={titleId} className="font-display text-title text-ink">
           Frame the photo
         </h2>
@@ -188,7 +208,7 @@ function Cropper({
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerUp}
           onKeyDown={onKeyDown}
-          className="relative aspect-square w-full touch-none overflow-hidden rounded-control bg-sunk"
+          className={`relative w-full touch-none overflow-hidden rounded-control bg-sunk ${aspect === "wide" ? "aspect-video" : "aspect-square"}`}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           {src && <img
@@ -205,8 +225,11 @@ function Cropper({
               visibility: natural ? "visible" : "hidden",
             }}
           />}
-          {/* The circle the avatar will show, over the square that is saved. */}
-          <span aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-full shadow-[0_0_0_999px] shadow-ink/40" />
+          {/* The circle the avatar will show, over the square that is saved.
+              A wide cover is shown exactly as framed, so it has no overlay. */}
+          {aspect === "square" && (
+            <span aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-full shadow-[0_0_0_999px] shadow-ink/40" />
+          )}
         </div>
 
         <label className="flex items-center gap-3 font-condensed text-label font-medium text-muted">
@@ -248,6 +271,7 @@ export function PhotoUpload({
   label,
   size = "lg",
   autoSubmit = false,
+  aspect = "square",
 }: {
   /** The form field the cropped square is submitted as. */
   name?: string;
@@ -260,6 +284,8 @@ export function PhotoUpload({
   label: string;
   size?: Size;
   autoSubmit?: boolean;
+  /** "wide": a 16:9 course cover — a landscape tile, cropped to 16:9. */
+  aspect?: PhotoAspect;
 }) {
   const pickRef = useRef<HTMLInputElement>(null);
   const fieldRef = useRef<HTMLInputElement>(null);
@@ -293,8 +319,42 @@ export function PhotoUpload({
   );
   const current = preview ?? src ?? null;
 
+  const wideEmpty = (
+    <span
+      aria-hidden="true"
+      className="flex aspect-video w-full items-center justify-center gap-2 rounded-control border border-dashed border-ink/40 bg-sunk font-condensed text-label font-semibold uppercase tracking-[0.08em] text-ink"
+    >
+      <Icon name="plus" className="size-4" strokeWidth={2.5} />
+      {label}
+    </span>
+  );
+
   return (
     <>
+      {aspect === "wide" ? (
+        <button
+          type="button"
+          onClick={() => pickRef.current?.click()}
+          aria-label={`${current ? "Change" : "Add"} ${label.toLowerCase()}`}
+          className="relative block w-full max-w-md rounded-control"
+        >
+          {current ? (
+            <FaceImage
+              key={current}
+              src={current}
+              className="aspect-video w-full rounded-control border border-rule object-cover"
+              fallback={wideEmpty}
+            />
+          ) : (
+            wideEmpty
+          )}
+          {current && (
+            <span className="absolute bottom-2 right-2 rounded-control border border-ink/50 bg-surface px-2 py-1 font-condensed text-micro font-semibold uppercase text-ink">
+              Change
+            </span>
+          )}
+        </button>
+      ) : (
       <button
         type="button"
         onClick={() => pickRef.current?.click()}
@@ -319,6 +379,7 @@ export function PhotoUpload({
           <Icon name="plus" className="size-3.5" strokeWidth={2.5} />
         </span>
       </button>
+      )}
 
       {/* What the picker returns, before cropping. Never submitted. */}
       <input
@@ -337,7 +398,7 @@ export function PhotoUpload({
       {/* The cropped square — this is the one the form sends. */}
       <input ref={fieldRef} type="file" name={name} className="sr-only" tabIndex={-1} aria-hidden="true" />
 
-      {picked && <Cropper file={picked} onCancel={() => setPicked(null)} onDone={done} />}
+      {picked && <Cropper file={picked} onCancel={() => setPicked(null)} onDone={done} aspect={aspect} />}
     </>
   );
 }

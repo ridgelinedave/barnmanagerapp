@@ -26,7 +26,9 @@ import {
   mintPlaybackToken,
   playbackUrls,
   streamCredentialsFrom,
+  thumbnailUrl,
 } from "../lib/stream-core.ts";
+import { COMPLETE_AT, crossedCompletion } from "../lib/academy-format.ts";
 import {
   CHUNK_BYTES,
   FALLBACK_MAX_DURATION_SECONDS,
@@ -132,6 +134,23 @@ console.log("\nids and URLs\n");
   const urls = playbackUrls("customer-abc.cloudflarestream.com", "signed.token.value");
   check("the token replaces the uid in the iframe path", urls.iframe === "https://customer-abc.cloudflarestream.com/signed.token.value/iframe");
   check("…and in the HLS manifest path", urls.hls.endsWith("/signed.token.value/manifest/video.m3u8"));
+  // Thumbnails are signed the same way as playback: the token, never the uid,
+  // is the path. (Behaviourally, the bare-uid thumbnail of a private video is
+  // a 401 from Stream; the QA run checks that against a real upload.)
+  const thumb = new URL(thumbnailUrl("customer-abc.cloudflarestream.com", "signed.token.value"));
+  check("a thumbnail rides on the signed token, not the uid", thumb.pathname === "/signed.token.value/thumbnails/thumbnail.jpg");
+  check("…over https, at the customer host", thumb.protocol === "https:" && thumb.host === "customer-abc.cloudflarestream.com");
+  check("…1 s in, 270 px tall by default", thumb.searchParams.get("time") === "1s" && thumb.searchParams.get("height") === "270");
+}
+
+console.log("\nprogress: a lesson is watched at 90%\n");
+{
+  check("the mark is 90%", COMPLETE_AT === 0.9);
+  check("crossing 90% going forward completes (100 s: 89 -> 90)", crossedCompletion(89, 90, 100));
+  check("already past it does not complete again (95 -> 96)", !crossedCompletion(95, 96, 100));
+  check("below it does not complete (10 -> 50)", !crossedCompletion(10, 50, 100));
+  check("a seek from 10 s to 95 s crosses it", crossedCompletion(10, 95, 100));
+  check("an unknown duration never completes", !crossedCompletion(0, 50, 0) && !crossedCompletion(0, 50, Number.NaN));
 }
 
 console.log("\ndirect creator uploads: the browser gets a link, never the token\n");

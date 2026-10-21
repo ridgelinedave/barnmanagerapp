@@ -6,6 +6,7 @@ import {
   describeVideo,
   mintPlaybackToken,
   playbackUrls,
+  thumbnailUrl,
   streamCredentialsFrom,
   type StreamCredentials,
 } from "@/lib/stream-core";
@@ -86,4 +87,41 @@ export async function streamVideoStatus(videoId: string): Promise<{ ready: boole
 /** Delete an unused upload's video. The caller has checked it is admin and that no lesson uses it. */
 export async function streamDeleteVideo(videoId: string): Promise<void> {
   return deleteVideo(credentials(), videoId);
+}
+
+/**
+ * Signed thumbnails for lessons, by video id — the SAME privileged step as
+ * playback (a token minted with the account token, server-side), so the
+ * caller must only pass video ids from lesson rows the viewer's own RLS
+ * session returned. One token per video, minted in parallel; the account's
+ * playback host is the same for every video, so it is looked up once per
+ * request batch. A video that cannot be signed (deleted, still uploading) is
+ * simply absent and the row shows its placeholder.
+ */
+export async function streamThumbnails(videoIds: string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  const ids = [...new Set(videoIds.filter(Boolean))];
+  if (ids.length === 0) return out;
+  const creds = credentials();
+  let host: string | null = null;
+  for (const id of ids) {
+    try {
+      host = (await describeVideo(creds, id)).playbackHost;
+      break;
+    } catch {
+      /* try the next one */
+    }
+  }
+  if (!host) return out;
+  await Promise.all(
+    ids.map(async (id) => {
+      try {
+        const token = await mintPlaybackToken(creds, id, PLAYBACK_TTL_SECONDS);
+        out.set(id, thumbnailUrl(host as string, token));
+      } catch {
+        /* absent: the placeholder shows */
+      }
+    }),
+  );
+  return out;
 }

@@ -3,9 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { currentRole } from "@/lib/guard";
-import { streamDeleteVideo, streamUploadLink, streamVideoStatus } from "@/lib/stream";
+import { streamDeleteVideo, streamUploadLink } from "@/lib/stream";
 import { STREAM_UID } from "@/lib/stream-core";
 import { expiryFor, maxDurationFor } from "@/lib/academy-upload";
+import { fillLessonDurations } from "@/lib/academy";
 
 /**
  * Academy uploads — the server's whole part in them.
@@ -128,29 +129,7 @@ export async function syncLessonDurations(lessonIds: string[]): Promise<{ pendin
   const ids = lessonIds.filter((id) => UUID.test(id)).slice(0, 50);
   if (ids.length === 0) return { pending: 0 };
 
-  const supabase = await createClient();
-  const { data: lessons } = await supabase
-    .from("learning_lessons")
-    .select("id, video_id")
-    .in("id", ids)
-    .is("duration_seconds", null)
-    .not("video_id", "is", null);
-
-  let pending = 0;
-  let changed = false;
-  for (const lesson of lessons ?? []) {
-    try {
-      const status = await streamVideoStatus(lesson.video_id as string);
-      if (status.ready && status.durationSeconds) {
-        await supabase.from("learning_lessons").update({ duration_seconds: status.durationSeconds }).eq("id", lesson.id);
-        changed = true;
-      } else {
-        pending += 1;
-      }
-    } catch {
-      pending += 1;
-    }
-  }
+  const { pending, changed } = await fillLessonDurations(ids);
   if (changed) revalidatePath("/lessons/learn");
   return { pending };
 }

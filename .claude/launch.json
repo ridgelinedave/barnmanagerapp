@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "--", "--port", "3210"],
       "port": 3210
+    },
+    {
+      "name": "crouse-barn-app-prod",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "start", "--", "--port", "3220"],
+      "port": 3220
     }
   ]
 }

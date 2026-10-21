@@ -17,6 +17,8 @@ export const MEDIA_BUCKETS = {
   horse: "horse-photos",
   rider: "rider-photos",
   announcement: "announcement-images",
+  /** 0028: Academy course covers; readable exactly when the course is. */
+  cover: "learning-covers",
 } as const;
 
 export type MediaBucket = (typeof MEDIA_BUCKETS)[keyof typeof MEDIA_BUCKETS];

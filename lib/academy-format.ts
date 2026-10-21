@@ -31,3 +31,22 @@ export function outlineSummary(sections: number, lessons: number): string {
   const l = `${lessons} ${lessons === 1 ? "lesson" : "lessons"}`;
   return `${s} · ${l}`;
 }
+
+/**
+ * A lesson counts as watched at 90% — the credits and the last "see you next
+ * time" are not the lesson. The same for every barn, so it lives here, not in
+ * config/barn.ts.
+ */
+export const COMPLETE_AT = 0.9;
+
+/**
+ * Whether playback just CROSSED the completion mark, moving forward: the
+ * previous position was below it and this one is at or past it. Crossing,
+ * not "is past", so a member who un-ticks a lesson by hand and keeps
+ * watching the last tenth is not re-ticked on every time update.
+ */
+export function crossedCompletion(previous: number, current: number, duration: number): boolean {
+  if (!(duration > 0)) return false;
+  const mark = duration * COMPLETE_AT;
+  return previous < mark && current >= mark;
+}

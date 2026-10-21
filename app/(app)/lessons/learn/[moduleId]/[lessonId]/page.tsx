@@ -1,14 +1,15 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { TabPage } from "@/components/TabPage";
-import { VideoPlayer } from "@/components/VideoPlayer";
+import { LessonPlayerShell } from "@/components/academy/LessonPlayerShell";
+import { LessonVideo } from "@/components/academy/LessonVideo";
+import { CourseOutline } from "@/components/academy/CourseOutline";
 import { LearningNotesEditor } from "@/components/LearningNotesEditor";
-import { SectionHeader } from "@/components/ui/primitives";
-import { Icon } from "@/components/ui/Icon";
 import { requireTab } from "@/lib/guard";
-import { formatDuration, loadModule } from "@/lib/learning";
+import { loadCourse } from "@/lib/academy";
 import { resolveLessonPlayback } from "@/lib/video";
+import { streamThumbnails } from "@/lib/stream";
 import { barn, featureEnabled } from "@/config/barn";
+import { setLessonComplete } from "../../course-actions";
 
 export const metadata = { title: barn.learning.label };
 
@@ -16,18 +17,23 @@ export const metadata = { title: barn.learning.label };
 export const dynamic = "force-dynamic";
 
 /**
- * One lesson: the video, then the barn owner's notes.
+ * One lesson. On the desk, TabPage layout="split": the video, its details
+ * and the notes on the left; the course outline down the right with this
+ * lesson marked. On a phone the same stack: video, details, then the list.
  *
  * THE PRIVACY ORDER, which is the whole design (DESIGN-MASTER §8):
- *   1. `loadModule` reads the module and its lessons on the VIEWER'S OWN
- *      session. RLS — learning_audience_allows / learning_module_is_readable —
- *      returns nothing to a viewer outside the module's audience.
+ *   1. `loadCourse` reads the course, its sections and lessons on the
+ *      VIEWER'S OWN session. RLS (0023's audience rule, 0028's
+ *      learning_lesson_is_readable) returns nothing to a viewer outside the
+ *      audience, and nothing of a draft to anyone but the admin.
  *   2. No row: 404. Nothing below runs, and no Stream API call is made.
- *   3. Only for a lesson that came back from step 1 does the server mint a
- *      short-lived signed token (lib/video.ts → lib/stream.ts, server-only),
- *      and the page renders the player with it.
+ *   3. Only for a lesson that came back from step 1 does the server mint
+ *      short-lived signed tokens (lib/video.ts, lib/stream.ts, server-only)
+ *      for the player and the outline's thumbnails.
  * There is no route or action a browser can call to ask for a token, and a
  * video id alone plays nothing because every video requires signed URLs.
+ *
+ * Previous and Next walk the whole course in reading order, across sections.
  */
 export default async function LearningLessonPage({
   params,
@@ -38,108 +44,91 @@ export default async function LearningLessonPage({
   if (!featureEnabled("learning")) notFound();
 
   const { moduleId, lessonId } = await params;
-  const loaded = await loadModule(moduleId);
+  const loaded = await loadCourse(moduleId);
   if (!loaded) notFound();
 
-  const { module, lessons } = loaded;
+  const { course, sections, lessons, completedIds } = loaded;
   const index = lessons.findIndex((l) => l.id === lessonId);
   if (index < 0) notFound();
   const lesson = lessons[index];
 
-  const playback = await resolveLessonPlayback(lesson);
+  const [playback, thumbs] = await Promise.all([
+    resolveLessonPlayback({ video_provider: lesson.videoProvider, video_id: lesson.videoId }),
+    streamThumbnails(lessons.map((l) => l.videoId).filter((v): v is string => Boolean(v))),
+  ]);
+
+  const href = (id: string) => `/lessons/learn/${course.id}/${id}`;
   const previous = lessons[index - 1];
   const next = lessons[index + 1];
   const isAdmin = role === "admin";
-  const duration = formatDuration(lesson.duration_seconds);
+  const completed = completedIds.has(lesson.id);
+
+  const outline = sections.map((s) => ({
+    id: s.id,
+    title: s.title,
+    lessons: lessons
+      .filter((l) => l.sectionId === s.id)
+      .map((l) => ({
+        id: l.id,
+        title: l.title,
+        href: href(l.id),
+        durationSeconds: l.durationSeconds,
+        thumbnailSrc: l.videoId ? (thumbs.get(l.videoId) ?? null) : null,
+        completed: completedIds.has(l.id),
+        current: l.id === lesson.id,
+        toggleAction: setLessonComplete,
+      })),
+  }));
 
   return (
-    <TabPage title={lesson.title} back="/lessons/learn" layout="wide" density="airy">
-      <div className="flex flex-col gap-7 lg:grid lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start lg:gap-10">
-        <div className="flex min-w-0 flex-col gap-5">
-          <VideoPlayer playback={playback} title={lesson.title} />
-
-          <p className="font-condensed text-micro uppercase text-muted">
-            Lesson {index + 1} of {lessons.length}
-            {duration ? ` · ${duration}` : ""}
-          </p>
-
-          {/* NOTES — ONE section. The barn owner writes these herself; nothing
-              is generated or pre-filled. The admin sees the editor under the
-              one "Notes" heading (the textarea is labelled by it); members see
-              the notes, or nothing at all when there are none. */}
-          {isAdmin ? (
-            <section aria-labelledby={`notes-heading-${lesson.id}`} className="flex flex-col gap-3">
-              <SectionHeader title="Notes" id={`notes-heading-${lesson.id}`} />
+    <TabPage
+      title={course.title}
+      back={`/lessons/learn/${course.id}`}
+      layout="split"
+      density="normal"
+      detail={
+        <nav aria-label={`Lessons in ${course.title}`}>
+          <CourseOutline sections={outline.filter((s) => s.lessons.length > 0)} compact heading="Lessons" />
+        </nav>
+      }
+    >
+      <LessonPlayerShell
+        key={lesson.id}
+        lessonId={lesson.id}
+        video={
+          <LessonVideo
+            playback={playback}
+            title={lesson.title}
+            lessonId={lesson.id}
+            courseId={course.id}
+            completed={completed}
+            enrolled={course.enrolled}
+          />
+        }
+        title={lesson.title}
+        position={`Lesson ${index + 1} of ${lessons.length}`}
+        durationSeconds={lesson.videoId ? lesson.durationSeconds : null}
+        notes={lesson.notes}
+        completed={completed}
+        toggleAction={setLessonComplete}
+        previousHref={previous ? href(previous.id) : null}
+        nextHref={next ? href(next.id) : null}
+        notesSlot={
+          isAdmin ? (
+            <section aria-labelledby={`notes-heading-${lesson.id}`} className="flex flex-col gap-3 border-t border-rule pt-4">
+              <h3 id={`notes-heading-${lesson.id}`} className="font-display text-title text-ink">
+                Notes
+              </h3>
               <LearningNotesEditor
                 lessonId={lesson.id}
-                moduleId={module.id}
+                moduleId={course.id}
                 notes={lesson.notes}
                 labelledBy={`notes-heading-${lesson.id}`}
               />
             </section>
-          ) : (
-            lesson.notes.trim() && (
-              <section className="flex flex-col gap-3">
-                <SectionHeader title="Notes" />
-                <p className="whitespace-pre-line text-body leading-relaxed text-ink">{lesson.notes}</p>
-              </section>
-            )
-          )}
-        </div>
-
-        {/* The module's lessons beside the player on a desk, under it on a
-            phone; the current one carries the nav accent and aria-current. */}
-        <nav aria-label="Lessons in this module" className="flex flex-col gap-2">
-          <SectionHeader title={module.title} />
-          <ol className="flex flex-col">
-            {lessons.map((item, i) => {
-              const current = item.id === lesson.id;
-              return (
-                <li key={item.id}>
-                  <Link
-                    href={`/lessons/learn/${module.id}/${item.id}`}
-                    aria-current={current ? "page" : undefined}
-                    className={`flex min-h-11 items-center gap-3 border-l-2 py-2 pl-3 pr-2 text-label lg:min-h-9 lg:text-table ${
-                      current
-                        ? "border-accent bg-accent-tint font-semibold text-ink"
-                        : "border-transparent text-ink hover:bg-surface"
-                    }`}
-                  >
-                    <span className="w-5 shrink-0 tabular-nums text-muted">{i + 1}</span>
-                    <span className="min-w-0 flex-1">{item.title}</span>
-                    {formatDuration(item.duration_seconds) && (
-                      <span className="shrink-0 tabular-nums text-muted">{formatDuration(item.duration_seconds)}</span>
-                    )}
-                  </Link>
-                </li>
-              );
-            })}
-          </ol>
-
-          {(previous || next) && (
-            <div className="mt-2 flex gap-2">
-              {previous && (
-                <Link
-                  href={`/lessons/learn/${module.id}/${previous.id}`}
-                  className="flex min-h-11 flex-1 items-center gap-1.5 rounded-control border border-ink/50 px-3 text-label font-semibold text-ink lg:hover:bg-surface lg:min-h-9 lg:text-table"
-                >
-                  <Icon name="back" className="size-4 shrink-0" strokeWidth={2} />
-                  Previous
-                </Link>
-              )}
-              {next && (
-                <Link
-                  href={`/lessons/learn/${module.id}/${next.id}`}
-                  className="flex min-h-11 flex-1 items-center justify-end gap-1.5 rounded-control border border-ink/50 px-3 text-label font-semibold text-ink lg:hover:bg-surface lg:min-h-9 lg:text-table"
-                >
-                  Next
-                  <Icon name="arrow" className="size-4 shrink-0" strokeWidth={2} />
-                </Link>
-              )}
-            </div>
-          )}
-        </nav>
-      </div>
+          ) : undefined
+        }
+      />
     </TabPage>
   );
 }

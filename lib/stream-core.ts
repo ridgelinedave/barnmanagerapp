@@ -230,3 +230,14 @@ export async function deleteVideo(creds: StreamCredentials, videoId: string, fet
   });
   if (!res.ok && res.status !== 404) throw new StreamError(`Stream delete failed: HTTP ${res.status}${await errorCodes(res)}.`);
 }
+
+/**
+ * A thumbnail for a signed-URL video. The SIGNED TOKEN replaces the uid in
+ * the path, exactly as for playback; a bare uid path is refused by Stream
+ * for a video that requires signed URLs (proved behaviourally, see the
+ * Academy build notes). `time` picks the frame; `height` keeps it light.
+ */
+export function thumbnailUrl(host: string, token: string, opts: { time?: string; height?: number } = {}): string {
+  const q = new URLSearchParams({ time: opts.time ?? "1s", height: String(opts.height ?? 270) });
+  return `https://${host}/${token}/thumbnails/thumbnail.jpg?${q}`;
+}
