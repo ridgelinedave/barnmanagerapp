@@ -85,6 +85,7 @@ export default async function LearningLessonPage({
       title={course.title}
       back={`/lessons/learn/${course.id}`}
       layout="split"
+      split="player"
       density="normal"
       detail={
         <nav aria-label={`Lessons in ${course.title}`}>

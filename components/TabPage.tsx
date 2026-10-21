@@ -3,9 +3,11 @@ import { AppHeader } from "@/components/AppHeader";
 import {
   DEFAULT_LAYOUT,
   DENSITY_GAP,
+  SPLIT_COLUMNS,
   bucketMainClass,
   type Density,
   type LayoutBucket,
+  type SplitShape,
 } from "@/components/layout-buckets";
 
 /**
@@ -14,7 +16,8 @@ import {
  *
  * `layout` picks the desktop bucket (see components/layout-buckets.ts). Leave
  * it off and the screen is the capped reading column at every width.
- * `detail` is the second column of a `split` screen and is ignored otherwise.
+ * `detail` is the second column of a `split` screen and is ignored otherwise;
+ * `split` picks its column shape (layout-buckets.ts: master, or player).
  * `density` sets the rhythm between blocks — tight for a list, airy for a
  * record about one thing.
  *
@@ -32,6 +35,7 @@ export function TabPage({
   density = "normal",
   tabs,
   detail,
+  split = "master",
   header = "default",
   headerMeta,
   children,
@@ -44,6 +48,7 @@ export function TabPage({
   density?: Density;
   tabs?: ReactNode;
   detail?: ReactNode;
+  split?: SplitShape;
   /** `board` keeps the oxblood header at every width (the feed board). */
   header?: "default" | "board";
   headerMeta?: ReactNode;
@@ -65,7 +70,7 @@ export function TabPage({
       />
       <main id="main" className={bucketMainClass(layout)}>
         {layout === "split" ? (
-          <div className={`flex flex-col ${gap} lg:grid lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:items-start lg:gap-8`}>
+          <div className={`flex flex-col ${gap} lg:grid ${SPLIT_COLUMNS[split]} lg:items-start lg:gap-8`}>
             <div className={`flex min-w-0 flex-col ${gap}`}>
               {tabs && <div className="lg:hidden">{tabs}</div>}
               {children}

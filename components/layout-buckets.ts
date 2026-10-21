@@ -35,6 +35,22 @@ export const BUCKET_FRAME: Record<LayoutBucket, string> = {
 };
 
 /**
+ * The two column shapes of `split` from `lg` up.
+ *
+ *   master  the list, then the record — 2fr : 3fr. The default.
+ *   player  the record is the wide one and the list is a side rail: a lesson
+ *           player (video and its details) beside the course outline, 20rem,
+ *           24rem from `xl`. At a 1280px window that leaves the video ~600px;
+ *           the master shape would give it ~370px and the outline the rest.
+ */
+export type SplitShape = "master" | "player";
+
+export const SPLIT_COLUMNS: Record<SplitShape, string> = {
+  master: "lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]",
+  player: "lg:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_24rem]",
+};
+
+/**
  * Density — the vertical rhythm between blocks. Identical padding everywhere
  * is what makes a screen feel machine-made, so a screen says which it is.
  *
