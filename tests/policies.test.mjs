@@ -233,7 +233,21 @@ function parseMigrationFunctions() {
       returnsTrigger: returns === "trigger",
       revokedFrom: functions.get(name)?.revokedFrom ?? new Set(),
       grantedTo: functions.get(name)?.grantedTo ?? new Set(),
+      declaredAt: match.index,
     });
+  }
+
+  // Drops. `drop function [if exists] public.f(...)` removes f from the
+  // inventory UNLESS a later migration declares it again — the files are
+  // concatenated in apply order, so "later" is simply a higher offset. Without
+  // this, a function a migration deliberately dropped (0028 drops the
+  // module-level learning_reorder_lessons) would still be expected to exist,
+  // and "admin CAN reach it" would fail against a schema that is right.
+  const dropRe = /drop\s+function\s+(?:if\s+exists\s+)?public\.(?:"([^"]+)"|([a-z_][a-z0-9_]*))\s*\(/gi;
+  while ((match = dropRe.exec(sql)) !== null) {
+    const name = match[1] ?? match[2];
+    const entry = functions.get(name);
+    if (entry && entry.declaredAt < match.index) functions.delete(name);
   }
 
   // Revokes and grants. Later statements win, which matches apply order.
@@ -5652,10 +5666,30 @@ async function main() {
 
       /* --- lessons follow the module -------------------------------------- */
 
+      // 0028: every lesson sits in a section of its own course. One section
+      // per module here, made on first use (deleted with the module).
+      const sectionOf = new Map();
+      const sectionFor = async (moduleId) => {
+        if (!sectionOf.has(moduleId)) {
+          const { data } = await admin
+            .from("learning_sections")
+            .insert({ module_id: moduleId, title: `${TAG} section`, position: 0 })
+            .select("id")
+            .single();
+          sectionOf.set(moduleId, data?.id ?? null);
+        }
+        return sectionOf.get(moduleId);
+      };
       const addLesson = async (moduleId, position, extra = {}) => {
         const { data, error } = await admin
           .from("learning_lessons")
-          .insert({ module_id: moduleId, title: `${TAG} lesson ${position}`, position, ...extra })
+          .insert({
+            module_id: moduleId,
+            section_id: await sectionFor(moduleId),
+            title: `${TAG} lesson ${position}`,
+            position,
+            ...extra,
+          })
           .select("id")
           .single();
         return { id: data?.id ?? null, error };
@@ -5732,7 +5766,13 @@ async function main() {
         await writeRefused(
           parent
             .from("learning_lessons")
-            .insert({ module_id: everyone.id, title: `${TAG} parent lesson`, position: 9 })
+            // A VALID section, so the refusal is RLS and not a NOT NULL error.
+            .insert({
+              module_id: everyone.id,
+              section_id: await sectionFor(everyone.id),
+              title: `${TAG} parent lesson`,
+              position: 9,
+            })
             .select("id"),
         ),
       );
@@ -5746,16 +5786,19 @@ async function main() {
       const second = await addLesson(everyone.id, 1);
       // Positions 0 (openLesson), 1 (second), 6 (streamRef). New order: second, stream, open.
       const order = [second.id, streamRef.id, openLesson.id];
-      const { error: reorderErr } = await admin.rpc("learning_reorder_lessons", {
-        module: everyone.id,
+      // 0028: positions are per SECTION; the whole-section rewrite replaces
+      // the dropped module-level learning_reorder_lessons.
+      const everyoneSection = await sectionFor(everyone.id);
+      const { error: reorderErr } = await admin.rpc("learning_reorder_section", {
+        section: everyoneSection,
         lesson_ids: order,
       });
-      check("control: admin CAN reorder a module's lessons", !reorderErr, reorderErr?.message);
+      check("control: admin CAN reorder a section's lessons", !reorderErr, reorderErr?.message);
       {
         const { data } = await admin
           .from("learning_lessons")
           .select("id, position")
-          .eq("module_id", everyone.id)
+          .eq("section_id", everyoneSection)
           .order("position");
         check(
           "the new order is exactly the list given, positions 0..n-1",
@@ -5765,20 +5808,20 @@ async function main() {
         );
       }
 
-      const { error: partialErr } = await admin.rpc("learning_reorder_lessons", {
-        module: everyone.id,
+      const { error: partialErr } = await admin.rpc("learning_reorder_section", {
+        section: everyoneSection,
         lesson_ids: [second.id, openLesson.id],
       });
       check("an incomplete lesson order is refused", Boolean(partialErr), "a partial list was accepted");
 
-      const { error: dupErr } = await admin.rpc("learning_reorder_lessons", {
-        module: everyone.id,
+      const { error: dupErr } = await admin.rpc("learning_reorder_section", {
+        section: everyoneSection,
         lesson_ids: [second.id, second.id, openLesson.id],
       });
       check("a lesson order that repeats an id is refused", Boolean(dupErr), "a duplicate was accepted");
 
-      const { error: parentReorder } = await parent.rpc("learning_reorder_lessons", {
-        module: everyone.id,
+      const { error: parentReorder } = await parent.rpc("learning_reorder_section", {
+        section: everyoneSection,
         lesson_ids: order,
       });
       check("a parent CANNOT reorder lessons", Boolean(parentReorder), "a parent reordered a module");
@@ -5832,6 +5875,260 @@ async function main() {
 
       const left = (await visibleIds(admin, "learning_modules")).ids.filter((id) => made.includes(id));
       check("this section's modules (and their lessons) are cleaned up", left.length === 0, `${left.length} left`);
+    }
+  }
+
+  // ===========================================================================
+  // ACADEMY STRUCTURE (migration 0028) — course > section > lesson,
+  // categories, enrolment and progress per LOGIN, private course covers.
+  //
+  // Every row here is this section's own: courses at positions 950000+, the
+  // TAG on every title, all deleted at the end (cascades take sections,
+  // lessons, links, enrolments and progress with them).
+  // ===========================================================================
+  console.log("\n\n═══ academy (0028) — sections, enrolment, progress, covers ═══\n");
+  {
+    const TAG = "[policytest-0028]";
+    const base = 950000 + Math.floor(Math.random() * 10000) * 10;
+    const made = { modules: [], covers: [] };
+    const PNG = Uint8Array.from(
+      atob("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="),
+      (ch) => ch.charCodeAt(0),
+    );
+    const canRead = async (client, path) => {
+      const { data, error } = await client.storage.from("learning-covers").download(path);
+      return !error && Boolean(data) && data.size > 0;
+    };
+    const course = async (fields) => {
+      const { data, error } = await admin
+        .from("learning_modules")
+        .insert({ title: `${TAG} course`, ...fields })
+        .select("id")
+        .single();
+      if (data?.id) made.modules.push(data.id);
+      return { id: data?.id ?? null, error };
+    };
+    const section = async (moduleId, position, title = `${TAG} section ${position}`) =>
+      (await admin.from("learning_sections").insert({ module_id: moduleId, title, position }).select("id").single()).data
+        ?.id ?? null;
+    const lesson = async (moduleId, sectionId, position) =>
+      (
+        await admin
+          .from("learning_lessons")
+          .insert({ module_id: moduleId, section_id: sectionId, title: `${TAG} lesson ${position}`, position })
+          .select("id")
+          .single()
+      ).data?.id ?? null;
+
+    try {
+      const { data: riderRow } = await admin.from("riders").select("level_id").eq("id", riderId).single();
+      const { data: levelRows } = await admin.from("levels").select("id");
+      const otherLevel = (levelRows ?? []).map((l) => l.id).find((id) => id !== riderRow?.level_id) ?? null;
+
+      // --- the migration itself -----------------------------------------------
+      {
+        const { data: withLessons } = await admin.from("learning_lessons").select("module_id, section_id");
+        check("control: there are lessons to check", (withLessons ?? []).length > 0, `${(withLessons ?? []).length}`);
+        check(
+          "every lesson has a section (0028 backfill + NOT NULL)",
+          (withLessons ?? []).every((l) => l.section_id),
+        );
+        // The real course's migration (Adjusting Stirrups: one section, both
+        // lessons, same ids / video ids / notes / order) is proved by a
+        // before-and-after snapshot at apply time, not here: an assertion
+        // keyed to a real course's title would fail forever once she renames it.
+      }
+
+      // --- fixtures -------------------------------------------------------------
+      const open = await course({ position: base, audience: "all", published: true });
+      const other = await course({ position: base + 1, audience: "all", published: true });
+      const draft = await course({ position: base + 2, audience: "all", published: false });
+      const elsewhere = otherLevel
+        ? await course({ position: base + 3, audience: "level", audience_level_id: otherLevel, published: true })
+        : { id: null };
+      check(
+        "control: admin created an open, a second, a draft and an other-level course",
+        Boolean(open.id && other.id && draft.id && elsewhere.id),
+        open.error?.message,
+      );
+      const s1 = await section(open.id, 0);
+      const s2 = await section(open.id, 1);
+      const sOther = await section(other.id, 0);
+      const sDraft = await section(draft.id, 0);
+      const sElsewhere = await section(elsewhere.id, 0);
+      const l1 = await lesson(open.id, s1, 0);
+      const l2 = await lesson(open.id, s1, 1);
+      const l3 = await lesson(open.id, s2, 0);
+      const lDraft = await lesson(draft.id, sDraft, 0);
+      const lElsewhere = await lesson(elsewhere.id, sElsewhere, 0);
+      check("control: sections and lessons created", Boolean(s1 && s2 && sOther && l1 && l2 && l3 && lDraft && lElsewhere));
+
+      // --- structure: a lesson's section is its own course's ---------------------
+      {
+        const { error } = await admin
+          .from("learning_lessons")
+          .insert({ module_id: open.id, section_id: sOther, title: `${TAG} crossed`, position: 9 })
+          .select("id");
+        check("a lesson cannot sit in another course's section (23503)", error?.code === "23503", error?.code ?? "accepted");
+      }
+
+      // --- draft and audience: sections follow the course ----------------------
+      check("control: a client reads the open course's sections", (await visibleIds(parent, "learning_sections")).ids.includes(s1));
+      await assertCannotSee("a client cannot read a draft course's section", parent, "learning_sections", sDraft);
+      await assertCannotSee("…nor its lesson", parent, "learning_lessons", lDraft);
+      await assertCannotSee("a client cannot read another level's section", parent, "learning_sections", sElsewhere);
+      check("control: admin reads the draft's section", (await visibleIds(admin, "learning_sections")).ids.includes(sDraft));
+
+      // --- categories ------------------------------------------------------------
+      const { data: cats } = await parent.from("learning_categories").select("id, name");
+      const names = (cats ?? []).map((c) => c.name);
+      check(
+        "a client reads the barn's categories, the seven seeded among them",
+        ["Veterinary", "Groundwork", "Dressage", "Horse Care", "Horsemanship", "Riding", "Tack"].every((n) => names.includes(n)),
+        names.join(", "),
+      );
+      check(
+        "a client CANNOT add a category",
+        await writeRefused(parent.from("learning_categories").insert({ name: `${TAG} cat` }).select("id")),
+      );
+      const cat = cats?.[0]?.id;
+      const linkOpen = await admin.from("learning_module_categories").insert({ module_id: open.id, category_id: cat }).select();
+      const linkDraft = await admin.from("learning_module_categories").insert({ module_id: draft.id, category_id: cat }).select();
+      check("control: admin links categories to courses", !linkOpen.error && !linkDraft.error, linkOpen.error?.message ?? linkDraft.error?.message);
+      {
+        const { data } = await parent.from("learning_module_categories").select("module_id").in("module_id", [open.id, draft.id]);
+        const seen = (data ?? []).map((r) => r.module_id);
+        check("a client sees the open course's category link", seen.includes(open.id));
+        check("…and NOT the draft course's", !seen.includes(draft.id));
+      }
+      check(
+        "a client CANNOT link a category",
+        await writeRefused(parent.from("learning_module_categories").insert({ module_id: other.id, category_id: cat }).select()),
+      );
+
+      // --- enrolment: own rows, visible courses only ----------------------------
+      const enrol = await parent.from("learning_enrolments").insert({ module_id: open.id }).select("id, profile_id").single();
+      check(
+        "control: a client enrols themselves in a visible course",
+        !enrol.error && enrol.data?.profile_id === users.parent.profileId,
+        enrol.error?.message,
+      );
+      check("…and reads it", (await visibleIds(parent, "learning_enrolments")).ids.includes(enrol.data?.id));
+      check(
+        "a client CANNOT enrol another login",
+        await writeRefused(parent.from("learning_enrolments").insert({ module_id: other.id, profile_id: users.parent2.profileId }).select()),
+      );
+      check(
+        "a client CANNOT enrol in a draft",
+        await writeRefused(parent.from("learning_enrolments").insert({ module_id: draft.id }).select()),
+      );
+      check(
+        "a client CANNOT enrol in another level's course",
+        await writeRefused(parent.from("learning_enrolments").insert({ module_id: elsewhere.id }).select()),
+      );
+
+      // --- progress: own rows, visible lessons only ------------------------------
+      const done = await parent.from("learning_progress").insert({ lesson_id: l1 }).select("id, profile_id").single();
+      check(
+        "control: a client completes a visible lesson",
+        !done.error && done.data?.profile_id === users.parent.profileId,
+        done.error?.message,
+      );
+      check(
+        "a client CANNOT complete a draft's lesson",
+        await writeRefused(parent.from("learning_progress").insert({ lesson_id: lDraft }).select()),
+      );
+      check(
+        "a client CANNOT complete another level's lesson",
+        await writeRefused(parent.from("learning_progress").insert({ lesson_id: lElsewhere }).select()),
+      );
+      check(
+        "a client CANNOT write progress for another login",
+        await writeRefused(parent.from("learning_progress").insert({ lesson_id: l2, profile_id: users.parent2.profileId }).select()),
+      );
+
+      // --- another client sees none of it, and cannot remove it -----------------
+      await assertCannotSee("another client CANNOT read the client's enrolment", parent2, "learning_enrolments", enrol.data?.id);
+      await assertCannotSee("another client CANNOT read the client's progress", parent2, "learning_progress", done.data?.id);
+      await assertCannotSee("staff CANNOT read a client's progress", staff, "learning_progress", done.data?.id);
+      check(
+        "another client CANNOT delete the client's enrolment",
+        await writeRefused(parent2.from("learning_enrolments").delete().eq("id", enrol.data?.id).select()),
+      );
+      check(
+        "another client CANNOT delete the client's progress",
+        await writeRefused(parent2.from("learning_progress").delete().eq("id", done.data?.id).select()),
+      );
+      check("…both rows are unchanged", (await visibleIds(parent, "learning_progress")).ids.includes(done.data?.id) &&
+        (await visibleIds(parent, "learning_enrolments")).ids.includes(enrol.data?.id));
+      check("admin reads every enrolment", (await visibleIds(admin, "learning_enrolments")).ids.includes(enrol.data?.id));
+      check("admin reads every progress row", (await visibleIds(admin, "learning_progress")).ids.includes(done.data?.id));
+      {
+        const { data } = await parent.from("learning_progress").delete().eq("id", done.data?.id).select("id");
+        check("control: a client CAN un-complete their own lesson", (data ?? []).length === 1);
+      }
+
+      // --- ordering: whole-list rewrites only -----------------------------------
+      {
+        const r = await admin.rpc("learning_reorder_sections", { module: open.id, section_ids: [s2, s1] });
+        const { data } = await admin.from("learning_sections").select("id, position").eq("module_id", open.id).order("position");
+        check(
+          "control: admin reorders a course's sections",
+          !r.error && JSON.stringify((data ?? []).map((x) => x.id)) === JSON.stringify([s2, s1]),
+          r.error?.message,
+        );
+        check("an incomplete section order is refused", Boolean((await admin.rpc("learning_reorder_sections", { module: open.id, section_ids: [s1] })).error));
+        check("a section order with a duplicate is refused", Boolean((await admin.rpc("learning_reorder_sections", { module: open.id, section_ids: [s1, s1] })).error));
+        check("a section from another course is refused", Boolean((await admin.rpc("learning_reorder_sections", { module: open.id, section_ids: [s1, sOther] })).error));
+        const st = await staff.rpc("learning_reorder_sections", { module: open.id, section_ids: [s1, s2] });
+        check("staff CANNOT reorder sections (42501)", st.error?.code === "42501", st.error?.code);
+        const pr = await parent.rpc("learning_reorder_section", { section: s1, lesson_ids: [l2, l1] });
+        check("a client CANNOT reorder lessons (42501)", pr.error?.code === "42501", pr.error?.code);
+
+        const move = await admin.rpc("learning_reorder_section", { section: s2, lesson_ids: [l1, l3] });
+        const { data: moved } = await admin.from("learning_lessons").select("id, section_id, position").in("id", [l1, l3]).order("position");
+        check(
+          "control: a lesson MOVES into another section of the same course",
+          !move.error && (moved ?? []).every((x) => x.section_id === s2) && moved?.[0]?.id === l1,
+          move.error?.message ?? JSON.stringify(moved),
+        );
+        check(
+          "a section order missing one of its own lessons is refused",
+          Boolean((await admin.rpc("learning_reorder_section", { section: s2, lesson_ids: [l1] })).error),
+        );
+        check(
+          "a lesson from another course is refused",
+          Boolean((await admin.rpc("learning_reorder_section", { section: s2, lesson_ids: [l1, l3, lDraft] })).error),
+        );
+      }
+
+      // --- covers follow the course ---------------------------------------------
+      const coverOpen = `${open.id}/policytest.png`;
+      const coverDraft = `${draft.id}/policytest.png`;
+      const coverElsewhere = `${elsewhere.id}/policytest.png`;
+      for (const path of [coverOpen, coverDraft, coverElsewhere]) {
+        const { error } = await admin.storage
+          .from("learning-covers")
+          .upload(path, new Blob([PNG], { type: "image/png" }), { upsert: true, contentType: "image/png" });
+        if (!error) made.covers.push(path);
+      }
+      check("control: admin uploaded three covers", made.covers.length === 3, `${made.covers.length}`);
+      check("a client in the audience reads the open course's cover", await canRead(parent, coverOpen));
+      check("a client CANNOT read a draft course's cover", !(await canRead(parent, coverDraft)));
+      check("a client CANNOT read another level's cover", !(await canRead(parent, coverElsewhere)));
+      check("control: staff read the other-level cover (published)", await canRead(staff, coverElsewhere));
+      check("a client CANNOT upload a cover", Boolean((await parent.storage.from("learning-covers").upload(`${open.id}/client.png`, new Blob([PNG], { type: "image/png" }))).error));
+      {
+        const { data } = admin.storage.from("learning-covers").getPublicUrl(coverOpen);
+        const res = await fetch(data.publicUrl, { redirect: "manual" });
+        check("learning-covers is PRIVATE — the public URL serves nothing without a session", !res.ok, `status ${res.status}`);
+      }
+      check("anon CANNOT read a cover", !(await canRead(anon, coverOpen)));
+    } finally {
+      if (made.covers.length) await admin.storage.from("learning-covers").remove(made.covers);
+      if (made.modules.length) await admin.from("learning_modules").delete().in("id", made.modules);
+      const left = (await visibleIds(admin, "learning_modules")).ids.filter((id) => made.modules.includes(id));
+      check("cleanup: this section's courses are gone", left.length === 0, `${left.length} left`);
     }
   }
 

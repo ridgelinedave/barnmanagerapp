@@ -90,6 +90,12 @@ const EXPECTED_TABLES = [
   "learning_lessons",
   // 0025 — recurring enrolment.
   "lesson_enrolments",
+  // 0028 — the Academy restructure (course > section > lesson).
+  "learning_sections",
+  "learning_categories",
+  "learning_module_categories",
+  "learning_enrolments",
+  "learning_progress",
 ];
 
 /**
@@ -336,6 +342,8 @@ console.log("\nStorage");
     { id: "horse-photos", migration: "0027" },
     { id: "rider-photos", migration: "0027" },
     { id: "announcement-images", migration: "0027" },
+    // 0028 — Academy course covers; readability follows the course.
+    { id: "learning-covers", migration: "0028" },
   ];
 
   for (const bucket of BUCKETS) {

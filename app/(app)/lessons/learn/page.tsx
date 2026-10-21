@@ -77,19 +77,36 @@ export default async function LearningPage() {
             {module.lessons.length === 0 ? (
               <EmptyState title="No lessons yet" />
             ) : (
-              <ol className="flex flex-col">
-                {module.lessons.map((lesson, index) => (
-                  <LessonRow
-                    key={lesson.id}
-                    moduleId={module.id}
-                    lesson={lesson}
-                    index={index}
-                    count={module.lessons.length}
-                    duration={formatDuration(lesson.duration_seconds)}
-                    reorder={isAdmin && module.lessons.length > 1}
-                  />
-                ))}
-              </ol>
+              // Sections (0028). Reordering moves a lesson WITHIN its section,
+              // so a row's first/last bounds are its section's. A course with
+              // one section shows no section heading — it would repeat the
+              // course title it was migrated from.
+              module.sections.map((section) => {
+                const inSection = module.lessons.filter((l) => l.section_id === section.id);
+                if (inSection.length === 0 && module.sections.length === 1) return null;
+                return (
+                  <div key={section.id} className="flex flex-col">
+                    {module.sections.length > 1 && (
+                      <h3 className="pt-2 font-condensed text-label font-semibold uppercase tracking-[0.12em] text-muted">
+                        {section.title}
+                      </h3>
+                    )}
+                    <ol className="flex flex-col">
+                      {inSection.map((lesson, index) => (
+                        <LessonRow
+                          key={lesson.id}
+                          moduleId={module.id}
+                          lesson={lesson}
+                          index={index}
+                          count={inSection.length}
+                          duration={formatDuration(lesson.duration_seconds)}
+                          reorder={isAdmin && inSection.length > 1}
+                        />
+                      ))}
+                    </ol>
+                  </div>
+                );
+              })
             )}
           </section>
         ))

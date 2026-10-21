@@ -33,9 +33,10 @@ export async function setModulePublished(formData: FormData): Promise<void> {
 }
 
 /**
- * Moves one lesson up or down by rewriting the WHOLE list through
- * learning_reorder_lessons — never by swapping two rows' numbers, which goes
- * wrong the moment two rows share a value (the levels reorder lesson).
+ * Moves one lesson up or down WITHIN ITS SECTION by rewriting that section's
+ * whole list through learning_reorder_section (0028) — never by swapping two
+ * rows' numbers, which goes wrong the moment two rows share a value (the
+ * levels reorder lesson). Positions are per section since 0028.
  */
 export async function moveLesson(formData: FormData): Promise<void> {
   if ((await currentRole()) !== "admin") return;
@@ -46,10 +47,17 @@ export async function moveLesson(formData: FormData): Promise<void> {
   if (direction !== "up" && direction !== "down") return;
 
   const supabase = await createClient();
+  const { data: lesson } = await supabase
+    .from("learning_lessons")
+    .select("section_id")
+    .eq("id", lessonId)
+    .eq("module_id", moduleId)
+    .maybeSingle();
+  if (!lesson?.section_id) return;
   const { data } = await supabase
     .from("learning_lessons")
     .select("id")
-    .eq("module_id", moduleId)
+    .eq("section_id", lesson.section_id)
     .order("position");
   const ids = (data ?? []).map((row) => row.id as string);
 
@@ -58,7 +66,7 @@ export async function moveLesson(formData: FormData): Promise<void> {
   if (index < 0 || target < 0 || target >= ids.length) return;
   [ids[index], ids[target]] = [ids[target], ids[index]];
 
-  await supabase.rpc("learning_reorder_lessons", { module: moduleId, lesson_ids: ids });
+  await supabase.rpc("learning_reorder_section", { section: lesson.section_id, lesson_ids: ids });
   revalidate(moduleId);
 }
 

@@ -174,6 +174,28 @@ if (!module) {
   console.log(`module exists: ${module.id} (published: ${module.published})`);
 }
 
+// --- the section (0028) ----------------------------------------------------------
+// Every lesson belongs to a section of its course. The seed's lessons go in
+// the course's FIRST section, created (titled with the course's own title,
+// as 0028's backfill does) when the course has none yet.
+let { data: section } = await db
+  .from("learning_sections")
+  .select("*")
+  .eq("module_id", module.id)
+  .order("position")
+  .limit(1)
+  .maybeSingle();
+if (!section) {
+  const { data, error } = await db
+    .from("learning_sections")
+    .insert({ module_id: module.id, title: module.title, position: 0 })
+    .select("*")
+    .single();
+  if (error) throw new Error(`Could not create the section: ${error.message}`);
+  section = data;
+  console.log(`section created: ${section.id}`);
+}
+
 // --- the lessons, in order -----------------------------------------------------
 for (const [position, file] of FILES.entries()) {
   const title = basename(file, ".mp4");
@@ -190,6 +212,7 @@ for (const [position, file] of FILES.entries()) {
 
   const row = {
     module_id: module.id,
+    section_id: section.id,
     title,
     notes: "", // the barn owner writes these herself
     position,
