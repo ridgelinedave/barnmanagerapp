@@ -20,11 +20,21 @@
  */
 import {
   STREAM_UID,
+  createDirectUpload,
+  deleteVideo,
   describeVideo,
   mintPlaybackToken,
   playbackUrls,
   streamCredentialsFrom,
 } from "../lib/stream-core.ts";
+import {
+  CHUNK_BYTES,
+  FALLBACK_MAX_DURATION_SECONDS,
+  byFilename,
+  expiryFor,
+  maxDurationFor,
+  titleFromFilename,
+} from "../lib/academy-upload.ts";
 
 let passed = 0;
 const failures = [];
@@ -122,6 +132,79 @@ console.log("\nids and URLs\n");
   const urls = playbackUrls("customer-abc.cloudflarestream.com", "signed.token.value");
   check("the token replaces the uid in the iframe path", urls.iframe === "https://customer-abc.cloudflarestream.com/signed.token.value/iframe");
   check("…and in the HLS manifest path", urls.hls.endsWith("/signed.token.value/manifest/video.m3u8"));
+}
+
+console.log("\ndirect creator uploads: the browser gets a link, never the token\n");
+{
+  const seen = [];
+  const ok = (headers) => async (url, init) => {
+    seen.push({ url, init });
+    return new Response(null, { status: 201, headers });
+  };
+  const good = { "stream-media-id": UID, location: `https://upload.cloudflarestream.com/tus/${UID}?tusv2=true` };
+  const expiry = new Date("2026-10-21T12:00:00Z");
+  const link = await createDirectUpload(FAKE, { sizeBytes: 172040339, maxDurationSeconds: 135, expiry, name: "Stirrups Off" }, ok(good));
+  check("control: a link and a video id come back", link.videoId === UID && link.uploadUrl === good.location);
+  check("the request went to api.cloudflare.com as a direct_user tus creation", seen.length === 1 && new URL(seen[0].url).host === "api.cloudflare.com" && seen[0].url.endsWith("/stream?direct_user=true"));
+  const h = seen[0].init.headers;
+  check("the token rode in the Authorization header of THAT request only", h.Authorization === `Bearer ${FAKE.apiToken}`);
+  check("NOTHING returned to the caller carries a credential", !leaks(JSON.stringify(link)));
+  const meta = Object.fromEntries(
+    h["Upload-Metadata"].split(",").map((pair) => {
+      const [k, v] = pair.split(" ");
+      return [k, v ? Buffer.from(v, "base64").toString("utf8") : true];
+    }),
+  );
+  check("private from the first byte: requiresignedurls is set at creation", meta.requiresignedurls === true);
+  check("maxdurationseconds is the file's own (135), not a blanket cap", meta.maxdurationseconds === "135");
+  check("expiry is sent as RFC 3339 (no milliseconds)", meta.expiry === "2026-10-21T12:00:00Z");
+  check("Upload-Length is the exact file size", h["Upload-Length"] === "172040339");
+
+  const noId = await caught(() => createDirectUpload(FAKE, { sizeBytes: 10, maxDurationSeconds: 60, expiry, name: "x" }, ok({ location: good.location })));
+  check("no stream-media-id header -> refused (the id is never parsed from the URL)", Boolean(noId));
+  const elsewhere = await caught(() =>
+    createDirectUpload(FAKE, { sizeBytes: 10, maxDurationSeconds: 60, expiry, name: "x" }, ok({ "stream-media-id": UID, location: "https://evil.example.com/tus/x" })),
+  );
+  check("an upload address off Cloudflare's hosts is refused", Boolean(elsewhere));
+  const plain = await caught(() =>
+    createDirectUpload(FAKE, { sizeBytes: 10, maxDurationSeconds: 60, expiry, name: "x" }, ok({ "stream-media-id": UID, location: "http://upload.cloudflarestream.com/tus/x" })),
+  );
+  check("…and so is plain http", Boolean(plain));
+  let called = false;
+  const badMax = await caught(() =>
+    createDirectUpload(FAKE, { sizeBytes: 10, maxDurationSeconds: 36001, expiry, name: "x" }, async () => {
+      called = true;
+      return new Response(null, { status: 201 });
+    }),
+  );
+  check("a max duration past Cloudflare's 36000 s is refused before any request", Boolean(badMax) && !called);
+  const refused = await caught(() =>
+    createDirectUpload(FAKE, { sizeBytes: 10, maxDurationSeconds: 60, expiry, name: "x" }, respond(400, { errors: [{ code: 10005, message: `bad ${FAKE.apiToken}` }] })),
+  );
+  check("a refused link names Cloudflare's code, carries no credential", refused?.message.includes("10005") && !leaks(refused.message), refused?.message);
+  const delErr = await caught(() => deleteVideo(FAKE, UID, respond(500, { errors: [{ code: 10000, message: FAKE.accountId }] })));
+  check("a failed delete carries no credential", Boolean(delErr) && !leaks(delErr.message), delErr?.message);
+  check("deleting an already-gone video is not an error", (await caught(() => deleteVideo(FAKE, UID, respond(404, {})))) === null);
+}
+
+console.log("\nthe upload policy\n");
+{
+  check("chunks are 10 MiB", CHUNK_BYTES === 10 * 1024 * 1024);
+  check("…a multiple of 256 KiB", CHUNK_BYTES % (256 * 1024) === 0);
+  check("…above Cloudflare's 5 MiB minimum and under its 200 MiB maximum", CHUNK_BYTES >= 5_242_880 && CHUNK_BYTES <= 209_715_200);
+  const m = maxDurationFor(68.4);
+  check("max duration = real length rounded up, +10%, +60 s (69 s -> 136 s)", m.seconds === Math.ceil(69 * 1.1) + 60 && m.fromFile);
+  const f = maxDurationFor(null);
+  check("an unreadable length falls back to the fixed cap, and says it did", f.seconds === FALLBACK_MAX_DURATION_SECONDS && !f.fromFile);
+  check("max duration never exceeds Cloudflare's 36000 s", maxDurationFor(50_000).seconds === 36_000);
+  const now = new Date("2026-10-21T00:00:00Z");
+  const hours = (d) => (d.getTime() - now.getTime()) / 3_600_000;
+  check("a small file still gets 2 h (the floor)", hours(expiryFor(20 * 1024 * 1024, now)) === 2);
+  check("a 2 GB file gets its slow-upload budget (~18 h)", Math.abs(hours(expiryFor(2 * 1024 ** 3, now)) - (2 * 1024 ** 3) / (32 * 1024) / 3600) < 0.01);
+  check("expiry never exceeds Cloudflare's 24 h", hours(expiryFor(10 * 1024 ** 3, now)) === 24);
+  check("lessons are titled from the filename", titleFromFilename("Stirrups_On.mp4") === "Stirrups On");
+  const order = [{ name: "Lesson 10.mp4" }, { name: "Lesson 2.mp4" }, { name: "lesson 1.mp4" }].sort(byFilename).map((x) => x.name);
+  check("filename order is natural (1, 2, 10)", JSON.stringify(order) === JSON.stringify(["lesson 1.mp4", "Lesson 2.mp4", "Lesson 10.mp4"]), order.join(", "));
 }
 
 console.log(`\n${passed} passed, ${failures.length} failed`);

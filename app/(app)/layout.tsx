@@ -8,6 +8,7 @@ import { ViewerProvider } from "@/components/ViewerContext";
 import { Sidebar } from "@/components/Sidebar";
 import { barn, featureEnabled } from "@/config/barn";
 import { sidebarFor } from "@/lib/nav";
+import { UploadQueueProvider } from "@/components/academy/UploadQueue";
 
 /**
  * The app shell. Resolves the viewer's role once, here, and renders the tab bar
@@ -67,7 +68,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         {devRoleSwitcherEnabled() && (
           <DevRoleSwitcher current={viewer.isDevRole ? viewer.role : null} />
         )}
-        {children}
+        {/* The Academy upload queue lives here, above every page, so uploads
+            survive moving between screens. Only the barn admin can enqueue. */}
+        <UploadQueueProvider enabled={viewer.role === "admin" && !viewer.isDevRole && featureEnabled("learning")}>
+          {children}
+        </UploadQueueProvider>
         <TabBar role={viewer.role} />
       </div>
     </ViewerProvider>

@@ -1,6 +1,8 @@
 import "server-only";
 
 import {
+  createDirectUpload,
+  deleteVideo,
   describeVideo,
   mintPlaybackToken,
   playbackUrls,
@@ -56,4 +58,32 @@ export async function streamPlayback(videoId: string): Promise<StreamPlayback> {
 
   const token = await mintPlaybackToken(creds, videoId, PLAYBACK_TTL_SECONDS);
   return { iframe: playbackUrls(video.playbackHost, token).iframe, ready: video.readyToStream };
+}
+
+/**
+ * A one-time browser upload link (see createDirectUpload). The CALLER must
+ * already have established that the viewer is the barn admin — this is the
+ * privileged step and decides nothing about who may upload.
+ */
+export async function streamUploadLink(options: {
+  sizeBytes: number;
+  maxDurationSeconds: number;
+  expiry: Date;
+  name: string;
+}): Promise<{ uploadUrl: string; videoId: string }> {
+  return createDirectUpload(credentials(), options);
+}
+
+/**
+ * Stream's own facts about a video, for the admin's duration sync: whether
+ * it has finished processing and how long it is. Never handed to a member.
+ */
+export async function streamVideoStatus(videoId: string): Promise<{ ready: boolean; durationSeconds: number | null }> {
+  const video = await describeVideo(credentials(), videoId);
+  return { ready: video.readyToStream, durationSeconds: video.durationSeconds };
+}
+
+/** Delete an unused upload's video. The caller has checked it is admin and that no lesson uses it. */
+export async function streamDeleteVideo(videoId: string): Promise<void> {
+  return deleteVideo(credentials(), videoId);
 }

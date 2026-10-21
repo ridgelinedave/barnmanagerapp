@@ -1,11 +1,13 @@
 import { TabPage } from "@/components/TabPage";
+import { SectionVideoDrop } from "@/components/academy/SectionVideoDrop";
+import { formatDuration as formatLessonDuration } from "@/lib/academy-format";
 import { StubScreen } from "@/components/StubScreen";
 import { LessonsSegments } from "@/components/LessonsSegments";
 import { LessonRow } from "@/components/LessonRow";
 import { Button } from "@/components/ui/Button";
 import { Chip, ChipRow, EmptyState } from "@/components/ui/primitives";
 import { requireTab } from "@/lib/guard";
-import { formatDuration, listModulesWithLessons } from "@/lib/learning";
+import { listModulesWithLessons } from "@/lib/learning";
 import { barn, featureEnabled } from "@/config/barn";
 import { setModulePublished } from "./actions";
 
@@ -74,7 +76,7 @@ export default async function LearningPage() {
 
             {module.description && <p className="text-body text-ink">{module.description}</p>}
 
-            {module.lessons.length === 0 ? (
+            {module.lessons.length === 0 && !(isAdmin && module.sections.length > 0) ? (
               <EmptyState title="No lessons yet" />
             ) : (
               // Sections (0028). Reordering moves a lesson WITHIN its section,
@@ -83,7 +85,6 @@ export default async function LearningPage() {
               // course title it was migrated from.
               module.sections.map((section) => {
                 const inSection = module.lessons.filter((l) => l.section_id === section.id);
-                if (inSection.length === 0 && module.sections.length === 1) return null;
                 return (
                   <div key={section.id} className="flex flex-col">
                     {module.sections.length > 1 && (
@@ -91,6 +92,7 @@ export default async function LearningPage() {
                         {section.title}
                       </h3>
                     )}
+                    {isAdmin && <SectionVideoDrop sectionId={section.id} sectionTitle={section.title} />}
                     <ol className="flex flex-col">
                       {inSection.map((lesson, index) => (
                         <LessonRow
@@ -99,7 +101,7 @@ export default async function LearningPage() {
                           lesson={lesson}
                           index={index}
                           count={inSection.length}
-                          duration={formatDuration(lesson.duration_seconds)}
+                          duration={lesson.video_id ? formatLessonDuration(lesson.duration_seconds) : null}
                           reorder={isAdmin && inSection.length > 1}
                         />
                       ))}
