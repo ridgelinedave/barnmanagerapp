@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { currentRole } from "@/lib/guard";
 import { streamDeleteVideo, streamUploadLink } from "@/lib/stream";
 import { STREAM_UID } from "@/lib/stream-core";
-import { expiryFor, maxDurationFor } from "@/lib/academy-upload";
+import { expiryFor, maxDurationFor, statusFromMessage, uploadProblem } from "@/lib/academy-upload";
 import { fillLessonDurations } from "@/lib/academy";
 
 /**
@@ -36,13 +36,13 @@ export async function requestUploadLink(input: {
   sizeBytes: number;
   durationSeconds: number | null;
 }): Promise<UploadLink> {
-  if ((await currentRole()) !== "admin") return { ok: false, error: "Only the barn admin can upload lessons." };
+  if ((await currentRole()) !== "admin") return { ok: false, error: "Only the barn admin can upload lessons. Sign in as the admin and try again." };
   if (!UUID.test(input.sectionId)) return { ok: false, error: "That section could not be found." };
   if (!Number.isInteger(input.sizeBytes) || input.sizeBytes <= 0) return { ok: false, error: "That file is empty." };
 
   const supabase = await createClient();
   const { data: section } = await supabase.from("learning_sections").select("id").eq("id", input.sectionId).maybeSingle();
-  if (!section) return { ok: false, error: "That section could not be found." };
+  if (!section) return { ok: false, error: "That section has been deleted. Add the file to another section." };
 
   const max = maxDurationFor(input.durationSeconds);
   const expiry = expiryFor(input.sizeBytes);
@@ -63,8 +63,10 @@ export async function requestUploadLink(input: {
     };
   } catch (error) {
     // StreamError messages carry only HTTP status and Cloudflare error CODES
-    // (test:stream proves no credential is ever in one).
-    return { ok: false, error: error instanceof Error ? error.message : "The upload link could not be created." };
+    // (test:stream proves no credential is ever in one); the owner gets the
+    // plain-words version of that status, never the message itself.
+    const message = error instanceof Error ? error.message : "";
+    return { ok: false, error: uploadProblem(statusFromMessage(message), message) };
   }
 }
 
@@ -113,7 +115,7 @@ export async function createLessonFromUpload(input: {
     })
     .select("id")
     .single();
-  if (error || !data) return { ok: false, error: error?.message ?? "The lesson was not saved." };
+  if (error || !data) return { ok: false, error: "The video is uploaded but its lesson wasn't saved. Press Retry." };
 
   revalidatePath("/lessons/learn");
   return { ok: true, lessonId: data.id };

@@ -2,7 +2,7 @@
 
 import { useId, useState } from "react";
 import { Icon } from "@/components/ui/Icon";
-import { outlineSummary } from "@/lib/academy-format";
+import { formatTotal, outlineSummary, totalSeconds } from "@/lib/academy-format";
 import { AcademyLessonRow, type AcademyLessonRowProps } from "@/components/academy/AcademyLessonRow";
 
 /**
@@ -56,7 +56,7 @@ export function CourseOutline({
           {heading && <h2 className="min-w-0 flex-1 font-display text-title text-ink">{heading}</h2>}
           {!compact && (
             <p className="min-w-0 flex-1 font-condensed text-label font-medium uppercase tracking-[0.08em] text-muted">
-              {outlineSummary(sections.length, total)}
+              {outlineSummary(sections.length, total, totalSeconds(sections.flatMap((s) => s.lessons)))}
             </p>
           )}
           {sections.length > 1 && (
@@ -90,7 +90,12 @@ export function CourseOutline({
                     {section.title}
                   </span>
                   <span className="shrink-0 font-condensed text-label font-medium tabular-nums text-muted">
-                    {done > 0 ? `${done} / ${section.lessons.length}` : `${section.lessons.length} ${section.lessons.length === 1 ? "lesson" : "lessons"}`}
+                    {[
+                      done > 0 ? `${done} / ${section.lessons.length}` : `${section.lessons.length} ${section.lessons.length === 1 ? "lesson" : "lessons"}`,
+                      formatTotal(totalSeconds(section.lessons)),
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
                   </span>
                   <Icon
                     name="chevron"

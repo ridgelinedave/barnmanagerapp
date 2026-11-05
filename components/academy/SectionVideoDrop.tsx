@@ -17,11 +17,16 @@ export function SectionVideoDrop({ sectionId, sectionTitle }: { sectionId: strin
   const queue = useUploadQueue();
   const inputRef = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
+  const [skipped, setSkipped] = useState<string[]>([]);
   const id = useId();
   if (!queue) return null;
 
+  const isVideo = (f: File) => f.type.startsWith("video/") || /\.(mp4|mov|m4v|hevc|webm|mkv|avi)$/i.test(f.name);
   const add = (list: FileList | null) => {
-    const files = [...(list ?? [])].filter((f) => f.type.startsWith("video/") || /\.(mp4|mov|m4v|webm|mkv|avi)$/i.test(f.name));
+    const all = [...(list ?? [])];
+    const files = all.filter(isVideo);
+    // Say what was left out and why, rather than dropping it silently.
+    setSkipped(all.filter((f) => !isVideo(f)).map((f) => f.name));
     if (files.length) queue.enqueue(sectionId, sectionTitle, files);
   };
 
@@ -62,6 +67,11 @@ export function SectionVideoDrop({ sectionId, sectionTitle }: { sectionId: strin
         />
       </label>
       <span className="hidden font-condensed text-label text-muted lg:inline">or drop them here</span>
+      {skipped.length > 0 && (
+        <p role="status" className="basis-full text-caption text-ink">
+          Not a video, so not added: {skipped.join(", ")}.
+        </p>
+      )}
     </div>
   );
 }

@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { useOptimistic, useTransition } from "react";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { formatDuration } from "@/lib/academy-format";
+import { LessonNotes } from "@/components/academy/LessonNotes";
 
 /**
  * The lesson player's main column: video, title, Mark complete, previous /
@@ -102,7 +103,7 @@ export function LessonPlayerShell({
         (notes.trim() ? (
           <section aria-label="Notes" className="flex flex-col gap-2 border-t border-rule pt-4">
             <h3 className="font-display text-title text-ink">Notes</h3>
-            <p className="whitespace-pre-line text-body leading-relaxed text-ink">{notes}</p>
+            <LessonNotes text={notes} />
           </section>
         ) : null)}
     </div>

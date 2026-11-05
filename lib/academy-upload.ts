@@ -57,3 +57,33 @@ export function titleFromFilename(filename: string): string {
 export function byFilename(a: { name: string }, b: { name: string }): number {
   return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" });
 }
+
+/**
+ * What to tell the barn owner when the video service says no — in plain
+ * words, each ending in what to do next. Keyed on the HTTP status (and
+ * Cloudflare's 10017, "link expired"), never on Cloudflare's message text.
+ *
+ * Cloudflare documents 413 and 429 for uploads over its limits, including an
+ * account whose storage is full; it names no separate code for that, so both
+ * read as "busy or full".
+ */
+export function uploadProblem(status: number | null | undefined, body?: string | null): string {
+  if (body && /10017|expired/i.test(body)) return "The upload link ran out before the file finished. Press Retry to send this file again.";
+  if (status === 413) return "This file is bigger than the video service accepts (30 GB). Export a smaller copy and add it again.";
+  if (status === 429) {
+    return "The video service is busy, or the barn's video storage is full. Wait a few minutes and press Retry. If it keeps happening, the storage plan needs more room.";
+  }
+  if (status === 401 || status === 403) {
+    return "The video service turned down the barn's account. This can't be fixed from here: take a screenshot of this message for support.";
+  }
+  if (status && status >= 400 && status < 500) {
+    return "The video service would not take this file. Press Retry. If it happens again, take a screenshot of this message for support.";
+  }
+  return "Couldn't reach the video service. Check the internet connection, then press Retry.";
+}
+
+/** The HTTP status inside a StreamError message ("… HTTP 429 …"), if any. */
+export function statusFromMessage(message: string): number | null {
+  const m = /HTTP (\d{3})/.exec(message);
+  return m ? Number(m[1]) : null;
+}

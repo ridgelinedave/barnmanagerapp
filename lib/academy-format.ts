@@ -25,11 +25,31 @@ export function coursePercent(completed: number, total: number): number {
   return Math.min(100, Math.round((completed / total) * 100));
 }
 
-/** "3 sections · 24 lessons" — singular where it is one. */
-export function outlineSummary(sections: number, lessons: number): string {
+/**
+ * A running time for a course or section: "1 h 40 min", "24 min", "45 s".
+ * Empty for nothing known yet (every lesson still processing).
+ */
+export function formatTotal(seconds: number): string {
+  const s = Math.round(seconds);
+  if (s <= 0) return "";
+  if (s < 60) return `${s} s`;
+  const h = Math.floor(s / 3600);
+  const m = Math.round((s % 3600) / 60);
+  if (h === 0) return `${m} min`;
+  return m === 0 ? `${h} h` : `${h} h ${m} min`;
+}
+
+/** The known running time of some lessons (processing ones count as nothing yet). */
+export function totalSeconds(lessons: { durationSeconds: number | null }[]): number {
+  return lessons.reduce((n, l) => n + (l.durationSeconds && l.durationSeconds > 0 ? l.durationSeconds : 0), 0);
+}
+
+/** "3 sections · 24 lessons · 1 h 40 min" — singular where it is one; no time while none is known. */
+export function outlineSummary(sections: number, lessons: number, seconds = 0): string {
   const s = `${sections} ${sections === 1 ? "section" : "sections"}`;
   const l = `${lessons} ${lessons === 1 ? "lesson" : "lessons"}`;
-  return `${s} · ${l}`;
+  const t = formatTotal(seconds);
+  return t ? `${s} · ${l} · ${t}` : `${s} · ${l}`;
 }
 
 /**
@@ -49,4 +69,15 @@ export function crossedCompletion(previous: number, current: number, duration: n
   if (!(duration > 0)) return false;
   const mark = duration * COMPLETE_AT;
   return previous < mark && current >= mark;
+}
+
+/**
+ * Where to pick a lesson up again, from the position saved last time: only
+ * if it is worth it (10 s in or more) and not at the very end (the last 15 s,
+ * where starting over is what the member wants). Null: start from the top.
+ */
+export function resumeFrom(saved: number | null | undefined, duration: number): number | null {
+  if (!saved || !Number.isFinite(saved) || !(duration > 0)) return null;
+  if (saved < 10 || saved > duration - 15) return null;
+  return Math.floor(saved);
 }

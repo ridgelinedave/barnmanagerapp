@@ -3,7 +3,7 @@ import { TabPage } from "@/components/TabPage";
 import { LessonPlayerShell } from "@/components/academy/LessonPlayerShell";
 import { LessonVideo } from "@/components/academy/LessonVideo";
 import { CourseOutline } from "@/components/academy/CourseOutline";
-import { LearningNotesEditor } from "@/components/LearningNotesEditor";
+import { AdminLessonNotes } from "@/components/academy/AdminLessonNotes";
 import { requireTab } from "@/lib/guard";
 import { loadCourse } from "@/lib/academy";
 import { resolveLessonPlayback } from "@/lib/video";
@@ -104,6 +104,9 @@ export default async function LearningLessonPage({
             courseId={course.id}
             completed={completed}
             enrolled={course.enrolled}
+            next={next ? { href: href(next.id), title: next.title } : null}
+            courseHref={`/lessons/learn/${course.id}`}
+            courseDoneAfterThis={lessons.every((l) => l.id === lesson.id || completedIds.has(l.id))}
           />
         }
         title={lesson.title}
@@ -116,17 +119,7 @@ export default async function LearningLessonPage({
         nextHref={next ? href(next.id) : null}
         notesSlot={
           isAdmin ? (
-            <section aria-labelledby={`notes-heading-${lesson.id}`} className="flex flex-col gap-3 border-t border-rule pt-4">
-              <h3 id={`notes-heading-${lesson.id}`} className="font-display text-title text-ink">
-                Notes
-              </h3>
-              <LearningNotesEditor
-                lessonId={lesson.id}
-                moduleId={course.id}
-                notes={lesson.notes}
-                labelledBy={`notes-heading-${lesson.id}`}
-              />
-            </section>
+            <AdminLessonNotes key={lesson.notes} lessonId={lesson.id} courseId={course.id} notes={lesson.notes} />
           ) : undefined
         }
       />

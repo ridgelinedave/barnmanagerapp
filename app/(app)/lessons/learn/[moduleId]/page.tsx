@@ -15,7 +15,8 @@ import { listLevels } from "@/lib/lessons";
 import { streamThumbnails } from "@/lib/stream";
 import { formatBarnDate } from "@/lib/dates";
 import { barn, featureEnabled } from "@/config/barn";
-import { enrolInCourse, setCoursePublished, setLessonComplete } from "../course-actions";
+import { PublishControl } from "@/components/academy/PublishControl";
+import { enrolInCourse, setLessonComplete } from "../course-actions";
 
 export const metadata = { title: barn.learning.label };
 export const dynamic = "force-dynamic";
@@ -32,11 +33,21 @@ export const dynamic = "force-dynamic";
  * reorder, upload — each lesson row opens its player) and who is watching.
  * A member never reaches a draft: RLS does not return it, and this page 404s.
  */
-export default async function CoursePage({ params }: { params: Promise<{ moduleId: string }> }) {
+export default async function CoursePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ moduleId: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const role = await requireTab("/lessons");
   if (!featureEnabled("learning")) notFound();
   const { moduleId } = await params;
   const isAdmin = role === "admin";
+  // "Preview as a member" (Circle's View as student): the admin sees the page
+  // a member sees — outline, Start, no authoring — with a way back.
+  const previewing = isAdmin && (await searchParams).view === "member";
+  const editing = isAdmin && !previewing;
 
   let loaded = await loadCourse(moduleId);
   if (!loaded) notFound();
@@ -76,6 +87,13 @@ export default async function CoursePage({ params }: { params: Promise<{ moduleI
         toggleAction: setLessonComplete,
       })),
   }));
+  // Who a published course reaches — the rule in learning_audience_allows
+  // (0023), in words: staff always; clients by the course's audience.
+  const levelName = levels.find((l) => l.id === course.audienceLevelId)?.name;
+  const audienceSentence =
+    course.audience === "level"
+      ? `All staff, and clients with an active rider at ${levelName ?? "the chosen level"},`
+      : "All staff and every client";
   const label = course.percent >= 100 ? "Watch again" : course.completed > 0 ? "Continue" : "Start";
 
   const learnerColumns: Column[] = [
@@ -99,7 +117,7 @@ export default async function CoursePage({ params }: { params: Promise<{ moduleI
       layout="split"
       density="normal"
       detail={
-        isAdmin ? (
+        editing ? (
           <section className="flex flex-col gap-3">
             <SectionHeader title="Sections and lessons" />
             <CourseEditor
@@ -122,9 +140,20 @@ export default async function CoursePage({ params }: { params: Promise<{ moduleI
         )
       }
     >
+      {previewing && (
+        <div role="status" className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-control border border-rule bg-surface px-3 py-2">
+          <span className="min-w-0 flex-1 text-caption text-ink">
+            Preview: this is what a member sees{course.published ? "" : " once it's published"}.
+          </span>
+          <ButtonLink href={`/lessons/learn/${course.id}`} variant="secondary" size="sm" arrow={false}>
+            Back to editing
+          </ButtonLink>
+        </div>
+      )}
+
       <CourseCover src={course.coverSrc} title={course.title} />
 
-      {isAdmin && (
+      {editing && (
         <div className="flex flex-wrap items-center gap-2">
           <span
             className={`rounded-chip border px-1.5 py-0.5 font-condensed text-micro uppercase ${
@@ -133,13 +162,13 @@ export default async function CoursePage({ params }: { params: Promise<{ moduleI
           >
             {course.published ? "Published" : "Draft"}
           </span>
-          <form action={setCoursePublished}>
-            <input type="hidden" name="id" value={course.id} />
-            <input type="hidden" name="published" value={course.published ? "false" : "true"} />
-            <Button type="submit" variant={course.published ? "secondary" : "primary"} arrow={false}>
-              {course.published ? "Unpublish" : "Publish"}
-            </Button>
-          </form>
+          <PublishControl
+            courseId={course.id}
+            title={course.title}
+            published={course.published}
+            audience={audienceSentence}
+            lessonCount={course.lessonCount}
+          />
           <SheetTrigger label="Edit course" title={`Edit — ${course.title}`}>
             <CourseForm
               course={{
@@ -155,6 +184,9 @@ export default async function CoursePage({ params }: { params: Promise<{ moduleI
               levels={levels.map((l) => ({ id: l.id, name: l.name }))}
             />
           </SheetTrigger>
+          <ButtonLink href={`/lessons/learn/${course.id}?view=member`} variant="ghost" arrow={false}>
+            Preview as a member
+          </ButtonLink>
         </div>
       )}
 
@@ -181,7 +213,7 @@ export default async function CoursePage({ params }: { params: Promise<{ moduleI
         </div>
       )}
 
-      {isAdmin && (
+      {editing && (
         <section className="flex flex-col gap-3">
           <SectionHeader title="Who is watching" count={learners.length ? `${learners.length}` : undefined} />
           {learners.length === 0 ? (

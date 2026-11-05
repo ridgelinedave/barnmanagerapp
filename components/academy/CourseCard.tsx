@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { FaceImage } from "@/components/ui/FaceImage";
+import { Icon } from "@/components/ui/Icon";
 
 /**
  * A course in the Academy grid — Circle's STRUCTURE, the Monarch LOOK.
@@ -49,7 +50,14 @@ export function ProgressBar({ percent, label }: { percent: number; label?: strin
       >
         <div className="h-full rounded-full bg-accent" style={{ width: `${value}%` }} />
       </div>
-      <span className="font-condensed text-label font-medium tabular-nums text-muted">{value}% complete</span>
+      {value >= 100 ? (
+        <span className="inline-flex items-center gap-1 font-condensed text-label font-semibold uppercase tracking-[0.08em] text-forest">
+          <Icon name="check" className="size-3.5" strokeWidth={2.5} />
+          Completed
+        </span>
+      ) : (
+        <span className="font-condensed text-label font-medium tabular-nums text-muted">{value}% complete</span>
+      )}
     </div>
   );
 }

@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { Playback } from "@/lib/video";
-import { crossedCompletion } from "@/lib/academy-format";
+import { crossedCompletion, formatDuration, resumeFrom } from "@/lib/academy-format";
+import { clearPosition, savePosition, savedPosition } from "@/lib/academy-resume";
 
 /**
  * THE ONE PLAYER (DESIGN-MASTER §8). Every learning video renders through
@@ -28,6 +29,15 @@ import { crossedCompletion } from "@/lib/academy-format";
  * postMessage; it never sees the token or the account): the first play calls
  * `onPlay` (enrol), and crossing 90% — or the end — calls `onComplete` once.
  *
+ * RESUME (with `resumeKey`, the lesson id). The position is saved in this
+ * browser every few seconds while it plays; next time, once the video's
+ * length is known, it seeks there (10 s in or more, not in the last 15 s) and
+ * says so, with Start over beside it. Reaching the end clears it, so a
+ * finished lesson watched again starts from the top.
+ *
+ * THE END (`onEnded`) belongs to the page — Next lesson, course complete —
+ * and draws in `overlay`, over the frame.
+ *
  * THE ADDRESS IS HELD FOR THE LIFE OF THE PLAYER. Each server render mints a
  * fresh token, so a refresh (which ticking a lesson off causes) would hand
  * the iframe a new address and restart the video mid-lesson. The first
@@ -39,6 +49,8 @@ type StreamApi = {
   currentTime: number;
   duration: number;
 };
+
+const SAVE_EVERY_SECONDS = 5;
 
 declare global {
   interface Window {
@@ -70,6 +82,9 @@ export function VideoPlayer({
   title,
   onPlay,
   onComplete,
+  onEnded,
+  resumeKey,
+  overlay,
 }: {
   playback: Playback;
   title: string;
@@ -77,17 +92,25 @@ export function VideoPlayer({
   onPlay?: () => void;
   /** Called once per crossing of 90%, or at the end. */
   onComplete?: () => void;
+  /** The video reached its end. */
+  onEnded?: () => void;
+  /** Remember and resume the position, under this key (the lesson id). */
+  resumeKey?: string;
+  /** Drawn over the frame — the page's end-of-video panel. */
+  overlay?: ReactNode;
 }) {
   const [src] = useState(() =>
     playback.kind === "iframe" ? `${playback.src}${playback.src.includes("?") ? "&" : "?"}autoplay=true` : null,
   );
   const frame = useRef<HTMLIFrameElement>(null);
-  const handlers = useRef({ onPlay, onComplete });
+  const handlers = useRef({ onPlay, onComplete, onEnded });
   useEffect(() => {
-    handlers.current = { onPlay, onComplete };
-  }, [onPlay, onComplete]);
+    handlers.current = { onPlay, onComplete, onEnded };
+  }, [onPlay, onComplete, onEnded]);
+  const api = useRef<StreamApi | null>(null);
+  const [resumedAt, setResumedAt] = useState<number | null>(null);
 
-  const tracking = Boolean(onPlay || onComplete);
+  const tracking = Boolean(onPlay || onComplete || onEnded || resumeKey);
   useEffect(() => {
     const iframe = frame.current;
     if (!tracking || !iframe) return;
@@ -96,6 +119,8 @@ export function VideoPlayer({
     let played = false;
     let last = 0;
     let finished = false;
+    let lastSaved = 0;
+    let resumeChecked = false;
 
     const handlePlay = () => {
       if (played) return;
@@ -107,20 +132,41 @@ export function VideoPlayer({
       finished = true;
       handlers.current.onComplete?.();
     };
+    const tryResume = () => {
+      if (resumeChecked || !player || !resumeKey || !(player.duration > 0)) return;
+      resumeChecked = true;
+      const at = resumeFrom(savedPosition(resumeKey), player.duration);
+      if (at !== null) {
+        player.currentTime = at;
+        last = at;
+        setResumedAt(at);
+      }
+    };
     const handleTime = () => {
       if (!player) return;
+      tryResume();
       const now = player.currentTime;
+      if (resumeKey && Math.abs(now - lastSaved) >= SAVE_EVERY_SECONDS) {
+        savePosition(resumeKey, now);
+        lastSaved = now;
+      }
       if (crossedCompletion(last, now, player.duration)) complete();
       // A seek back below the mark arms it again.
       if (now < last) finished = false;
       last = now;
     };
-    const handleEnded = () => complete();
+    const handleEnded = () => {
+      complete();
+      if (resumeKey) clearPosition(resumeKey);
+      handlers.current.onEnded?.();
+    };
 
     loadStreamSdk()
       .then(() => {
         if (cancelled || !window.Stream) return;
         player = window.Stream(iframe);
+        api.current = player;
+        player.addEventListener("loadedmetadata", tryResume);
         player.addEventListener("play", handlePlay);
         player.addEventListener("timeupdate", handleTime);
         player.addEventListener("ended", handleEnded);
@@ -131,11 +177,12 @@ export function VideoPlayer({
 
     return () => {
       cancelled = true;
+      player?.removeEventListener("loadedmetadata", tryResume);
       player?.removeEventListener("play", handlePlay);
       player?.removeEventListener("timeupdate", handleTime);
       player?.removeEventListener("ended", handleEnded);
     };
-  }, [tracking]);
+  }, [tracking, resumeKey]);
 
   if (playback.kind === "none" || !src) {
     return (
@@ -161,7 +208,24 @@ export function VideoPlayer({
           allowFullScreen
           referrerPolicy="strict-origin-when-cross-origin"
         />
+        {overlay}
       </div>
+      {resumedAt !== null && (
+        <p className="flex flex-wrap items-center gap-x-3 text-caption text-muted" role="status">
+          Picked up at {formatDuration(resumedAt)}.
+          <button
+            type="button"
+            onClick={() => {
+              if (api.current) api.current.currentTime = 0;
+              if (resumeKey) clearPosition(resumeKey);
+              setResumedAt(null);
+            }}
+            className="-my-3 min-h-11 font-condensed text-label font-semibold uppercase tracking-[0.08em] text-accent-text underline-offset-4 lg:hover:underline"
+          >
+            Start over
+          </button>
+        </p>
+      )}
       {!playback.ready && <p className="text-caption text-muted">Still processing. A new upload can take a few minutes.</p>}
     </div>
   );

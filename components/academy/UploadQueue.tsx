@@ -4,7 +4,8 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
-import { CHUNK_BYTES, byFilename, maxDurationFor, titleFromFilename } from "@/lib/academy-upload";
+import { CHUNK_BYTES, byFilename, maxDurationFor, titleFromFilename, uploadProblem } from "@/lib/academy-upload";
+import { forgetUpload, readSaved, rememberUpload, sameFile, stillUsable } from "@/lib/academy-upload-store";
 import { createLessonFromUpload, discardUpload, requestUploadLink, syncLessonDurations } from "@/app/(app)/lessons/learn/upload-actions";
 
 /**
@@ -21,34 +22,58 @@ import { createLessonFromUpload, discardUpload, requestUploadLink, syncLessonDur
  *
  * PER FILE:
  *   1. its duration is read HERE, from the file's own metadata in a <video>
- *      element (nothing uploaded); unreadable -> the fixed fallback, and the
- *      row says so;
+ *      element (nothing uploaded); unreadable (an iPhone HEVC .mov in some
+ *      browsers) -> the fixed fallback reservation;
  *   2. its link is minted JUST BEFORE it starts (requestUploadLink), so a
  *      long queue cannot outlive its links — an expired link refuses even an
  *      upload in progress (proved: Cloudflare error 10017);
  *   3. 10 MiB chunks are PATCHed straight to Cloudflare's upload host with
  *      NO Authorization header — the account token never reaches the
  *      browser; on a dropped chunk it waits, asks Cloudflare for the offset it
- *      holds (HEAD) and resumes from there, so a retry costs one chunk;
+ *      holds (HEAD) and resumes from there, so a retry costs one chunk.
+ *      OFFLINE is not a failure: it waits for the connection to come back,
+ *      however long that takes, and carries on;
  *   4. when the last byte is in, the lesson is created at the end of its
  *      section, titled from the filename, and shows "Processing" until Stream
  *      has encoded it and reported a duration.
+ *
+ * LEAVING AND COMING BACK. Each running upload's link is remembered in this
+ * browser (lib/academy-upload-store.ts). After a reload, a closed tab or a
+ * locked phone, the panel lists what was interrupted: one whose bytes were
+ * all in becomes its lesson by itself; one with bytes left asks for the same
+ * file again (dropping it on any section works too) and resumes from what
+ * Cloudflare already holds.
  */
-type Status = "reading" | "queued" | "uploading" | "retrying" | "finishing" | "processing" | "failed" | "cancelled";
+type Status =
+  | "reading"
+  | "queued"
+  | "uploading"
+  | "retrying"
+  | "offline"
+  | "finishing"
+  | "processing"
+  | "interrupted"
+  | "failed"
+  | "cancelled";
+
+type Link = { uploadUrl: string; videoId: string; expiresAt: string };
 
 type Item = {
   key: string;
-  file: File;
+  /** Null for an interrupted upload until the same file is chosen again. */
+  file: File | null;
+  name: string;
+  size: number;
   sectionId: string;
   sectionTitle: string;
   title: string;
   status: Status;
   sent: number;
   durationSeconds: number | null;
-  /** Shown in the row: the fallback reservation, a retry countdown, an error. */
+  /** Shown in the row: a retry countdown, an error and what to do about it. */
   note: string | null;
   lessonId: string | null;
-  link: { uploadUrl: string; videoId: string } | null;
+  link: Link | null;
 };
 
 type QueueApi = { enqueue: (sectionId: string, sectionTitle: string, files: File[]) => void };
@@ -60,6 +85,7 @@ export function useUploadQueue(): QueueApi | null {
 }
 
 const RETRY_DELAYS_MS = [1_000, 3_000, 6_000, 10_000, 20_000, 30_000, 60_000, 60_000];
+const RUNNING: Status[] = ["reading", "queued", "uploading", "retrying", "offline", "finishing"];
 
 function readDuration(file: File): Promise<number | null> {
   return new Promise((resolve) => {
@@ -117,7 +143,7 @@ function sendChunk(
   });
 }
 
-/** The offset Cloudflare holds for this upload, or null if it cannot say. */
+/** The offset Cloudflare holds for this upload, or null if it cannot say (gone, expired, offline). */
 async function serverOffset(uploadUrl: string): Promise<number | null> {
   try {
     const res = await fetch(uploadUrl, { method: "HEAD", headers: { "Tus-Resumable": "1.0.0" } });
@@ -129,16 +155,16 @@ async function serverOffset(uploadUrl: string): Promise<number | null> {
   }
 }
 
-function megabytes(bytes: number): string {
-  return `${Math.round(bytes / (1024 * 1024))} MB`;
+function waitForOnline(): Promise<void> {
+  if (navigator.onLine) return Promise.resolve();
+  return new Promise((resolve) => window.addEventListener("online", () => resolve(), { once: true }));
 }
 
-function describeFailure(error: unknown): string {
-  const e = error as { status?: number; body?: string; message?: string };
-  if (e.body && /10017|expired/i.test(e.body)) return "The upload link expired. Retry for a new one.";
-  if (e.status && e.status >= 400 && e.status < 500) return `Cloudflare refused the upload (HTTP ${e.status}).`;
-  return "The connection kept dropping.";
+function megabytes(bytes: number): string {
+  return bytes >= 1024 ** 3 ? `${(bytes / 1024 ** 3).toFixed(1)} GB` : `${Math.round(bytes / (1024 * 1024))} MB`;
 }
+
+const pctOf = (item: Pick<Item, "sent" | "size">) => (item.size > 0 ? Math.floor((item.sent / item.size) * 100) : 0);
 
 export function UploadQueueProvider({ enabled, children }: { enabled: boolean; children: ReactNode }) {
   const [items, setItems] = useState<Item[]>([]);
@@ -147,16 +173,39 @@ export function UploadQueueProvider({ enabled, children }: { enabled: boolean; c
   const busy = useRef(false);
   const xhrs = useRef(new Map<string, XMLHttpRequest>());
   const cancelled = useRef(new Set<string>());
+  const itemsRef = useRef<Item[]>([]);
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
 
   const patch = useCallback((key: string, change: Partial<Item>) => {
     setItems((list) => list.map((item) => (item.key === key ? { ...item, ...change } : item)));
   }, []);
 
+  /** The last step, shared by a finished upload and one recovered after a reload. */
+  const finish = useCallback(
+    async (key: string, sectionId: string, title: string, videoId: string) => {
+      patch(key, { status: "finishing", note: null });
+      const lesson = await createLessonFromUpload({ sectionId, title, videoId });
+      if (!lesson.ok) {
+        patch(key, { status: "failed", note: lesson.error });
+        return;
+      }
+      forgetUpload(videoId);
+      patch(key, { status: "processing", lessonId: lesson.lessonId, note: null });
+      router.refresh();
+    },
+    [patch, router],
+  );
+
   const run = useCallback(
     async (item: Item) => {
-      const { file, key } = item;
-      let link = item.link;
+      const { key } = item;
+      const file = item.file;
+      if (!file) return;
+      let link = item.link && stillUsable(item.link) ? item.link : null;
       if (!link) {
+        if (item.link) void discardUpload(item.link.videoId);
         const minted = await requestUploadLink({
           sectionId: item.sectionId,
           title: item.title,
@@ -164,16 +213,28 @@ export function UploadQueueProvider({ enabled, children }: { enabled: boolean; c
           durationSeconds: item.durationSeconds,
         });
         if (!minted.ok) {
-          patch(key, { status: "failed", note: minted.error });
+          patch(key, { status: "failed", note: minted.error, link: null });
           return;
         }
-        link = { uploadUrl: minted.uploadUrl, videoId: minted.videoId };
-        patch(key, { link });
+        link = { uploadUrl: minted.uploadUrl, videoId: minted.videoId, expiresAt: minted.expiresAt };
+        rememberUpload({
+          name: file.name,
+          size: file.size,
+          sectionId: item.sectionId,
+          sectionTitle: item.sectionTitle,
+          title: item.title,
+          uploadUrl: link.uploadUrl,
+          videoId: link.videoId,
+          expiresAt: link.expiresAt,
+          durationSeconds: item.durationSeconds,
+        });
+        patch(key, { link, sent: 0 });
       }
 
-      let offset = (item.link ? await serverOffset(link.uploadUrl) : 0) ?? item.sent;
+      // Resume from what Cloudflare actually holds.
+      let offset = item.link === link ? ((await serverOffset(link.uploadUrl)) ?? item.sent) : 0;
       let failures = 0;
-      patch(key, { status: "uploading", sent: offset });
+      patch(key, { status: "uploading", sent: offset, note: null });
 
       while (offset < file.size) {
         if (cancelled.current.has(key)) {
@@ -191,42 +252,44 @@ export function UploadQueueProvider({ enabled, children }: { enabled: boolean; c
             (xhr) => xhrs.current.set(key, xhr),
           );
           failures = 0;
-          patch(key, { status: "uploading", sent: offset, note: item.note });
+          patch(key, { status: "uploading", sent: offset, note: null });
         } catch (error) {
-          const e = error as { status?: number };
+          const e = error as { status?: number; body?: string };
           if (e.status === -1) {
             patch(key, { status: "cancelled", note: null });
             return;
           }
           // A refusal (4xx) will not fix itself; a dropped connection might.
           if ((e.status ?? 0) >= 400 && (e.status ?? 0) < 500) {
-            patch(key, { status: "failed", note: describeFailure(error), link: null });
+            forgetUpload(link.videoId);
+            patch(key, { status: "failed", note: uploadProblem(e.status, e.body), link: null });
             return;
           }
-          if (failures >= RETRY_DELAYS_MS.length) {
-            patch(key, { status: "failed", note: describeFailure(error) });
-            return;
+          if (!navigator.onLine) {
+            // Offline is not a failure and does not use up retries.
+            patch(key, { status: "offline", note: "No internet connection. This carries on by itself when it's back." });
+            await waitForOnline();
+          } else {
+            if (failures >= RETRY_DELAYS_MS.length) {
+              patch(key, {
+                status: "failed",
+                note: `The connection kept dropping. Press Retry: it carries on from ${pctOf({ sent: offset, size: file.size })}%.`,
+              });
+              return;
+            }
+            const wait = RETRY_DELAYS_MS[failures++];
+            patch(key, { status: "retrying", note: `Connection dropped. Trying again in ${Math.round(wait / 1000)} s.` });
+            await new Promise((r) => setTimeout(r, wait));
           }
-          const wait = RETRY_DELAYS_MS[failures++];
-          patch(key, { status: "retrying", note: `Connection dropped. Retrying in ${Math.round(wait / 1000)} s` });
-          await new Promise((r) => setTimeout(r, wait));
-          // Resume from what Cloudflare actually holds, so the retry costs at
-          // most one chunk.
           offset = (await serverOffset(link.uploadUrl)) ?? offset;
-          patch(key, { status: "uploading", sent: offset, note: item.note });
+          patch(key, { status: "uploading", sent: offset, note: null });
         }
       }
 
-      patch(key, { status: "finishing", sent: file.size });
-      const lesson = await createLessonFromUpload({ sectionId: item.sectionId, title: item.title, videoId: link.videoId });
-      if (!lesson.ok) {
-        patch(key, { status: "failed", note: lesson.error });
-        return;
-      }
-      patch(key, { status: "processing", lessonId: lesson.lessonId, note: null });
-      router.refresh();
+      patch(key, { sent: file.size });
+      await finish(key, item.sectionId, item.title, link.videoId);
     },
-    [patch, router],
+    [patch, finish],
   );
 
   // THE PUMP: start the next queued file when nothing is uploading. Called
@@ -255,12 +318,30 @@ export function UploadQueueProvider({ enabled, children }: { enabled: boolean; c
     [run],
   );
 
+  /** The same file chosen again for an interrupted upload: queue it to resume. */
+  const resumeWith = useCallback(
+    (key: string, file: File) => {
+      patch(key, { file, status: "queued", note: null });
+      pump();
+    },
+    [patch, pump],
+  );
+
   const enqueue = useCallback(
     (sectionId: string, sectionTitle: string, files: File[]) => {
       const sorted = [...files].filter((f) => f.size > 0).sort(byFilename);
-      const added: Item[] = sorted.map((file) => ({
+      const fresh: File[] = [];
+      for (const file of sorted) {
+        // A file that matches an interrupted upload resumes it, whichever section it was dropped on.
+        const waiting = itemsRef.current.find((i) => i.status === "interrupted" && sameFile(i, file));
+        if (waiting) resumeWith(waiting.key, file);
+        else fresh.push(file);
+      }
+      const added: Item[] = fresh.map((file) => ({
         key: `${file.name}:${file.size}:${file.lastModified}:${Math.random().toString(36).slice(2)}`,
         file,
+        name: file.name,
+        size: file.size,
         sectionId,
         sectionTitle,
         title: titleFromFilename(file.name),
@@ -276,19 +357,59 @@ export function UploadQueueProvider({ enabled, children }: { enabled: boolean; c
       // Durations first, all files, locally — so each link's reservation is
       // sized to its own file before any of them starts.
       for (const item of added) {
-        void readDuration(item.file).then((seconds) => {
-          const plan = maxDurationFor(seconds);
-          patch(item.key, {
-            status: "queued",
-            durationSeconds: seconds,
-            note: plan.fromFile ? null : `Length unreadable here: reserving ${plan.seconds / 3600} h`,
-          });
+        void readDuration(item.file as File).then((seconds) => {
+          patch(item.key, { status: "queued", durationSeconds: maxDurationFor(seconds).fromFile ? seconds : null });
           pump();
         });
       }
     },
-    [patch, pump],
+    [patch, pump, resumeWith],
   );
+
+  // COMING BACK: what this browser was uploading when it last left.
+  useEffect(() => {
+    if (!enabled) return;
+    let stop = false;
+    void (async () => {
+      const recovered: Item[] = [];
+      for (const saved of readSaved()) {
+        if (!stillUsable(saved)) {
+          forgetUpload(saved.videoId);
+          continue;
+        }
+        const held = await serverOffset(saved.uploadUrl);
+        if (held === null) {
+          // Gone at Cloudflare (finished and closed, or expired) — nothing to resume.
+          forgetUpload(saved.videoId);
+          continue;
+        }
+        recovered.push({
+          key: `saved:${saved.videoId}`,
+          file: null,
+          name: saved.name,
+          size: saved.size,
+          sectionId: saved.sectionId,
+          sectionTitle: saved.sectionTitle,
+          title: saved.title,
+          status: held >= saved.size ? "finishing" : "interrupted",
+          sent: held,
+          durationSeconds: saved.durationSeconds,
+          note: null,
+          lessonId: null,
+          link: { uploadUrl: saved.uploadUrl, videoId: saved.videoId, expiresAt: saved.expiresAt },
+        });
+      }
+      if (stop || recovered.length === 0) return;
+      setItems((list) => [...recovered.filter((r) => !list.some((i) => i.key === r.key)), ...list]);
+      setOpen(true);
+      for (const r of recovered) {
+        if (r.status === "finishing" && r.link) void finish(r.key, r.sectionId, r.title, r.link.videoId);
+      }
+    })();
+    return () => {
+      stop = true;
+    };
+  }, [enabled, finish]);
 
   // Stream processing -> durations. Poll gently while any lesson is processing.
   useEffect(() => {
@@ -297,12 +418,12 @@ export function UploadQueueProvider({ enabled, children }: { enabled: boolean; c
     const timer = window.setTimeout(async () => {
       const { pending } = await syncLessonDurations(waiting);
       if (pending < waiting.length) router.refresh();
-      if (pending === 0) setItems((list) => list.map((i) => (i.status === "processing" ? { ...i, status: "processing", note: "Ready", lessonId: null } : i)));
+      if (pending === 0) setItems((list) => list.map((i) => (i.status === "processing" ? { ...i, note: "Ready", lessonId: null } : i)));
     }, 15_000);
     return () => window.clearTimeout(timer);
   }, [items, router]);
 
-  const active = items.some((i) => ["reading", "queued", "uploading", "retrying", "finishing"].includes(i.status));
+  const active = items.some((i) => RUNNING.includes(i.status));
   useEffect(() => {
     if (!active) return;
     const warn = (e: BeforeUnloadEvent) => {
@@ -317,16 +438,24 @@ export function UploadQueueProvider({ enabled, children }: { enabled: boolean; c
     xhrs.current.get(key)?.abort();
     // Give the storage reservation back now, not at the link's expiry.
     const videoId = items.find((i) => i.key === key)?.link?.videoId;
-    if (videoId) void discardUpload(videoId);
+    if (videoId) {
+      forgetUpload(videoId);
+      void discardUpload(videoId);
+    }
     patch(key, { status: "cancelled", note: null, link: null });
   };
   const retry = (key: string) => {
     cancelled.current.delete(key);
-    patch(key, { status: "queued", note: null });
+    const item = items.find((i) => i.key === key);
+    if (item?.status === "failed" && !item.file && item.link) {
+      // A recovered upload whose lesson failed to save: just save it again.
+      void finish(key, item.sectionId, item.title, item.link.videoId);
+      return;
+    }
+    patch(key, { status: item?.file ? "queued" : "interrupted", note: null });
     pump();
   };
-  const clearFinished = () =>
-    setItems((list) => list.filter((i) => !["processing", "failed", "cancelled"].includes(i.status)));
+  const clearFinished = () => setItems((list) => list.filter((i) => !["processing", "failed", "cancelled"].includes(i.status)));
 
   const total = items.length;
   const finished = items.filter((i) => i.status === "processing").length;
@@ -357,76 +486,122 @@ export function UploadQueueProvider({ enabled, children }: { enabled: boolean; c
           </div>
           {open && (
             <ul className="flex flex-col overflow-y-auto" aria-live="polite">
-              {items.map((item) => {
-                const pct = Math.round((item.sent / item.file.size) * 100);
-                const label =
-                  item.status === "reading"
-                    ? "Reading length"
-                    : item.status === "queued"
-                      ? "Waiting"
-                      : item.status === "uploading"
-                        ? `${pct}% · ${megabytes(item.sent)} of ${megabytes(item.file.size)}`
-                        : item.status === "retrying"
-                          ? `${pct}% · paused`
-                          : item.status === "finishing"
-                            ? "Saving the lesson"
-                            : item.status === "processing"
-                              ? item.note === "Ready"
-                                ? "Ready"
-                                : "Processing"
-                              : item.status === "cancelled"
-                                ? "Cancelled"
-                                : "Failed";
-                return (
-                  <li key={item.key} className="flex flex-col gap-1.5 border-b border-line px-3 py-2.5 last:border-b-0">
-                    <div className="flex items-baseline gap-2">
-                      <span className="min-w-0 flex-1 truncate font-sans text-body text-ink">{item.title}</span>
-                      <span
-                        className={`shrink-0 font-condensed text-label tabular-nums ${
-                          item.status === "failed" ? "text-danger" : "text-muted"
-                        }`}
-                      >
-                        {label}
-                      </span>
-                    </div>
-                    {["uploading", "retrying", "finishing"].includes(item.status) && (
-                      <div
-                        role="progressbar"
-                        aria-label={`${item.title} upload`}
-                        aria-valuenow={pct}
-                        aria-valuemin={0}
-                        aria-valuemax={100}
-                        className="h-1 w-full overflow-hidden rounded-full bg-rule"
-                      >
-                        <div className="h-full bg-accent transition-[width]" style={{ width: `${pct}%` }} />
-                      </div>
-                    )}
-                    {(item.note && item.note !== "Ready") || item.status === "failed" || ["uploading", "retrying", "queued"].includes(item.status) ? (
-                      <div className="flex flex-wrap items-center gap-2">
-                        {item.note && item.note !== "Ready" && (
-                          <span className={`min-w-0 flex-1 text-caption ${item.status === "failed" ? "text-danger" : "text-muted"}`}>
-                            {item.note}
-                          </span>
-                        )}
-                        {["uploading", "retrying", "queued"].includes(item.status) && (
-                          <Button type="button" size="sm" variant="ghost" onClick={() => cancel(item.key)} className="max-lg:min-h-11">
-                            Cancel
-                          </Button>
-                        )}
-                        {item.status === "failed" && (
-                          <Button type="button" size="sm" variant="secondary" onClick={() => retry(item.key)} className="max-lg:min-h-11">
-                            Retry
-                          </Button>
-                        )}
-                      </div>
-                    ) : null}
-                  </li>
-                );
-              })}
+              {items.map((item) => (
+                <UploadRow
+                  key={item.key}
+                  item={item}
+                  onCancel={() => cancel(item.key)}
+                  onRetry={() => retry(item.key)}
+                  onDiscard={() => cancel(item.key)}
+                  onChoose={(file) => {
+                    if (sameFile(item, file)) resumeWith(item.key, file);
+                    else patch(item.key, { note: `That's a different file. Choose "${item.name}" (${megabytes(item.size)}).` });
+                  }}
+                />
+              ))}
             </ul>
           )}
         </aside>
       )}
     </QueueContext.Provider>
+  );
+}
+
+function UploadRow({
+  item,
+  onCancel,
+  onRetry,
+  onDiscard,
+  onChoose,
+}: {
+  item: Item;
+  onCancel: () => void;
+  onRetry: () => void;
+  onDiscard: () => void;
+  onChoose: (file: File) => void;
+}) {
+  const pct = pctOf(item);
+  const label =
+    item.status === "reading"
+      ? "Getting ready"
+      : item.status === "queued"
+        ? "Waiting"
+        : item.status === "uploading"
+          ? `${pct}% · ${megabytes(item.sent)} of ${megabytes(item.size)}`
+          : item.status === "retrying" || item.status === "offline"
+            ? `${pct}% · paused`
+            : item.status === "finishing"
+              ? "Saving the lesson"
+              : item.status === "processing"
+                ? item.note === "Ready"
+                  ? "Ready"
+                  : "Processing"
+                : item.status === "interrupted"
+                  ? `${pct}% · interrupted`
+                  : item.status === "cancelled"
+                    ? "Cancelled"
+                    : "Didn't finish";
+  const note =
+    item.status === "interrupted"
+      ? (item.note ?? `Choose "${item.name}" again to finish. It carries on from ${pct}%.`)
+      : item.note && item.note !== "Ready"
+        ? item.note
+        : null;
+  const problem = item.status === "failed";
+
+  return (
+    <li className="flex flex-col gap-1.5 border-b border-line px-3 py-2.5 last:border-b-0">
+      <div className="flex items-baseline gap-2">
+        <span className="min-w-0 flex-1 truncate font-sans text-body text-ink">{item.title}</span>
+        <span className={`shrink-0 font-condensed text-label tabular-nums ${problem ? "text-danger" : "text-muted"}`}>{label}</span>
+      </div>
+      {["uploading", "retrying", "offline", "finishing", "interrupted"].includes(item.status) && (
+        <div
+          role="progressbar"
+          aria-label={`${item.title} upload`}
+          aria-valuenow={pct}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          className="h-1 w-full overflow-hidden rounded-full bg-rule"
+        >
+          <div className="h-full bg-accent transition-[width]" style={{ width: `${pct}%` }} />
+        </div>
+      )}
+      {note || problem || ["uploading", "retrying", "offline", "queued", "interrupted"].includes(item.status) ? (
+        <div className="flex flex-wrap items-center gap-2">
+          {note && <span className={`min-w-0 flex-1 basis-full text-caption ${problem ? "text-danger" : "text-muted"}`}>{note}</span>}
+          {item.status === "interrupted" && (
+            <label className="inline-flex min-h-11 cursor-pointer items-center rounded-control border border-ink/50 px-3 font-condensed text-label font-semibold uppercase tracking-[0.08em] text-ink focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ink lg:min-h-9">
+              Choose file
+              <input
+                type="file"
+                accept="video/*"
+                className="sr-only"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) onChoose(file);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+          )}
+          {item.status === "interrupted" && (
+            <Button type="button" size="sm" variant="ghost" onClick={onDiscard} className="max-lg:min-h-11">
+              Discard
+            </Button>
+          )}
+          {["uploading", "retrying", "offline", "queued"].includes(item.status) && (
+            <Button type="button" size="sm" variant="ghost" onClick={onCancel} className="max-lg:min-h-11">
+              Cancel
+            </Button>
+          )}
+          {problem && (
+            <Button type="button" size="sm" variant="secondary" onClick={onRetry} className="max-lg:min-h-11">
+              Retry
+            </Button>
+          )}
+        </div>
+      ) : null}
+    </li>
   );
 }

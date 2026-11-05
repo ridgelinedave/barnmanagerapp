@@ -28,11 +28,14 @@ import {
   streamCredentialsFrom,
   thumbnailUrl,
 } from "../lib/stream-core.ts";
-import { COMPLETE_AT, crossedCompletion } from "../lib/academy-format.ts";
+import { COMPLETE_AT, crossedCompletion, formatTotal, outlineSummary, resumeFrom, totalSeconds } from "../lib/academy-format.ts";
+import { sameFile, stillUsable } from "../lib/academy-upload-store.ts";
 import {
   CHUNK_BYTES,
   FALLBACK_MAX_DURATION_SECONDS,
   byFilename,
+  statusFromMessage,
+  uploadProblem,
   expiryFor,
   maxDurationFor,
   titleFromFilename,
@@ -224,6 +227,32 @@ console.log("\nthe upload policy\n");
   check("lessons are titled from the filename", titleFromFilename("Stirrups_On.mp4") === "Stirrups On");
   const order = [{ name: "Lesson 10.mp4" }, { name: "Lesson 2.mp4" }, { name: "lesson 1.mp4" }].sort(byFilename).map((x) => x.name);
   check("filename order is natural (1, 2, 10)", JSON.stringify(order) === JSON.stringify(["lesson 1.mp4", "Lesson 2.mp4", "Lesson 10.mp4"]), order.join(", "));
+}
+
+console.log("\nresume, totals, and what Belle is told\n");
+{
+  check("resume: 4:12 into a 10-min lesson picks up there", resumeFrom(252.7, 600) === 252);
+  check("resume: under 10 s in starts from the top", resumeFrom(8, 600) === null);
+  check("resume: in the last 15 s starts from the top", resumeFrom(590, 600) === null);
+  check("resume: nothing saved, or no length yet, starts from the top", resumeFrom(null, 600) === null && resumeFrom(100, 0) === null);
+  check("totals: 1 h 40 min", formatTotal(6000) === "1 h 40 min");
+  check("totals: 24 min / 45 s / exactly 2 h", formatTotal(1440) === "24 min" && formatTotal(45) === "45 s" && formatTotal(7200) === "2 h");
+  check("totals: still-processing lessons count as nothing yet", totalSeconds([{ durationSeconds: 60 }, { durationSeconds: null }]) === 60);
+  check("summary carries the running time", outlineSummary(2, 5, 1500) === "2 sections · 5 lessons · 25 min");
+  check("summary has no time while none is known", outlineSummary(1, 1, 0) === "1 section · 1 lesson");
+  check(
+    "an interrupted upload matches the same name and size only",
+    sameFile({ name: "a.mov", size: 10 }, { name: "a.mov", size: 10 }) && !sameFile({ name: "a.mov", size: 10 }, { name: "a.mov", size: 11 }),
+  );
+  const now = Date.parse("2026-11-05T12:00:00Z");
+  check("a link with an hour left is resumed", stillUsable({ expiresAt: "2026-11-05T13:00:00Z" }, now));
+  check("a link with under five minutes left is not", !stillUsable({ expiresAt: "2026-11-05T12:04:00Z" }, now) && !stillUsable({ expiresAt: "junk" }, now));
+  check("a 429 reads as busy or storage full, and says what to do", /storage/.test(uploadProblem(429)) && /Retry/.test(uploadProblem(429)));
+  check("an expired link (10017) says to retry", /Retry/.test(uploadProblem(400, '{"errors":[{"code":10017}]}')));
+  check("a dropped connection says to check the internet", /internet connection/.test(uploadProblem(0)));
+  check("a 403 says it can't be fixed from here", /can't be fixed from here/.test(uploadProblem(403)));
+  check("no message names an HTTP status", ![0, 400, 401, 403, 413, 429, 500].some((c) => /HTTP|\b4\d\d\b/.test(uploadProblem(c))));
+  check("the status is read from a StreamError message", statusFromMessage("Stream upload link request failed: HTTP 429 (codes 10011).") === 429);
 }
 
 console.log(`\n${passed} passed, ${failures.length} failed`);

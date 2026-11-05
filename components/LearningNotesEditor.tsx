@@ -37,7 +37,12 @@ export function LearningNotesEditor({
         rows={8}
         defaultValue={notes}
         aria-labelledby={labelledBy}
+        aria-describedby={`notes-help-${lessonId}`}
       />
+      <p id={`notes-help-${lessonId}`} className="text-caption text-muted">
+        A blank line starts a new paragraph. Start a line with “- ” for a bullet. **Two stars** make text bold. Web
+        addresses become links.
+      </p>
       <FormFeedback error={state.error} message={state.message} />
       <Button type="submit" variant="primary" arrow={false} disabled={pending} className="lg:self-start">
         {pending ? "Saving…" : "Save notes"}
