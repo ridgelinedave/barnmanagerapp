@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/ui/primitives";
 import { requireTab } from "@/lib/guard";
 import { listCategories, listCourses } from "@/lib/academy";
 import { listLevels } from "@/lib/lessons";
+import { listTags } from "@/lib/tags";
 import { barn, featureEnabled } from "@/config/barn";
 import { enrolInCourse } from "./course-actions";
 
@@ -51,10 +52,11 @@ export default async function AcademyPage({
   const categoryParam = one(params.category) ?? null;
   const isAdmin = role === "admin";
 
-  const [courses, categories, levels] = await Promise.all([
+  const [courses, categories, levels, tags] = await Promise.all([
     listCourses(),
     listCategories(),
     isAdmin ? listLevels() : Promise.resolve([]),
+    isAdmin ? listTags() : Promise.resolve([]),
   ]);
   const activeCategory = categories.some((c) => c.id === categoryParam) ? categoryParam : null;
 
@@ -83,7 +85,11 @@ export default async function AcademyPage({
       action={
         isAdmin ? (
           <SheetTrigger label="New course" title="New course" variant="primary">
-            <CourseForm categories={categories} levels={levels.map((l) => ({ id: l.id, name: l.name }))} />
+            <CourseForm
+              categories={categories}
+              levels={levels.map((l) => ({ id: l.id, name: l.name }))}
+              tags={tags.map((t) => ({ id: t.id, name: t.name }))}
+            />
           </SheetTrigger>
         ) : undefined
       }

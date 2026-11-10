@@ -407,6 +407,14 @@ export const SETTINGS_ADMIN_GROUP: DestinationGroup = {
       roles: ADMIN,
     },
     {
+      // Named groups of people (0029): who sees a tag-only course; later,
+      // email audiences.
+      href: "/manage/tags",
+      title: "Tags",
+      icon: "tag",
+      roles: ADMIN,
+    },
+    {
       flag: "clockIn",
       href: "/manage/timesheets",
       title: "Clock-ins and timesheets",

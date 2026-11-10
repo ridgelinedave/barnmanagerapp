@@ -36,7 +36,8 @@ export type IconName =
   | "eyeOff"
   | "ribbon"
   | "play"
-  | "grip";
+  | "grip"
+  | "tag";
 
 const PATHS: Record<IconName, string> = {
   /** A placing rosette. Same path as the Lessons tab glyph in lib/nav.ts, so
@@ -46,6 +47,7 @@ const PATHS: Record<IconName, string> = {
   chevron: "m9 6 6 6-6 6",
   /** A drag handle: two columns of three dots. */
   grip: "M9 6h.01M9 12h.01M9 18h.01M15 6h.01M15 12h.01M15 18h.01",
+  tag: "M3.5 12.2V4.5a1 1 0 0 1 1-1h7.7l8.3 8.3a1.5 1.5 0 0 1 0 2.1l-6 6a1.5 1.5 0 0 1-2.1 0L3.5 12.2ZM8 8h.01",
   /** A play triangle inside the same frame weight as the rest of the set. */
   play: "M8.5 5.75v12.5L18.5 12 8.5 5.75Z",
   /** The trailing mark on a primary button. */

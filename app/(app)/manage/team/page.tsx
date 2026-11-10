@@ -34,6 +34,8 @@ import {
 } from "@/components/ui/DataTable";
 import { INVITE_STATUS_LABELS } from "@/lib/invites";
 import { requireTab } from "@/lib/guard";
+import { tagNamesByProfile } from "@/lib/tags";
+import Link from "next/link";
 import {
   listFamilies,
   listFamiliesWithRiders,
@@ -74,13 +76,32 @@ export default async function ManageTeamPage({
   const params = await searchParams;
   const sortState = parseSort(params, ["name", "role", "family"], { key: "role", dir: "asc" });
 
-  const [team, families, familiesWithRiders, levels, invites] = await Promise.all([
+  const [team, families, familiesWithRiders, levels, invites, tagsByPerson] = await Promise.all([
     listTeam(),
     listFamilies(),
     listFamiliesWithRiders(),
     listLevels(),
     listInvites(),
+    tagNamesByProfile(),
   ]);
+  // A person's tags (Settings → Tags), each linking to the tag's page.
+  const tagLinks = (personId: string) => {
+    const tags = tagsByPerson.get(personId) ?? [];
+    if (tags.length === 0) return null;
+    return (
+      <span className="flex flex-wrap gap-x-2 gap-y-1">
+        {tags.map((t) => (
+          <Link key={t.id} href={`/manage/tags/${t.id}`} className="text-label text-accent-text underline underline-offset-2">
+            {t.name}
+          </Link>
+        ))}
+      </span>
+    );
+  };
+  // A client login with no family and no tag really does see an empty app; one
+  // with a tag sees the courses it opens (a Circle member, say).
+  const looksEmpty = (person: { id: string; role: Role; family_id: string | null }) =>
+    person.role === "parent" && !person.family_id && !tagsByPerson.has(person.id);
   const riderPhotos = await riderPhotoUrls(familiesWithRiders.flatMap((f) => f.riders));
 
   const admins = team.filter((person) => person.role === "admin").length;
@@ -109,8 +130,9 @@ export default async function ManageTeamPage({
           />
         ),
         phone: person.phone ?? "—",
+        tags: tagLinks(person.id) ?? "—",
         family:
-          person.role === "parent" && !person.family_id ? (
+          looksEmpty(person) ? (
             <Chip value="No family linked" icon="alert" tone="danger" />
           ) : (
             (person.familyName ?? "—")
@@ -188,6 +210,7 @@ export default async function ManageTeamPage({
                 { key: "phone", label: "Phone", className: "whitespace-nowrap tabular-nums" },
                 { key: "family", label: "Family", sortable: true },
                 { key: "permissions", label: "Permissions" },
+                { key: "tags", label: "Tags" },
                 { key: "actions", label: "Actions", hideLabel: true, className: "w-px" },
               ]}
               rows={sortRows(peopleRows, sortState.key, sortState.dir)}
@@ -216,13 +239,14 @@ export default async function ManageTeamPage({
 
                 {/* A parent whose family has never been set can see nothing at
                     all — worth saying on the card, not just in the edit sheet. */}
-                {person.role === "parent" && !person.family_id && (
+                {looksEmpty(person) && (
                   <Callout tone="gold" icon="alert">
                     No family linked. This login sees an empty app.
                   </Callout>
                 )}
 
                 <PermissionRow person={person} />
+                {tagLinks(person.id)}
 
                 <SheetTrigger label="Edit" title={name}>
                   <PersonSheetBody

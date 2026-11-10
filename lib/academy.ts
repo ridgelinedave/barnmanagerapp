@@ -24,8 +24,9 @@ export type Course = {
   description: string;
   position: number;
   published: boolean;
-  audience: "all" | "level";
+  audience: "all" | "level" | "tag";
   audienceLevelId: string | null;
+  audienceTagId: string | null;
   coverPath: string | null;
 };
 
@@ -53,7 +54,7 @@ export type CourseSummary = Course & {
   continueLessonId: string | null;
 };
 
-const COURSE_COLUMNS = "id, title, description, position, published, audience, audience_level_id, cover_path";
+const COURSE_COLUMNS = "id, title, description, position, published, audience, audience_level_id, audience_tag_id, cover_path";
 
 function toCourse(row: Record<string, unknown>): Course {
   return {
@@ -62,8 +63,9 @@ function toCourse(row: Record<string, unknown>): Course {
     description: (row.description as string) ?? "",
     position: row.position as number,
     published: Boolean(row.published),
-    audience: row.audience as "all" | "level",
+    audience: row.audience as "all" | "level" | "tag",
     audienceLevelId: (row.audience_level_id as string) ?? null,
+    audienceTagId: (row.audience_tag_id as string) ?? null,
     coverPath: (row.cover_path as string) ?? null,
   };
 }

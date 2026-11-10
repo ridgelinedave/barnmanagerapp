@@ -12,6 +12,7 @@ import { ListRow, RowList } from "@/components/ui/ListRow";
 import { requireTab } from "@/lib/guard";
 import { courseLearners, fillLessonDurations, listCategories, loadCourse } from "@/lib/academy";
 import { listLevels } from "@/lib/lessons";
+import { listTags } from "@/lib/tags";
 import { streamThumbnails } from "@/lib/stream";
 import { formatBarnDate } from "@/lib/dates";
 import { barn, featureEnabled } from "@/config/barn";
@@ -63,11 +64,12 @@ export default async function CoursePage({
   }
   const { course, sections, lessons, completedIds } = loaded;
 
-  const [thumbs, categories, levels, learners] = await Promise.all([
+  const [thumbs, categories, levels, learners, tags] = await Promise.all([
     streamThumbnails(lessons.map((l) => l.videoId).filter((v): v is string => Boolean(v))),
     isAdmin ? listCategories() : Promise.resolve([]),
     isAdmin ? listLevels() : Promise.resolve([]),
     isAdmin ? courseLearners(course.id) : Promise.resolve([]),
+    isAdmin ? listTags() : Promise.resolve([]),
   ]);
 
   const lessonHref = (id: string) => `/lessons/learn/${course.id}/${id}`;
@@ -90,10 +92,13 @@ export default async function CoursePage({
   // Who a published course reaches — the rule in learning_audience_allows
   // (0023), in words: staff always; clients by the course's audience.
   const levelName = levels.find((l) => l.id === course.audienceLevelId)?.name;
+  const tagName = tags.find((t) => t.id === course.audienceTagId)?.name;
   const audienceSentence =
     course.audience === "level"
       ? `All staff, and clients with an active rider at ${levelName ?? "the chosen level"},`
-      : "All staff and every client";
+      : course.audience === "tag"
+        ? `All staff, and people tagged “${tagName ?? "the chosen tag"}”,`
+        : "All staff and every client";
   const label = course.percent >= 100 ? "Watch again" : course.completed > 0 ? "Continue" : "Start";
 
   const learnerColumns: Column[] = [
@@ -177,11 +182,13 @@ export default async function CoursePage({
                 description: course.description,
                 audience: course.audience,
                 audienceLevelId: course.audienceLevelId,
+                audienceTagId: course.audienceTagId,
                 categoryIds: course.categoryIds,
               }}
               coverSrc={course.coverSrc}
               categories={categories}
               levels={levels.map((l) => ({ id: l.id, name: l.name }))}
+              tags={tags.map((t) => ({ id: t.id, name: t.name }))}
             />
           </SheetTrigger>
           <ButtonLink href={`/lessons/learn/${course.id}?view=member`} variant="ghost" arrow={false}>

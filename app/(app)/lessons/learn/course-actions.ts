@@ -33,22 +33,27 @@ function revalidateCourse(courseId?: string) {
 type CourseFields = {
   title: string;
   description: string;
-  audience: "all" | "level";
+  audience: "all" | "level" | "tag";
   audience_level_id: string | null;
+  audience_tag_id: string | null;
 };
 
 function courseFields(formData: FormData): CourseFields | string {
   const title = String(formData.get("title") ?? "").trim();
   if (!title) return "Give the course a title.";
   if (title.length > 200) return "Titles need to be under 200 characters.";
-  const audience = String(formData.get("audience") ?? "all") === "level" ? "level" : "all";
+  const raw = String(formData.get("audience") ?? "all");
+  const audience = raw === "level" || raw === "tag" ? raw : "all";
   const level = String(formData.get("audience_level_id") ?? "");
+  const tag = String(formData.get("audience_tag_id") ?? "");
   if (audience === "level" && !UUID.test(level)) return "Choose the level this course is for.";
+  if (audience === "tag" && !UUID.test(tag)) return "Choose the tag this course is for. Make one under Settings → Tags.";
   return {
     title,
     description: String(formData.get("description") ?? "").trim().slice(0, 5000),
     audience,
     audience_level_id: audience === "level" ? level : null,
+    audience_tag_id: audience === "tag" ? tag : null,
   };
 }
 
