@@ -94,18 +94,35 @@ export async function createInvite(
   ) as Record<(typeof PERMISSION_FLAGS)[number], boolean>;
 
   const supabase = await createClient();
-  const { error } = await supabase.from("invites").insert({
-    role: role as Role,
-    // Staff and admin never belong to a family; the CHECK would refuse it.
-    family_id: role === "parent" ? optional(formData, "family_id") : null,
-    full_name: fullName,
-    email: optional(formData, "email"),
-    phone: optional(formData, "phone"),
-    ...effectiveFlags(role, submitted),
-    expires_at: inviteExpiryFrom(),
-  });
+  const { data: created, error } = await supabase
+    .from("invites")
+    .insert({
+      role: role as Role,
+      // Staff and admin never belong to a family; the CHECK would refuse it.
+      family_id: role === "parent" ? optional(formData, "family_id") : null,
+      full_name: fullName,
+      email: optional(formData, "email"),
+      phone: optional(formData, "phone"),
+      ...effectiveFlags(role, submitted),
+      expires_at: inviteExpiryFrom(),
+    })
+    .select("id")
+    .single();
 
-  if (error) return FAIL(readable(error.message));
+  if (error || !created) return FAIL(readable(error?.message ?? "The invite was not saved."));
+
+  // Tags the person gets the moment they accept (migration 0031). Copied onto
+  // their profile by the claim, from this table only.
+  const tagIds = formData.getAll("tag_id").map(String).filter((v) => /^[0-9a-f-]{36}$/i.test(v));
+  if (tagIds.length) {
+    const { error: tagError } = await supabase
+      .from("invite_tags")
+      .insert(tagIds.map((tag_id) => ({ invite_id: created.id, tag_id })));
+    if (tagError) {
+      revalidate();
+      return FAIL("The invite was made, but its tags weren't saved. Revoke it and make it again.");
+    }
+  }
 
   revalidate();
   return OK("Invite created. Copy the link and send it to them.");

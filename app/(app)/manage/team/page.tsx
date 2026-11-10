@@ -34,7 +34,7 @@ import {
 } from "@/components/ui/DataTable";
 import { INVITE_STATUS_LABELS } from "@/lib/invites";
 import { requireTab } from "@/lib/guard";
-import { tagNamesByProfile } from "@/lib/tags";
+import { listTags, tagNamesByProfile } from "@/lib/tags";
 import Link from "next/link";
 import {
   listFamilies,
@@ -76,14 +76,17 @@ export default async function ManageTeamPage({
   const params = await searchParams;
   const sortState = parseSort(params, ["name", "role", "family"], { key: "role", dir: "asc" });
 
-  const [team, families, familiesWithRiders, levels, invites, tagsByPerson] = await Promise.all([
+  const [team, families, familiesWithRiders, levels, invites, tagsByPerson, allTags] = await Promise.all([
     listTeam(),
     listFamilies(),
     listFamiliesWithRiders(),
     listLevels(),
     listInvites(),
     tagNamesByProfile(),
+    listTags(),
   ]);
+  // Every tag, for the invite form's "they get these on accepting".
+  const tagList = allTags.map((t) => ({ id: t.id, name: t.name }));
   // A person's tags (Settings → Tags), each linking to the tag's page.
   const tagLinks = (personId: string) => {
     const tags = tagsByPerson.get(personId) ?? [];
@@ -179,7 +182,7 @@ export default async function ManageTeamPage({
         featureEnabled("invites") ? (
           <div className="hidden lg:block">
             <SheetTrigger label="Invite" title="New invite" variant="primary">
-              <InviteForm families={families} />
+              <InviteForm families={families} tags={tagList} />
             </SheetTrigger>
           </div>
         ) : undefined
@@ -307,7 +310,7 @@ export default async function ManageTeamPage({
 
           <div className={MOBILE_ONLY}>
             <SheetTrigger label="Invite" title="New invite" variant="primary">
-              <InviteForm families={families} />
+              <InviteForm families={families} tags={tagList} />
             </SheetTrigger>
           </div>
         </section>

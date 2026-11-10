@@ -8,7 +8,7 @@ import {
   type InviteState,
 } from "@/app/(app)/manage/team/invite-actions";
 import { Button } from "@/components/ui/Button";
-import { Field, FormFeedback, Input, Select } from "@/components/ui/Field";
+import { CheckRow, Field, FormFeedback, Input, Select } from "@/components/ui/Field";
 import { Callout, Chip, ChipRow, Sunk } from "@/components/ui/primitives";
 import { Icon } from "@/components/ui/Icon";
 import {
@@ -42,7 +42,7 @@ const ROLE_LABELS: Record<Role, string> = { admin: "Admin", staff: "Staff", pare
  * grey them out for the other roles — it does not render them, because a
  * disabled checkbox still reads as "a thing you could have".
  */
-export function InviteForm({ families }: { families: Family[] }) {
+export function InviteForm({ families, tags = [] }: { families: Family[]; tags?: { id: string; name: string }[] }) {
   const [state, formAction, pending] = useActionState(createInvite, EMPTY);
   const [role, setRole] = useState<Role>("parent");
   const id = useId();
@@ -126,6 +126,20 @@ export function InviteForm({ families }: { families: Family[] }) {
       <Field label="Phone" htmlFor={`${id}-phone`} optional>
         <Input id={`${id}-phone`} name="phone" type="tel" inputMode="tel" autoComplete="off" />
       </Field>
+
+      {/* Tags they get the moment they accept — e.g. the Academy, for a Circle
+          member (migration 0031). Shown once the barn has a tag. */}
+      {tags.length > 0 && (
+        <fieldset className="flex flex-col gap-2">
+          <legend className="pb-1 text-label font-medium text-ink">
+            Tags <span className="font-normal text-muted">(optional)</span>
+          </legend>
+          {tags.map((tag) => (
+            <CheckRow key={tag.id} label={tag.name} name="tag_id" value={tag.id} />
+          ))}
+          <p className="text-caption text-muted">They get these the moment they accept.</p>
+        </fieldset>
+      )}
 
       <FormFeedback error={state.error} message={state.message} />
 

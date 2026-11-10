@@ -146,6 +146,35 @@ export async function claimInvite(_prev: ClaimState, formData: FormData): Promis
     return FAIL("Your account could not be set up. Ask the barn to send a fresh invite.");
   }
 
+  // --- 4b. The invite's tags, FROM THE INVITE (migration 0031) ---------------
+  // Rule 1 again: read from invite_tags for THIS invite id, never from
+  // `formData`. They are what the admin chose when she made the invite — the
+  // Academy access she promised. If they cannot be copied, undo the account
+  // (deleting the user cascades its profile) and release the invite, so the
+  // person retries into the access they were promised rather than landing
+  // without it.
+  const { data: inviteTags, error: tagReadError } = await admin
+    .from("invite_tags")
+    .select("tag_id")
+    .eq("invite_id", invite.id);
+  const tagIds = (inviteTags ?? []).map((t) => t.tag_id as string);
+  // A missing table (0031 not applied yet) means no invite has tags — never a
+  // reason to refuse every claim. Any other read error is.
+  const tableMissing = tagReadError?.code === "PGRST205" || tagReadError?.code === "42P01";
+  let tagError = tableMissing ? null : tagReadError;
+  if (!tagError && tagIds.length) {
+    const { data: profile } = await admin.from("profiles").select("id").eq("user_id", created.user.id).single();
+    const { error } = await admin
+      .from("profile_tags")
+      .insert(tagIds.map((tag_id) => ({ tag_id, profile_id: profile?.id, added_by: invite.created_by ?? null })));
+    tagError = error;
+  }
+  if (tagError) {
+    await admin.auth.admin.deleteUser(created.user.id);
+    await release();
+    return FAIL("Your account could not be set up. Ask the barn to send a fresh invite.");
+  }
+
   // --- 5. Sign them in -------------------------------------------------------
   // Through the COOKIE-BOUND client, not the admin one: this is the call that
   // writes the session cookies. A failure here is not fatal — the account
