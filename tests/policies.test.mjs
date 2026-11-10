@@ -230,6 +230,7 @@ function parseMigrationFunctions() {
     functions.set(name, {
       name,
       args: argNames(text),
+      arity: argNames(text).length,
       returnsTrigger: returns === "trigger",
       revokedFrom: functions.get(name)?.revokedFrom ?? new Set(),
       grantedTo: functions.get(name)?.grantedTo ?? new Set(),
@@ -243,11 +244,18 @@ function parseMigrationFunctions() {
   // this, a function a migration deliberately dropped (0028 drops the
   // module-level learning_reorder_lessons) would still be expected to exist,
   // and "admin CAN reach it" would fail against a schema that is right.
+  //
+  // A drop removes only the SAME SIGNATURE (by argument count): 0029 replaces
+  // learning_audience_allows(boolean, text, uuid) with a 4-argument version
+  // and then drops the 3-argument one — the new rule must stay in the
+  // inventory, and so under this guard.
   const dropRe = /drop\s+function\s+(?:if\s+exists\s+)?public\.(?:"([^"]+)"|([a-z_][a-z0-9_]*))\s*\(/gi;
   while ((match = dropRe.exec(sql)) !== null) {
     const name = match[1] ?? match[2];
+    const { text } = readArgList(sql, dropRe.lastIndex - 1);
+    const dropArity = text.trim() ? text.split(",").length : 0;
     const entry = functions.get(name);
-    if (entry && entry.declaredAt < match.index) functions.delete(name);
+    if (entry && entry.declaredAt < match.index && entry.arity === dropArity) functions.delete(name);
   }
 
   // Revokes and grants. Later statements win, which matches apply order.
@@ -6129,6 +6137,180 @@ async function main() {
       if (made.modules.length) await admin.from("learning_modules").delete().in("id", made.modules);
       const left = (await visibleIds(admin, "learning_modules")).ids.filter((id) => made.modules.includes(id));
       check("cleanup: this section's courses are gone", left.length === 0, `${left.length} left`);
+    }
+  }
+
+  // ===========================================================================
+  // ACCESS TAGS (migration 0029) — admin-managed tags on people, and a course
+  // audience "people with tag X". The one audience rule decides it, so the
+  // course, its sections, lessons, category links, cover, enrolment and
+  // progress all follow the tag.
+  //
+  // Control first throughout: the TAGGED client sees each thing before the
+  // UNTAGGED one is shown not to; removing the tag is checked against a
+  // course the client could just see, then re-read.
+  // ===========================================================================
+  console.log("\n\n═══ access tags (0029) — a course for people with a tag ═══\n");
+  if (!parent2) {
+    skip("access tags", "seed-output.json has no parent2 fixture — re-run db:seed");
+  } else {
+    const TAG = "[policytest-0029]";
+    const base = 960000 + Math.floor(Math.random() * 10000) * 10;
+    const made = { tags: [], modules: [], covers: [] };
+    const PNG = Uint8Array.from(
+      atob("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="),
+      (ch) => ch.charCodeAt(0),
+    );
+    const canRead = async (client, path) => {
+      const { data, error } = await client.storage.from("learning-covers").download(path);
+      return !error && Boolean(data) && data.size > 0;
+    };
+    const sees = async (client, table, id) => (await visibleIds(client, table)).ids.includes(id);
+
+    try {
+      // --- tags: admin only ------------------------------------------------------
+      const tag = await admin.from("tags").insert({ name: `${TAG} members ${base}` }).select("id").single();
+      if (tag.data?.id) made.tags.push(tag.data.id);
+      const other = await admin.from("tags").insert({ name: `${TAG} other ${base}` }).select("id").single();
+      if (other.data?.id) made.tags.push(other.data.id);
+      const tagId = tag.data?.id;
+      check("control: admin creates two tags", Boolean(tagId && other.data?.id), tag.error?.message ?? other.error?.message);
+      check("control: admin reads them", await sees(admin, "tags", tagId));
+      await assertCannotSee("a client CANNOT read tags", parent, "tags", tagId);
+      await assertCannotSee("staff CANNOT read tags", staff, "tags", tagId);
+      check("a client CANNOT create a tag", await writeRefused(parent.from("tags").insert({ name: `${TAG} mine` }).select("id")));
+      check(
+        "the same name again, in another case, is refused",
+        Boolean((await admin.from("tags").insert({ name: `  ${TAG} MEMBERS ${base} ` }).select("id")).error),
+      );
+
+      // --- memberships: admin only -----------------------------------------------
+      const on = await admin.from("profile_tags").insert({ tag_id: tagId, profile_id: users.parent.profileId }).select("tag_id");
+      check("control: admin puts the client on the tag", !on.error && on.data?.length === 1, on.error?.message);
+      check(
+        "a client CANNOT put themselves on a tag",
+        await writeRefused(parent2.from("profile_tags").insert({ tag_id: tagId, profile_id: users.parent2.profileId }).select()),
+      );
+      {
+        const { data } = await parent.from("profile_tags").select("tag_id").eq("tag_id", tagId);
+        check("a client CANNOT read memberships, not even their own", (data ?? []).length === 0);
+      }
+      check(
+        "a client CANNOT take a tag off",
+        await writeRefused(parent.from("profile_tags").delete().eq("tag_id", tagId).select()),
+      );
+      {
+        const { data } = await admin.from("profile_tags").select("profile_id").eq("tag_id", tagId);
+        check("…the membership is unchanged", (data ?? []).length === 1 && data[0].profile_id === users.parent.profileId);
+      }
+
+      // --- the course and everything under it --------------------------------------
+      const course = await admin
+        .from("learning_modules")
+        .insert({ title: `${TAG} course`, position: base, audience: "tag", audience_tag_id: tagId, published: true })
+        .select("id")
+        .single();
+      const cid = course.data?.id;
+      if (cid) made.modules.push(cid);
+      check("control: admin creates a PUBLISHED course for the tag", Boolean(cid), course.error?.message);
+      check(
+        "a 'tag' course with no tag is refused",
+        Boolean((await admin.from("learning_modules").insert({ title: `${TAG} x`, position: base + 1, audience: "tag" }).select("id")).error),
+      );
+      check(
+        "an 'all' course carrying a tag is refused",
+        Boolean(
+          (await admin.from("learning_modules").insert({ title: `${TAG} y`, position: base + 2, audience: "all", audience_tag_id: tagId }).select("id"))
+            .error,
+        ),
+      );
+      const sec = (await admin.from("learning_sections").insert({ module_id: cid, title: `${TAG} section`, position: 0 }).select("id").single()).data?.id;
+      const les = (
+        await admin.from("learning_lessons").insert({ module_id: cid, section_id: sec, title: `${TAG} lesson`, position: 0 }).select("id").single()
+      ).data?.id;
+      const cat = (await admin.from("learning_categories").select("id").limit(1)).data?.[0]?.id;
+      const link = await admin.from("learning_module_categories").insert({ module_id: cid, category_id: cat }).select();
+      const cover = `${cid}/policytest.png`;
+      const up = await admin.storage
+        .from("learning-covers")
+        .upload(cover, new Blob([PNG], { type: "image/png" }), { upsert: true, contentType: "image/png" });
+      if (!up.error) made.covers.push(cover);
+      check("control: a section, a lesson, a category link and a cover", Boolean(sec && les && !link.error && !up.error), up.error?.message ?? link.error?.message);
+
+      // The TAGGED client — the control.
+      check("the TAGGED client sees the course", await sees(parent, "learning_modules", cid));
+      check("…its section", await sees(parent, "learning_sections", sec));
+      check("…its lesson", await sees(parent, "learning_lessons", les));
+      check("…its cover", await canRead(parent, cover));
+      {
+        const { data } = await parent.from("learning_module_categories").select("module_id").eq("module_id", cid);
+        check("…its category link", (data ?? []).length === 1);
+      }
+
+      // The UNTAGGED client.
+      await assertCannotSee("the UNTAGGED client CANNOT see the course", parent2, "learning_modules", cid);
+      await assertCannotSee("…nor its section", parent2, "learning_sections", sec);
+      await assertCannotSee("…nor its lesson (so no playback or thumbnail token is ever minted)", parent2, "learning_lessons", les);
+      check("…nor read its cover", !(await canRead(parent2, cover)));
+      {
+        const { data } = await parent2.from("learning_module_categories").select("module_id").eq("module_id", cid);
+        check("…nor its category link", (data ?? []).length === 0);
+      }
+      check("…nor enrol in it", await writeRefused(parent2.from("learning_enrolments").insert({ module_id: cid }).select()));
+      check("…nor record progress on its lesson", await writeRefused(parent2.from("learning_progress").insert({ lesson_id: les }).select()));
+      check("control: staff see a published course whatever its tag", await sees(staff, "learning_modules", cid));
+      await assertCannotSee("anon sees nothing", anon, "learning_modules", cid);
+
+      // The tagged client makes progress, then loses the tag.
+      const enrol = await parent.from("learning_enrolments").insert({ module_id: cid }).select("id").single();
+      const prog = await parent.from("learning_progress").insert({ lesson_id: les }).select("id").single();
+      check(
+        "control: the tagged client enrols and completes the lesson",
+        Boolean(enrol.data?.id && prog.data?.id),
+        enrol.error?.message ?? prog.error?.message,
+      );
+      const off = await admin.from("profile_tags").delete().eq("tag_id", tagId).eq("profile_id", users.parent.profileId).select();
+      check("control: admin takes the client's tag off", !off.error && off.data?.length === 1, off.error?.message);
+      await assertCannotSee("TAG OFF: the client no longer sees the course", parent, "learning_modules", cid);
+      await assertCannotSee("…nor its section", parent, "learning_sections", sec);
+      await assertCannotSee("…nor its lesson", parent, "learning_lessons", les);
+      // The cover the way the APP serves it: a fresh signed link per page load
+      // (lib/media.ts signPhotos). Not a second download() — Supabase's CDN
+      // keeps serving an object this same session already fetched, for its
+      // cache lifetime, whatever RLS now says. A client who never had access
+      // is refused outright (above); a link already handed out lives out its
+      // 1 h signature. Removal stops every NEW link at once.
+      {
+        const signed = await parent.storage.from("learning-covers").createSignedUrl(cover, 60);
+        check("…nor get a link to its cover", Boolean(signed.error) && !signed.data?.signedUrl, signed.error ? "" : "a link was signed");
+        const { data: readable } = await parent.rpc("learning_cover_is_readable", { object_name: cover });
+        check("…and the storage rule says the cover is not theirs", readable === false, `returned ${readable}`);
+      }
+      check("…but their progress is KEPT", await sees(admin, "learning_progress", prog.data?.id));
+      check("…and their enrolment", await sees(admin, "learning_enrolments", enrol.data?.id));
+
+      // Back on: the course and the progress return.
+      const back = await admin.from("profile_tags").insert({ tag_id: tagId, profile_id: users.parent.profileId }).select();
+      check("control: admin puts the tag back", !back.error, back.error?.message);
+      check("TAG BACK: the course is visible again", await sees(parent, "learning_modules", cid));
+      check("…with their progress still there", await sees(parent, "learning_progress", prog.data?.id));
+
+      // A different tag does not open it.
+      const wrong = await admin.from("profile_tags").insert({ tag_id: other.data?.id, profile_id: users.parent2.profileId }).select();
+      check("control: the other client gets a DIFFERENT tag", !wrong.error, wrong.error?.message);
+      await assertCannotSee("a different tag does not open the course", parent2, "learning_modules", cid);
+
+      // A tag a course uses cannot be deleted out from under it.
+      const del = await admin.from("tags").delete().eq("id", tagId).select();
+      check("a tag a course uses CANNOT be deleted (23503)", del.error?.code === "23503", del.error?.code ?? "it was deleted");
+      check("…and it is still there", await sees(admin, "tags", tagId));
+    } finally {
+      if (made.covers.length) await admin.storage.from("learning-covers").remove(made.covers);
+      if (made.modules.length) await admin.from("learning_modules").delete().in("id", made.modules);
+      if (made.tags.length) await admin.from("tags").delete().in("id", made.tags);
+      const leftTags = (await visibleIds(admin, "tags")).ids.filter((id) => made.tags.includes(id));
+      const leftCourses = (await visibleIds(admin, "learning_modules")).ids.filter((id) => made.modules.includes(id));
+      check("cleanup: this section's tags and courses are gone", leftTags.length === 0 && leftCourses.length === 0);
     }
   }
 

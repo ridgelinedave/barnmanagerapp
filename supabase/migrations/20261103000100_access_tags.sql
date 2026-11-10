@@ -1,11 +1,10 @@
 -- 0029 — access tags: admin-managed TAGS on people, and a third course
 -- audience, "people with tag X".
 --
--- PRINTED FOR AUDIT, NOT APPLIED. Lives in supabase/pending/ until approved;
--- then it moves to supabase/migrations/ and is applied with
--- `npm run db:apply -- <file>`, followed by `npm run db:gate`, with the
--- assertions in supabase/pending/20261103000100_access_tags.test.mjs pasted
--- into tests/policies.test.mjs (Academy section) in the same commit.
+-- APPROVED 2026-11-10 (David: "implement the tag system") and applied as printed,
+-- plus the BEGIN/COMMIT wrapper. Applied with
+-- `npm run db:apply -- <file>`, followed by `npm run db:gate`; its assertions
+-- are the ACCESS TAGS section of tests/policies.test.mjs, in the same commit.
 --
 -- WHY. The barn owner needs to control who sees the Academy (it may become a
 -- paid subscription; payment is handled outside the app for now). Tags are
@@ -44,7 +43,10 @@
 -- course can never silently fall back to a different audience. Deleting a tag
 -- no course uses removes its people's memberships with it (cascade).
 --
--- Idempotent: safe to re-run.
+-- Idempotent: safe to re-run. One transaction: the course read policy is
+-- dropped and re-created in the same commit, so there is no moment without it.
+
+begin;
 
 -- =============================================================================
 -- 1. tags
@@ -228,3 +230,5 @@ create policy "learning_modules: read (audience-scoped)"
 
 -- The 3-argument rule has no callers left. One rule, not two.
 drop function if exists public.learning_audience_allows(boolean, text, uuid);
+
+commit;
