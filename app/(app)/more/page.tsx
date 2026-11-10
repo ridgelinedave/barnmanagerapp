@@ -1,4 +1,5 @@
 import { headers } from "next/headers";
+import { shareOrigin } from "@/lib/site";
 import { TabPage } from "@/components/TabPage";
 import { PoweredByMonarch } from "@/components/Wordmark";
 import { InstallPrompt } from "@/components/InstallPrompt";
@@ -38,18 +39,18 @@ export const metadata = { title: "Settings" };
  */
 
 /**
- * The absolute base URL, taken from the request.
+ * The absolute base URL for the calendar subscription link.
  *
- * A calendar subscription URL has to be absolute — the client fetching it is
- * Google, not the browser — and there is no configured host yet, so it is read
- * from the request rather than invented.
+ * It has to be absolute — the client fetching it is Google, not the browser.
+ * In production it is the barn's own address (config: barn.appHost) whichever
+ * host this page was opened at; locally, the dev server's (lib/site.ts).
  */
 async function baseUrl(): Promise<string> {
   const headerList = await headers();
   const host = headerList.get("x-forwarded-host") ?? headerList.get("host") ?? "localhost:3000";
   const protocol =
     headerList.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
-  return `${protocol}://${host}`;
+  return shareOrigin(host, protocol, barn.appHost);
 }
 
 function Row({ href, title }: { href: string; title: string }) {

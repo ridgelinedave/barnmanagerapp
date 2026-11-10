@@ -19,6 +19,8 @@ import {
   inviteStatus,
   type Invite,
 } from "@/lib/invites";
+import { shareOrigin } from "@/lib/site";
+import { barn } from "@/config/barn";
 import {
   PERMISSION_FLAGS,
   PERMISSION_FLAG_LABELS,
@@ -150,12 +152,12 @@ export function InviteForm({ families }: { families: Family[] }) {
 function useInviteCopy(invite: Invite, barnName: string) {
   const [copied, setCopied] = useState<"link" | "message" | null>(null);
 
-  // Built in the browser so the link carries whatever host the barn actually
-  // uses, rather than one baked in at build time.
+  // The barn's own address in production (config: barn.appHost), even when
+  // the admin is on the old vercel.app host; the dev server's locally.
   const url =
     typeof window === "undefined"
       ? invitePath(invite.token)
-      : `${window.location.origin}${invitePath(invite.token)}`;
+      : `${shareOrigin(window.location.host, window.location.protocol.replace(":", ""), barn.appHost)}${invitePath(invite.token)}`;
 
   async function copy(what: "link" | "message") {
     const text =

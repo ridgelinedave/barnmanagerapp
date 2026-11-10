@@ -42,6 +42,12 @@ export type BarnFeatureFlag =
 export const monarch = {
   name: "Monarch",
   descriptor: "Barn Management Software",
+  /**
+   * Monarch's own domain. Each barn lives at a subdomain of it, on its own
+   * deployment (`barn.appHost`). The bare domain has no page yet, so nothing
+   * links to it until it does.
+   */
+  domain: "monarchbarn.com",
 
   /**
    * OXBLOOD — Belle's scheme, and the default any barn gets before it picks
@@ -93,6 +99,17 @@ export const barn = {
   id: "crouse",
   name: "Crouse Equestrian",
   shortName: "Crouse",
+  /**
+   * The barn's address — every link the app hands out (calendar subscription,
+   * invites) is built on it, whichever address the person opened the app at.
+   * A subdomain of `monarch.domain`, pointed at this barn's own Vercel
+   * project (Cloudflare CNAME, DNS only).
+   *
+   * The previous address, barnmanagerapp.vercel.app, STILL SERVES the app and
+   * must keep doing so: calendars subscribed before 2026-11-10 fetch from it,
+   * and changing their host would break every one of them. No redirect.
+   */
+  appHost: "crouseequestrian.monarchbarn.com",
   /** Owner / admin. Displayed in the app shell and used in copy. */
   owner: "Belle Crouse",
   /**

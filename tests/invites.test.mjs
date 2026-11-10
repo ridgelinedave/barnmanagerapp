@@ -22,6 +22,7 @@ import {
   inviteShareText,
   inviteStatus,
 } from "../lib/invites.ts";
+import { shareOrigin } from "../lib/site.ts";
 
 let passed = 0;
 const failures = [];
@@ -146,6 +147,21 @@ check("invitePath is relative, so it works on any host", invitePath("abc") === "
 }
 
 console.log(`\n${passed} passed, ${failures.length} failed`);
+console.log("\nthe address on a link that is handed out");
+{
+  const APP = "crouseequestrian.monarchbarn.com";
+  check("production: the barn's own address", shareOrigin(APP, "https", APP) === `https://${APP}`);
+  check("…even from the old vercel.app host", shareOrigin("barnmanagerapp.vercel.app", "https", APP) === `https://${APP}`);
+  check("…and always https", shareOrigin("barnmanagerapp.vercel.app", "http", APP).startsWith("https://"));
+  check("local development: the dev server's own address", shareOrigin("localhost:3210", "http", APP) === "http://localhost:3210");
+  check(
+    "…127.0.0.1 and *.localhost too",
+    shareOrigin("127.0.0.1:3000", "http", APP) === "http://127.0.0.1:3000" &&
+      shareOrigin("crouse.localhost:3000", "http", APP) === "http://crouse.localhost:3000",
+  );
+  check("a host that only LOOKS local is not trusted as local", shareOrigin("localhost.evil.com", "https", APP) === `https://${APP}`);
+}
+
 if (failures.length > 0) {
   console.error("\nFailures:");
   for (const f of failures) console.error(`  - ${f.name}${f.detail ? ` (${f.detail})` : ""}`);
