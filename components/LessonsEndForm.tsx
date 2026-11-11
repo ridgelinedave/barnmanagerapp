@@ -36,7 +36,11 @@ export function LessonsEndForm({
   todayDay: string;
 }) {
   const [state, action, pending] = useActionState(setLessonsEnd, EMPTY);
-  const [editing, setEditing] = useState(false);
+  // Editing lasts until THIS edit's save succeeds: opening records the action
+  // state it was opened on; a new state with no error (a save) closes it, an
+  // error keeps it open with the message. Derived, so no effect is needed.
+  const [openedOn, setOpenedOn] = useState<State | null>(null);
+  const editing = openedOn !== null && (openedOn === state || state.error !== null);
   const id = useId();
   const passed = endDay !== null && endDay < todayDay;
 
@@ -52,14 +56,14 @@ export function LessonsEndForm({
       <div className="flex flex-col gap-2">
         <p className="text-caption text-ink">{line}</p>
         <div className="flex flex-wrap gap-2">
-          <Button type="button" size="sm" variant="secondary" arrow={false} onClick={() => setEditing(true)} className="max-lg:min-h-11">
+          <Button type="button" variant="secondary" arrow={false} onClick={() => setOpenedOn(state)}>
             {endDay ? "Change lessons end" : "Set lessons end"}
           </Button>
           {endDay && (
             <form action={action}>
               <input type="hidden" name="rider_id" value={riderId} />
               <input type="hidden" name="clear" value="1" />
-              <Button type="submit" size="sm" variant="ghost" arrow={false} disabled={pending} className="max-lg:min-h-11">
+              <Button type="submit" variant="ghost" arrow={false} disabled={pending}>
                 Clear
               </Button>
             </form>
@@ -79,10 +83,10 @@ export function LessonsEndForm({
       <Input id={id} name="lessons_end" type="date" required defaultValue={endDay ?? defaultDay} min={todayDay} />
       <p className="text-caption text-muted">Their Academy access ends at the end of this day.</p>
       <div className="flex flex-wrap gap-2">
-        <Button type="submit" size="sm" variant="primary" arrow={false} disabled={pending} className="max-lg:min-h-11">
+        <Button type="submit" variant="primary" arrow={false} disabled={pending}>
           Save
         </Button>
-        <Button type="button" size="sm" variant="ghost" arrow={false} onClick={() => setEditing(false)} className="max-lg:min-h-11">
+        <Button type="button" variant="ghost" arrow={false} onClick={() => setOpenedOn(null)}>
           Cancel
         </Button>
       </div>

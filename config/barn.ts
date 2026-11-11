@@ -453,11 +453,11 @@ export const barn = {
     /**
      * Academy access by lesson student (migration 0032): the Academy is
      * included for current lesson students until their lessons-end date, by
-     * hand for anyone else, and hidden from logins without access. OFF until
-     * 0032 is audited and applied and the gate is green — while off, the
-     * Academy behaves exactly as before (no entry is hidden).
+     * hand for anyone else, and hidden from logins without access. On since
+     * 2026-11-11: 0032 audited, applied, gate green. Off would restore the old
+     * menu (no entry hidden), but the DATABASE rule stays 0032's either way.
      */
-    academyAccess: false,
+    academyAccess: true,
   } satisfies Record<BarnFeatureFlag, boolean>,
 
   /**

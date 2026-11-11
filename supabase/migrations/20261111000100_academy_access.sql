@@ -1,10 +1,9 @@
 -- 0032 — Academy access: included for lesson students, ends on their notice
 -- date; manual grants for anyone else. One function decides it.
 --
--- PRINTED FOR AUDIT, NOT APPLIED (2026-11-11). After approval it moves to
--- supabase/migrations/, is applied with `npm run db:apply -- <file>` (twice —
--- idempotent), then `npm run db:gate`, with its assertions in
--- tests/policies.test.mjs in the same commit.
+-- AUDITED AND APPROVED 2026-11-11 (David). Applied with
+-- `npm run db:apply -- <file>` (twice — idempotent), then `npm run db:gate`,
+-- with its assertions in tests/policies.test.mjs in the same commit.
 --
 -- -----------------------------------------------------------------------------
 -- WHO IS A LESSON STUDENT (proposed; Belle's rule, 2026-11-11)
