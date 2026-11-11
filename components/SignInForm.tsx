@@ -1,33 +1,27 @@
 "use client";
 
-import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { Icon } from "@/components/ui/Icon";
-import { PoweredByMonarch } from "@/components/Wordmark";
+import { AuthShell } from "@/components/AuthShell";
+import { Button } from "@/components/ui/Button";
+import { Field, Input } from "@/components/ui/Field";
 import { createClient } from "@/lib/supabase/client";
 import { supabaseConfigured } from "@/lib/env";
-import { barn } from "@/config/barn";
 
 /**
- * Sign in. THE ONE DEEP SCREEN in the app.
+ * Sign in — on the white door (components/AuthShell.tsx).
  *
- * Everything past this door is paper-white with light chrome; this is the
- * threshold, and it is Belle's oxblood #4A002A — the same field as the launch
- * splash, so opening the app and signing in read as one continuous surface.
- * Gold on oxblood is her brand board, and it measures 7.22:1.
+ * DECIDED 2026-11-10 (David): the full-bleed oxblood field with ghost fields
+ * read as aggressive. Now a traditional bordered card on white, the barn's
+ * colours as accents (a band across the card's top edge), standard light
+ * fields and the barn's primary button — the same controls as everywhere past
+ * this door. Kept from the original brief:
  *
- * Built to design/mockups/login.html, variant B:
- *
- *   GHOST FIELDS — a barely-there fill with a hairline that lights gold on
- *     focus. White boxes on black glow in a dark barn at 5am; these do not.
- *   ONE METHOD — email and password. The magic-link option is gone: two ways
- *     to sign in is two things to explain, and the barn creates accounts
- *     anyway. Password reset is the recovery path, at the bottom.
+ *   ONE METHOD — email and password. Two ways to sign in is two things to
+ *     explain, and the barn creates accounts anyway. Password reset is the
+ *     recovery path, at the bottom.
  *   EYE TOGGLE — because a phone keyboard in a barn, in gloves, mistypes.
- *
- * The wordmark block is "Crouse skin" — it swaps per barn. Everything else
- * here is product character and stays.
  */
 const ERROR_COPY: Record<string, string> = {
   link_invalid: "That link has expired. Sign in with your password.",
@@ -80,151 +74,77 @@ export function SignInForm() {
     }
   }
 
-  const field =
-    "h-[3.125rem] w-full rounded-control border border-white/[0.16] bg-white/[0.05] px-4 " +
-    "text-body text-white placeholder:text-white/40 outline-none " +
-    "focus:border-gold focus:bg-white/[0.08] transition-colors duration-150";
-
-  const label = "mb-1.5 block pl-0.5 text-[0.6875rem] uppercase tracking-[0.13em] text-white/60";
-
   return (
-    <div className="flex min-h-dvh flex-col bg-deep px-7 text-white">
-      <div className="flex flex-1 flex-col justify-center py-10">
-        {/*
-         * --- the crest: "Crouse skin", swaps per barn ---------------------
-         *
-         * Belle's real crest. The mockup drew a monogram-in-a-circle plus a
-         * typeset CROUSE / EQUESTRIAN because whoever built it did not have
-         * this file — it was standing in for exactly this.
-         *
-         * The crest is a complete lockup: it already reads CROUSE, EQUESTRIAN,
-         * WNC, USA, EST. 2021. So it stands alone. Setting "CROUSE /
-         * EQUESTRIAN" underneath a crest that already says it, or captioning
-         * it "Barn Management", is the doubling that makes a real logo look
-         * like a stock one.
-         *
-         * `alt` carries the barn name rather than being empty, because with no
-         * text on the screen this image IS the name for anyone who cannot see it.
-         */}
-        <div className="mb-10 text-center">
-          <Image
-            src={barn.brand.logoSrc}
-            alt={barn.name}
-            width={340}
-            height={340}
-            priority
-            className="mx-auto size-[10.5rem]"
+    <AuthShell>
+      <h1 className="mb-6 text-center font-display text-title text-ink">Sign in</h1>
+
+      <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
+        <Field label="Email" htmlFor="email">
+          <Input
+            id="email"
+            name="email"
+            type="email"
+            required
+            autoComplete="email"
+            inputMode="email"
+            placeholder="you@email.com"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
           />
-        </div>
+        </Field>
 
-        <form onSubmit={onSubmit} noValidate>
-          <div className="mb-3.5">
-            <label htmlFor="email" className={label}>
-              Email
-            </label>
-            <input
-              id="email"
-              name="email"
-              type="email"
+        <Field label="Password" htmlFor="password">
+          <div className="relative flex items-center">
+            <Input
+              id="password"
+              name="password"
+              type={reveal ? "text" : "password"}
               required
-              autoComplete="email"
-              inputMode="email"
-              placeholder="you@email.com"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              className={field}
+              autoComplete="current-password"
+              placeholder="Your password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              className="pr-12"
             />
-          </div>
-
-          <div className="mb-3.5">
-            <label htmlFor="password" className={label}>
-              Password
-            </label>
-            <div className="relative flex items-center">
-              <input
-                id="password"
-                name="password"
-                type={reveal ? "text" : "password"}
-                required
-                autoComplete="current-password"
-                placeholder="Your password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                className={`${field} pr-12`}
-              />
-              <button
-                type="button"
-                onClick={() => setReveal((v) => !v)}
-                aria-label={reveal ? "Hide password" : "Show password"}
-                aria-pressed={reveal}
-                className="absolute right-0 flex size-12 items-center justify-center text-white/55"
-              >
-                <Icon name={reveal ? "eyeOff" : "eye"} className="size-5" />
-              </button>
-            </div>
-          </div>
-
-          {error && (
-            <p
-              role="alert"
-              className="mb-3 rounded-[0.3125rem] border border-danger/40 bg-danger/15 px-3 py-2.5 text-caption text-white"
+            {/* EYE TOGGLE — a phone keyboard in a barn, in gloves, mistypes. */}
+            <button
+              type="button"
+              onClick={() => setReveal((v) => !v)}
+              aria-label={reveal ? "Hide password" : "Show password"}
+              aria-pressed={reveal}
+              className="absolute right-0 flex size-12 items-center justify-center rounded-control text-muted focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-ink"
             >
-              {error}
-            </p>
-          )}
+              <Icon name={reveal ? "eyeOff" : "eye"} className="size-5" />
+            </button>
+          </div>
+        </Field>
 
-          {!configured && (
-            <p className="mb-3 text-caption text-white/60">
-              Supabase isn&apos;t connected yet — sign-in is wired but will not work until real
-              keys are in .env.local.
-            </p>
-          )}
+        {error && (
+          <p role="alert" className="rounded-control border border-danger/30 bg-danger-soft p-3 text-caption text-ink">
+            {error}
+          </p>
+        )}
 
-          {/*
-           * GOLD, not the accent — this is the one place gold is a fill.
-           * An oxblood button on an oxblood field is invisible, and Belle's
-           * gold carries ink at 7.92:1 here. Written out rather than using
-           * <Button> because the shared component is tuned for paper.
-           */}
-          <button
-            type="submit"
-            disabled={busy}
-            className="
-              mt-2 h-[3.25rem] w-full rounded-[0.3125rem] bg-gold text-ink
-              font-condensed text-[1.125rem] font-bold uppercase tracking-[0.11em]
-              shadow-press transition-[transform,background-color,box-shadow] duration-100 ease-out
-              active:translate-y-px active:bg-gold-press active:shadow-press-active
-              disabled:pointer-events-none disabled:opacity-60
-            "
-          >
-            {busy ? "Signing in…" : "Sign In"}
-          </button>
-        </form>
-      </div>
+        {!configured && (
+          <p className="text-caption text-muted">
+            Supabase isn&apos;t connected yet — sign-in is wired but will not work until real keys are in .env.local.
+          </p>
+        )}
 
-      <div className="pb-9 text-center">
-        {/* The mockup also carried a faint barn name along the bottom edge.
-            With the crest standing alone above, that was the name a third
-            time. Gone. */}
-        {/* The label is 17px of text; the target is 44px. Padding plus an
-            inline-flex box gives the finger something real to hit without the
-            link looking like a button. */}
-        <a
-          href="/sign-in/reset"
-          className="inline-flex min-h-11 items-center px-4 text-caption text-white/60 transition-colors hover:text-gold"
-        >
-          <span className="border-b border-transparent pb-px transition-colors hover:border-gold">
-            Forgot my password
-          </span>
-        </a>
+        <Button type="submit" variant="primary" block arrow={false} disabled={busy} className="mt-1">
+          {busy ? "Signing in…" : "Sign in"}
+        </Button>
+      </form>
 
-        {/* The product signature, same treatment as the More screen: Cinzel,
-            quiet, at the edge. `onDeep` rather than the paper `muted` — that
-            token is 2.5:1 on this oxblood field and would be unreadable. The
-            crest above stays the hero; this is the maker's mark. */}
-        <PoweredByMonarch tone="onDeep" className="mt-5" />
-      </div>
-    </div>
+      {/* 17px of text, a 44px target: padding gives the finger something real
+          to hit without the link looking like a button. */}
+      <a
+        href="/sign-in/reset"
+        className="mx-auto mt-4 inline-flex min-h-11 items-center px-3 text-caption text-accent-text underline-offset-4 hover:underline"
+      >
+        Forgot my password
+      </a>
+    </AuthShell>
   );
 }
 
