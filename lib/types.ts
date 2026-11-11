@@ -68,6 +68,11 @@ export type Rider = {
   photo_path?: string | null;
   /** The rider's own login, when they have one (0026). Admin-set. */
   profile_id?: string | null;
+  /**
+   * When this student's lessons end (0032): the END of the chosen day in the
+   * barn's timezone. Academy access through this rider ends then. Admin-set.
+   */
+  lessons_end_at?: string | null;
   active: boolean;
   notes: string | null;
   created_at: string;

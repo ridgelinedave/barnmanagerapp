@@ -5,7 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getViewer } from "@/lib/session";
 import { adminCount } from "@/lib/team";
 import { isPermissionFlag, isRole, type Role } from "@/lib/types";
-import { featureEnabled } from "@/config/barn";
+import { barn, featureEnabled } from "@/config/barn";
+import { endOfZonedDay } from "@/lib/academy-access";
 import { MEDIA_BUCKETS, photoFromForm, photoProblem, removePhoto, uploadPhoto } from "@/lib/media";
 
 /**
@@ -422,4 +423,37 @@ export async function moveLevel(formData: FormData): Promise<void> {
   );
 
   revalidate();
+}
+
+/* -------------------------------------------------------------------------- */
+/* Lessons end (0032) — the student's notice date; the Academy ends with it   */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Set or clear when a student's lessons end. Belle's rule: 30 days' notice, so
+ * the form defaults to today + 30 (config: barn.lessonNoticeDays), editable.
+ * Stored as the END of that day in the barn's timezone — computed here from
+ * config, never in SQL — and Academy access through this rider ends then.
+ * Admin only: RLS (riders admin update) plus riders_guard_lessons_end.
+ */
+export async function setLessonsEnd(_prev: TeamState, formData: FormData): Promise<TeamState> {
+  if (!featureEnabled("academyAccess")) return FAIL("Academy access isn't switched on yet.");
+  if (!(await requireAdmin())) return FAIL(DENIED);
+  const id = text(formData, "rider_id");
+  if (!id) return FAIL("Missing rider.");
+  const clear = formData.get("clear") === "1";
+  const date = text(formData, "lessons_end");
+  if (!clear && !/^\d{4}-\d{2}-\d{2}$/.test(date ?? "")) return FAIL("Pick the date their lessons end.");
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("riders")
+    .update({ lessons_end_at: clear ? null : endOfZonedDay(date as string, barn.timezone).toISOString() })
+    .eq("id", id)
+    .select("id");
+  if (error || !data?.length) return FAIL("That wasn't saved. Try again.");
+
+  revalidate();
+  revalidatePath("/manage/academy-access");
+  return OK(clear ? "Lessons end cleared." : "Saved.");
 }

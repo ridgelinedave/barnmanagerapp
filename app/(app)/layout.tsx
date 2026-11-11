@@ -9,6 +9,7 @@ import { Sidebar } from "@/components/Sidebar";
 import { barn, featureEnabled } from "@/config/barn";
 import { sidebarFor } from "@/lib/nav";
 import { UploadQueueProvider } from "@/components/academy/UploadQueue";
+import { navFlags } from "@/lib/academy-gate";
 
 /**
  * The app shell. Resolves the viewer's role once, here, and renders the tab bar
@@ -56,7 +57,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         Skip to content
       </a>
       <Sidebar
-        model={sidebarFor(viewer.role, featureEnabled, { learning: barn.learning.label })}
+        model={sidebarFor(viewer.role, await navFlags(), { learning: barn.learning.label })}
         account={account}
       />
       {/* lg:pl-64 makes room for the fixed sidebar; below lg it is absent. */}

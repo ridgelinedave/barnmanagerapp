@@ -1,7 +1,8 @@
 import { SubTabs } from "@/components/ui/SubTabs";
 import { lessonSegments } from "@/lib/nav";
 import type { Role } from "@/lib/types";
-import { barn, featureEnabled } from "@/config/barn";
+import { barn } from "@/config/barn";
+import { navFlags } from "@/lib/academy-gate";
 
 /**
  * The Lessons tab's segmented control — Students (or My lessons) · Shows ·
@@ -9,8 +10,9 @@ import { barn, featureEnabled } from "@/config/barn";
  * header on a desk and above the content on a phone. A role with only one
  * segment gets no control at all.
  */
-export function LessonsSegments({ role, current }: { role: Role; current: string }) {
-  const items = lessonSegments(role, featureEnabled, current, { learning: barn.learning.label });
+export async function LessonsSegments({ role, current }: { role: Role; current: string }) {
+  // The Academy segment shows only for a login with Academy access (0032).
+  const items = lessonSegments(role, await navFlags(), current, { learning: barn.learning.label });
   if (items.length < 2) return null;
   return <SubTabs label="Lessons" items={items} />;
 }

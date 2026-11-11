@@ -4,6 +4,7 @@ import { featureEnabled } from "@/config/barn";
 import { lessonSegments } from "@/lib/nav";
 import { StudentsView } from "./_views/StudentsView";
 import { MyLessonsView } from "./_views/MyLessonsView";
+import { navFlags } from "@/lib/academy-gate";
 
 export const metadata = { title: "Lessons" };
 
@@ -26,6 +27,6 @@ export default async function LessonsPage() {
   if (role === "admin" && featureEnabled("lessons")) return <StudentsView />;
   if (role === "parent") return <MyLessonsView />;
 
-  const first = lessonSegments(role, featureEnabled, "").find((s) => s.href !== "/lessons");
+  const first = lessonSegments(role, await navFlags(), "").find((s) => s.href !== "/lessons");
   redirect(first?.href ?? "/home");
 }

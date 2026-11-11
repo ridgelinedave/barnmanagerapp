@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { TabPage } from "@/components/TabPage";
 import { CourseCover, ProgressBar } from "@/components/academy/CourseCard";
 import { CourseOutline } from "@/components/academy/CourseOutline";
@@ -10,6 +10,7 @@ import { SectionHeader } from "@/components/ui/primitives";
 import { DataTable, DESKTOP_ONLY, MOBILE_ONLY, type Column, type Row } from "@/components/ui/DataTable";
 import { ListRow, RowList } from "@/components/ui/ListRow";
 import { requireTab } from "@/lib/guard";
+import { hasAcademyAccess } from "@/lib/academy-gate";
 import { courseLearners, fillLessonDurations, listCategories, loadCourse } from "@/lib/academy";
 import { listLevels } from "@/lib/lessons";
 import { listTags } from "@/lib/tags";
@@ -42,6 +43,8 @@ export default async function CoursePage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const role = await requireTab("/lessons");
+  // No Academy access (0032): no Academy. RLS would return nothing anyway.
+  if (!(await hasAcademyAccess())) redirect("/lessons");
   if (!featureEnabled("learning")) notFound();
   const { moduleId } = await params;
   const isAdmin = role === "admin";

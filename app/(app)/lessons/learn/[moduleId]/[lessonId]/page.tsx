@@ -1,10 +1,11 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { TabPage } from "@/components/TabPage";
 import { LessonPlayerShell } from "@/components/academy/LessonPlayerShell";
 import { LessonVideo } from "@/components/academy/LessonVideo";
 import { CourseOutline } from "@/components/academy/CourseOutline";
 import { AdminLessonNotes } from "@/components/academy/AdminLessonNotes";
 import { requireTab } from "@/lib/guard";
+import { hasAcademyAccess } from "@/lib/academy-gate";
 import { loadCourse } from "@/lib/academy";
 import { resolveLessonPlayback } from "@/lib/video";
 import { streamThumbnails } from "@/lib/stream";
@@ -41,6 +42,8 @@ export default async function LearningLessonPage({
   params: Promise<{ moduleId: string; lessonId: string }>;
 }) {
   const role = await requireTab("/lessons");
+  // No Academy access (0032): no Academy. RLS would return nothing anyway.
+  if (!(await hasAcademyAccess())) redirect("/lessons");
   if (!featureEnabled("learning")) notFound();
 
   const { moduleId, lessonId } = await params;

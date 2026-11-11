@@ -34,6 +34,8 @@ import {
 } from "@/components/ui/DataTable";
 import { INVITE_STATUS_LABELS } from "@/lib/invites";
 import { requireTab } from "@/lib/guard";
+import { LessonsEndForm } from "@/components/LessonsEndForm";
+import { lastZonedDay, noticeDate } from "@/lib/academy-access";
 import { listTags, tagNamesByProfile } from "@/lib/tags";
 import Link from "next/link";
 import {
@@ -43,7 +45,7 @@ import {
   listLevels,
   listTeam,
 } from "@/lib/team";
-import { ageGroupFor, formatBarnDateFull } from "@/lib/dates";
+import { ageGroupFor, barnToday, formatBarnDateFull } from "@/lib/dates";
 import { inviteStatus } from "@/lib/invites";
 import { barn, featureEnabled } from "@/config/barn";
 import type { Role } from "@/lib/types";
@@ -391,6 +393,17 @@ export default async function ManageTeamPage({
                             <p className="text-caption text-muted">
                               Born {formatBarnDateFull(rider.dob)}
                             </p>
+                          )}
+
+                          {/* Lessons end (0032): the Academy ends with them. */}
+                          {featureEnabled("academyAccess") && (
+                            <LessonsEndForm
+                              riderId={rider.id}
+                              riderName={rider.name}
+                              endDay={rider.lessons_end_at ? lastZonedDay(rider.lessons_end_at, barn.timezone) : null}
+                              defaultDay={noticeDate(barnToday(), barn.lessonNoticeDays)}
+                              todayDay={barnToday()}
+                            />
                           )}
 
                           <SheetTrigger label="Edit" title={rider.name}>
