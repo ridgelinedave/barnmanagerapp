@@ -26,6 +26,14 @@ Retire cream. Palette is black, white, gold (`#DABC51` / deep `#C9AA3F`), with c
 
 ## 2. Sign-in — LOCKED
 
+> **SUPERSEDED 2026-11-10 (David):** the dark field read as aggressive. Sign-in
+> and password reset are now a WHITE page with one bordered card — a band of the
+> barn's deep colour across its top edge, a gold hairline under it, the crest,
+> standard light fields, the barn's primary button — and "Powered by Monarch"
+> beneath (`components/AuthShell.tsx`). Still email + password only, still the
+> eye toggle, still "Forgot my password". The bullets below are the original
+> brief, kept for the record.
+
 - Single **email + password**. No magic-link / "email link" option.
 - Barn wordmark at top (placeholder monogram + CROUSE / EQUESTRIAN until Belle's real logo lands — this block is "Crouse skin," swaps per barn).
 - Email field, Password field **with show/hide eye toggle**.
