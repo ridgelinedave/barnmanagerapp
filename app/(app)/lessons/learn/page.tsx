@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { TabPage } from "@/components/TabPage";
 import { StubScreen } from "@/components/StubScreen";
 import { LessonsSegments } from "@/components/LessonsSegments";
@@ -7,6 +8,7 @@ import { CourseForm } from "@/components/academy/CourseForm";
 import { SheetTrigger } from "@/components/ui/Sheet";
 import { EmptyState } from "@/components/ui/primitives";
 import { requireTab } from "@/lib/guard";
+import { hasAcademyAccess } from "@/lib/academy-gate";
 import { listCategories, listCourses } from "@/lib/academy";
 import { listLevels } from "@/lib/lessons";
 import { listTags } from "@/lib/tags";
@@ -36,6 +38,8 @@ export default async function AcademyPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const role = await requireTab("/lessons");
+  // No Academy access (0032): no Academy. RLS would return nothing anyway.
+  if (!(await hasAcademyAccess())) redirect("/lessons");
   const tabs = <LessonsSegments role={role} current="/lessons/learn" />;
 
   if (!featureEnabled("learning")) {

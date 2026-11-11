@@ -63,6 +63,15 @@ export async function loadCalendar(today: string): Promise<CalendarItem[]> {
 }
 
 /**
+ * Everything — lessons, events, care due — from one day through another
+ * (inclusive). The Home dashboard's "Today" and the desk's week view use it,
+ * so they and the month/agenda views always agree on what a day holds.
+ */
+export async function loadCalendarForRange(from: string, through: string): Promise<CalendarItem[]> {
+  return loadCalendarBetween(from, through);
+}
+
+/**
  * Everything on one day except its lessons — the day view renders lessons as
  * full cards with their admin controls, and the events and care due beside
  * them from here, so the three views agree on what a day holds.

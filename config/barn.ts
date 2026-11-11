@@ -28,7 +28,8 @@ export type BarnFeatureFlag =
   | "shop"
   | "lessonSeries"
   | "clientStatus"
-  | "media";
+  | "media"
+  | "academyAccess";
 
 /**
  * THE PRODUCT. Monarch is what this software is; a barn is a skin on it.
@@ -119,6 +120,12 @@ export const barn = {
    * /lessons/learn on every barn).
    */
   learning: { label: "CE Academy" },
+  /**
+   * Notice a student gives before their lessons end — Belle's rule: 30 days.
+   * The "Lessons end" date defaults to today plus this, and the Academy (which
+   * is included with lessons) ends with it.
+   */
+  lessonNoticeDays: 30,
   /** Free-text service area. Not used for geocoding. */
   area: "Asheville / Candler, NC",
   /** IANA timezone. All timestamptz values render in this zone. */
@@ -443,6 +450,14 @@ export const barn = {
     clientStatus: true,
     /** Horse, rider and announcement photos. Migration 0027 audited, applied 2026-10-20, gate green; upload screens verified. ON. */
     media: true,
+    /**
+     * Academy access by lesson student (migration 0032): the Academy is
+     * included for current lesson students until their lessons-end date, by
+     * hand for anyone else, and hidden from logins without access. On since
+     * 2026-11-11: 0032 audited, applied, gate green. Off would restore the old
+     * menu (no entry hidden), but the DATABASE rule stays 0032's either way.
+     */
+    academyAccess: true,
   } satisfies Record<BarnFeatureFlag, boolean>,
 
   /**

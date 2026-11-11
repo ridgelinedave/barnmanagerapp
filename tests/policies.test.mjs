@@ -89,6 +89,12 @@ function check(name, condition, detail) {
   }
 }
 
+/** A section that could not run. Counted, so it is never mistaken for a pass. */
+function skip(name, reason) {
+  skipped += 1;
+  console.log(`\n  ⚠ ${name} — SKIPPED: ${reason}`);
+}
+
 /** Sign in as a fixture and return a client carrying that session. */
 async function clientFor(key) {
   const client = createClient(SUPABASE_URL, ANON_KEY, {
@@ -5614,9 +5620,13 @@ async function main() {
 
       const everyone = await createModule({ position: base + 1, audience: "all", published: true });
       check("control: admin CAN create a published module", Boolean(everyone.id), everyone.error?.message);
+      // 0032: staff have no blanket Academy access. The fixture staff login
+      // is linked to no rider and holds no grant, so a published course is
+      // as closed to them as a draft. (The control is the parent just below.)
       check(
-        "staff CAN read a published module",
-        (await visibleIds(staff, "learning_modules")).ids.includes(everyone.id),
+        "staff with no rider CANNOT read a published module (0032: no blanket access)",
+        !(await visibleIds(staff, "learning_modules")).ids.includes(everyone.id),
+        "a published course reached staff without Academy access",
       );
       check(
         "a parent CAN read a published 'all' module",
@@ -5659,8 +5669,8 @@ async function main() {
         check("…and not the other-level one", !p2.includes(otherLevelModule.id));
       }
       check(
-        "control: staff CAN read the other-level module (it exists and is published)",
-        (await visibleIds(staff, "learning_modules")).ids.includes(otherLevelModule.id),
+        "control: admin CAN read the other-level module (it exists and is published)",
+        (await visibleIds(admin, "learning_modules")).ids.includes(otherLevelModule.id),
       );
 
       const { error: badAudience } = await admin
@@ -6124,7 +6134,8 @@ async function main() {
       check("a client in the audience reads the open course's cover", await canRead(parent, coverOpen));
       check("a client CANNOT read a draft course's cover", !(await canRead(parent, coverDraft)));
       check("a client CANNOT read another level's cover", !(await canRead(parent, coverElsewhere)));
-      check("control: staff read the other-level cover (published)", await canRead(staff, coverElsewhere));
+      check("control: admin reads the other-level cover (it exists)", await canRead(admin, coverElsewhere));
+      check("staff with no rider CANNOT read the open course's cover (0032)", !(await canRead(staff, coverOpen)));
       check("a client CANNOT upload a cover", Boolean((await parent.storage.from("learning-covers").upload(`${open.id}/client.png`, new Blob([PNG], { type: "image/png" }))).error));
       {
         const { data } = admin.storage.from("learning-covers").getPublicUrl(coverOpen);
@@ -6258,7 +6269,7 @@ async function main() {
       }
       check("…nor enrol in it", await writeRefused(parent2.from("learning_enrolments").insert({ module_id: cid }).select()));
       check("…nor record progress on its lesson", await writeRefused(parent2.from("learning_progress").insert({ lesson_id: les }).select()));
-      check("control: staff see a published course whatever its tag", await sees(staff, "learning_modules", cid));
+      check("control: admin sees the tag course (it exists and is published)", await sees(admin, "learning_modules", cid));
       await assertCannotSee("anon sees nothing", anon, "learning_modules", cid);
 
       // The tagged client makes progress, then loses the tag.
@@ -6311,6 +6322,312 @@ async function main() {
       const leftTags = (await visibleIds(admin, "tags")).ids.filter((id) => made.tags.includes(id));
       const leftCourses = (await visibleIds(admin, "learning_modules")).ids.filter((id) => made.modules.includes(id));
       check("cleanup: this section's tags and courses are gone", leftTags.length === 0 && leftCourses.length === 0);
+    }
+  }
+
+  // ===========================================================================
+  // ACADEMY ACCESS (migration 0032) — the Academy is for current lesson
+  // students (by rider), plus manual grants; admin always. ONE function,
+  // academy_access(), and the course rule requires it, so courses, sections,
+  // lessons (and so video ids, i.e. playback and thumbnail tokens), category
+  // links, covers, enrolment and progress writes all follow it.
+  //
+  // Fixture facts this leans on: each fixture family has ONE active rider with
+  // no login of their own, and the fixture staff login is linked to no rider.
+  // So both clients have access through their family, and staff has none.
+  //
+  // Every state change here is to a fixture rider or client and is restored in
+  // `finally` from a snapshot taken first; every course and grant is this
+  // section's own and is deleted at the end.
+  // ===========================================================================
+  console.log("\n\n═══ academy access (0032) — lesson students, notice date, grants ═══\n");
+  if (!parent2) {
+    skip("academy access", "seed-output.json has no parent2 fixture — re-run db:seed");
+  } else {
+    const TAG = "[policytest-0032]";
+    const base = 970000 + Math.floor(Math.random() * 10000) * 10;
+    const made = { modules: [], covers: [], grants: [] };
+    const VIDEO = "fedcba9876543210fedcba9876543210";
+    const PNG = Uint8Array.from(
+      atob("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="),
+      (ch) => ch.charCodeAt(0),
+    );
+    const sees = async (client, table, id) => (await visibleIds(client, table)).ids.includes(id);
+    const access = async (client) => {
+      const { data, error } = await client.rpc("academy_access");
+      return error ? `error: ${error.message}` : data;
+    };
+    const minutes = (n) => new Date(Date.now() + n * 60_000).toISOString();
+    const riderState = async (id) =>
+      (await admin.from("riders").select("active, profile_id, lessons_end_at").eq("id", id).single()).data;
+    const familyStatus = async (id) => (await admin.from("families").select("status").eq("id", id).single()).data?.status;
+    const setRider = (id, fields) => admin.from("riders").update(fields).eq("id", id).select("id");
+    const setFamily = (id, status) => admin.from("families").update({ status }).eq("id", id).select("id");
+
+    const snapshot = {
+      rider: await riderState(riderId),
+      controlRider: await riderState(controlRiderId),
+      family: await familyStatus(familyId),
+      controlFamily: await familyStatus(controlFamilyId),
+    };
+
+    try {
+      check(
+        "control: both fixture riders are active with no login and no lessons-end; both clients not inactive",
+        snapshot.rider?.active === true &&
+          snapshot.controlRider?.active === true &&
+          !snapshot.rider?.profile_id &&
+          !snapshot.controlRider?.profile_id &&
+          !snapshot.rider?.lessons_end_at &&
+          !snapshot.controlRider?.lessons_end_at &&
+          snapshot.family !== "inactive" &&
+          snapshot.controlFamily !== "inactive",
+        JSON.stringify(snapshot),
+      );
+
+      // --- the rule, per login --------------------------------------------------
+      check("admin has Academy access", (await access(admin)) === true, String(await access(admin)));
+      check("control: a client whose family has a current student has access", (await access(parent)) === true, String(await access(parent)));
+      check("control: the other client too", (await access(parent2)) === true);
+      check("staff with no rider and no grant has NO access", (await access(staff)) === false, String(await access(staff)));
+
+      // --- a published course with everything under it -------------------------
+      const course = await admin
+        .from("learning_modules")
+        .insert({ title: `${TAG} course`, position: base, audience: "all", published: true })
+        .select("id")
+        .single();
+      const cid = course.data?.id;
+      if (cid) made.modules.push(cid);
+      const sec = (await admin.from("learning_sections").insert({ module_id: cid, title: `${TAG} section`, position: 0 }).select("id").single()).data?.id;
+      const lessonRow = async (position, extra = {}) =>
+        (
+          await admin
+            .from("learning_lessons")
+            .insert({ module_id: cid, section_id: sec, title: `${TAG} lesson ${position}`, position, ...extra })
+            .select("id")
+            .single()
+        ).data?.id;
+      const les = await lessonRow(0, { video_provider: "cloudflare_stream", video_id: VIDEO });
+      const les2 = await lessonRow(1);
+      const cat = (await admin.from("learning_categories").select("id").limit(1)).data?.[0]?.id;
+      const link = await admin.from("learning_module_categories").insert({ module_id: cid, category_id: cat }).select();
+      const cover = `${cid}/policytest.png`;
+      const up = await admin.storage
+        .from("learning-covers")
+        .upload(cover, new Blob([PNG], { type: "image/png" }), { upsert: true, contentType: "image/png" });
+      if (!up.error) made.covers.push(cover);
+      check(
+        "control: admin makes a published course, section, two lessons, a category link and a cover",
+        Boolean(cid && sec && les && les2 && !link.error && !up.error),
+        course.error?.message ?? link.error?.message ?? up.error?.message,
+      );
+
+      const videoIdFor = async (client) =>
+        ((await client.from("learning_lessons").select("id, video_id").eq("id", les)).data ?? [])[0]?.video_id ?? null;
+      const categoryLinks = async (client) =>
+        ((await client.from("learning_module_categories").select("module_id").eq("module_id", cid)).data ?? []).length;
+      // The cover the way the app serves it: a fresh signed link per page load.
+      const coverLink = async (client) => {
+        const signed = await client.storage.from("learning-covers").createSignedUrl(cover, 60);
+        return !signed.error && Boolean(signed.data?.signedUrl);
+      };
+      const coverRule = async (client) => (await client.rpc("learning_cover_is_readable", { object_name: cover })).data;
+
+      check("WITH ACCESS: the client sees the course", await sees(parent, "learning_modules", cid));
+      check("…its section", await sees(parent, "learning_sections", sec));
+      check(
+        "…its lesson and the lesson's video id (what a playback or thumbnail token is minted from)",
+        (await videoIdFor(parent)) === VIDEO,
+      );
+      check("…its category link", (await categoryLinks(parent)) === 1);
+      check("…a link to its cover", await coverLink(parent));
+
+      await assertCannotSee("staff with no access CANNOT see the course", staff, "learning_modules", cid);
+      await assertCannotSee("…nor its section", staff, "learning_sections", sec);
+      check("…nor the lesson's video id", (await videoIdFor(staff)) === null);
+      check("…nor a link to its cover", !(await coverLink(staff)));
+      check("admin sees the course", await sees(admin, "learning_modules", cid));
+
+      const enrol = await parent.from("learning_enrolments").insert({ module_id: cid }).select("id").single();
+      const prog = await parent.from("learning_progress").insert({ lesson_id: les }).select("id").single();
+      check(
+        "control: with access the client enrols and completes a lesson",
+        Boolean(enrol.data?.id && prog.data?.id),
+        enrol.error?.message ?? prog.error?.message,
+      );
+
+      // --- the lessons-end date passes -----------------------------------------
+      const ended = await setRider(riderId, { lessons_end_at: minutes(-1) });
+      check("control: admin sets the student's lessons-end a minute ago", !ended.error && ended.data?.length === 1, ended.error?.message);
+      check("LESSONS ENDED: the family login has NO access", (await access(parent)) === false, String(await access(parent)));
+      await assertCannotSee("…cannot see the course", parent, "learning_modules", cid);
+      await assertCannotSee("…nor its section", parent, "learning_sections", sec);
+      check("…nor the lesson's video id (asked for by its id)", (await videoIdFor(parent)) === null);
+      check("…nor the category link", (await categoryLinks(parent)) === 0);
+      check("…nor get a link to its cover", !(await coverLink(parent)));
+      check("…and the storage rule says the cover is not theirs", (await coverRule(parent)) === false);
+      check(
+        "…nor record progress on another lesson",
+        await writeRefused(parent.from("learning_progress").insert({ lesson_id: les2 }).select()),
+      );
+      check("…but their progress row is KEPT", await sees(admin, "learning_progress", prog.data?.id));
+      check("…and their enrolment", await sees(admin, "learning_enrolments", enrol.data?.id));
+      check(
+        "control: the other family is unaffected",
+        (await access(parent2)) === true && (await sees(parent2, "learning_modules", cid)),
+      );
+
+      const moved = await setRider(riderId, { lessons_end_at: minutes(60 * 24 * 30) });
+      check("control: admin moves the lessons-end 30 days ahead", !moved.error && moved.data?.length === 1, moved.error?.message);
+      check("DATE IN THE FUTURE: access is back", (await access(parent)) === true);
+      check("…the course is visible again", await sees(parent, "learning_modules", cid));
+      check("…with their progress intact", await sees(parent, "learning_progress", prog.data?.id));
+      check("…and their enrolment", await sees(parent, "learning_enrolments", enrol.data?.id));
+      await setRider(riderId, { lessons_end_at: snapshot.rider.lessons_end_at });
+
+      // --- a client marked inactive, a rider not riding -------------------------
+      const inactive = await setFamily(controlFamilyId, "inactive");
+      check("control: admin marks the other client inactive", !inactive.error && inactive.data?.length === 1, inactive.error?.message);
+      check("CLIENT INACTIVE: no access, though no lessons-end is set", (await access(parent2)) === false);
+      await assertCannotSee("…cannot see the course", parent2, "learning_modules", cid);
+      check("…cannot enrol", await writeRefused(parent2.from("learning_enrolments").insert({ module_id: cid }).select()));
+      check("…cannot record progress", await writeRefused(parent2.from("learning_progress").insert({ lesson_id: les }).select()));
+      {
+        const { data } = await admin
+          .from("learning_enrolments")
+          .select("id")
+          .eq("module_id", cid)
+          .eq("profile_id", users.parent2.profileId);
+        check("…and no enrolment was written", (data ?? []).length === 0, `${data?.length} row(s)`);
+      }
+      await setFamily(controlFamilyId, snapshot.controlFamily);
+      check("control: status restored, access back", (await access(parent2)) === true);
+
+      const stopped = await setRider(controlRiderId, { active: false });
+      check("control: admin marks the other rider not riding", !stopped.error && stopped.data?.length === 1, stopped.error?.message);
+      check("RIDER NOT RIDING: the family has no access", (await access(parent2)) === false);
+      await assertCannotSee("…cannot see the course", parent2, "learning_modules", cid);
+      await setRider(controlRiderId, { active: true });
+      check("control: rider back, access back", (await access(parent2)) === true);
+
+      // --- a rider with their own login ----------------------------------------
+      // Adult student: the rider linked to a client login gets it on THAT login.
+      const own = await setRider(controlRiderId, { profile_id: users.parent2.profileId });
+      check("control: admin links the other rider to the other client's login", !own.error && own.data?.length === 1, own.error?.message);
+      check("ADULT STUDENT: the rider's own login has access", (await access(parent2)) === true);
+      check("…and sees the course", await sees(parent2, "learning_modules", cid));
+
+      // Working student: the same rider linked to a STAFF login instead.
+      const working = await setRider(controlRiderId, { profile_id: users.staff.profileId });
+      check(
+        "control: admin links that rider to the staff login instead",
+        !working.error && working.data?.length === 1,
+        working.error?.message,
+      );
+      check("WORKING STUDENT: staff linked as a rider has access", (await access(staff)) === true);
+      check("…and sees the course", await sees(staff, "learning_modules", cid));
+      check("…and the lesson's video id", (await videoIdFor(staff)) === VIDEO);
+      check(
+        "a family whose only rider has their own login gets NO access through that rider",
+        (await access(parent2)) === false,
+      );
+      await assertCannotSee("…and cannot see the course", parent2, "learning_modules", cid);
+      await setRider(controlRiderId, { profile_id: snapshot.controlRider.profile_id });
+      check(
+        "control: link removed — staff loses access, the family gets it back",
+        (await access(staff)) === false && (await access(parent2)) === true,
+      );
+
+      // --- grants by hand -------------------------------------------------------
+      const grant = await admin
+        .from("academy_grants")
+        .insert({ profile_id: users.staff.profileId, note: `${TAG} grant` })
+        .select("id, granted_by")
+        .single();
+      if (grant.data?.id) made.grants.push(grant.data.id);
+      check("control: admin grants staff access with no end", Boolean(grant.data?.id), grant.error?.message);
+      check(
+        "…and the grant records who granted it",
+        grant.data?.granted_by === users.admin.profileId,
+        String(grant.data?.granted_by),
+      );
+      check("GRANT: staff now has access", (await access(staff)) === true);
+      check("…and sees the course", await sees(staff, "learning_modules", cid));
+      check("a login reads its own grant", await sees(staff, "academy_grants", grant.data?.id));
+      await assertCannotSee("a client CANNOT read someone else's grant", parent, "academy_grants", grant.data?.id);
+      check(
+        "a client CANNOT grant themselves access",
+        await writeRefused(parent.from("academy_grants").insert({ profile_id: users.parent.profileId }).select()),
+      );
+      check(
+        "staff CANNOT change their own grant",
+        await writeRefused(staff.from("academy_grants").update({ ends_at: minutes(-1) }).eq("id", grant.data?.id).select()),
+      );
+      check(
+        "staff CANNOT delete their own grant",
+        await writeRefused(staff.from("academy_grants").delete().eq("id", grant.data?.id).select()),
+      );
+      {
+        const { data } = await admin.from("academy_grants").select("ends_at").eq("id", grant.data?.id).single();
+        check("…the grant is unchanged", data?.ends_at === null, String(data?.ends_at));
+      }
+
+      const ahead = await admin.from("academy_grants").update({ ends_at: minutes(60) }).eq("id", grant.data?.id).select("id");
+      check("control: admin gives the grant an end an hour ahead", !ahead.error && ahead.data?.length === 1, ahead.error?.message);
+      check("…staff still has access before it", (await access(staff)) === true);
+      const over = await admin.from("academy_grants").update({ ends_at: minutes(-1) }).eq("id", grant.data?.id).select("id");
+      check("control: admin moves the grant's end to a minute ago", !over.error && over.data?.length === 1, over.error?.message);
+      check("GRANT ENDED: staff has no access", (await access(staff)) === false);
+      await assertCannotSee("…and cannot see the course", staff, "learning_modules", cid);
+      check("…the ended grant is still on record", await sees(admin, "academy_grants", grant.data?.id));
+
+      // --- guards on the lessons-end date ---------------------------------------
+      check(
+        "a client CANNOT set lessons-end on their own rider",
+        await writeRefused(
+          parent.from("riders").update({ lessons_end_at: minutes(60 * 24 * 365) }).eq("id", riderId).select(),
+        ),
+      );
+      check(
+        "staff CANNOT set a rider's lessons-end",
+        await writeRefused(staff.from("riders").update({ lessons_end_at: minutes(-1) }).eq("id", riderId).select()),
+      );
+      check(
+        "…the rider's lessons-end is unchanged",
+        (await riderState(riderId))?.lessons_end_at === snapshot.rider.lessons_end_at,
+      );
+
+      // --- drafts stay admin-only, access or not --------------------------------
+      const draft = await admin
+        .from("learning_modules")
+        .insert({ title: `${TAG} draft`, position: base + 1, audience: "all", published: false })
+        .select("id")
+        .single();
+      if (draft.data?.id) made.modules.push(draft.data.id);
+      check("control: admin creates and reads a draft", await sees(admin, "learning_modules", draft.data?.id));
+      await assertCannotSee("a client WITH access CANNOT see a draft", parent, "learning_modules", draft.data?.id);
+    } finally {
+      for (const [id, s] of [
+        [riderId, snapshot.rider],
+        [controlRiderId, snapshot.controlRider],
+      ]) {
+        if (s) await setRider(id, { active: s.active, profile_id: s.profile_id, lessons_end_at: s.lessons_end_at });
+      }
+      if (snapshot.family) await setFamily(familyId, snapshot.family);
+      if (snapshot.controlFamily) await setFamily(controlFamilyId, snapshot.controlFamily);
+      if (made.grants.length) await admin.from("academy_grants").delete().in("id", made.grants);
+      if (made.covers.length) await admin.storage.from("learning-covers").remove(made.covers);
+      if (made.modules.length) await admin.from("learning_modules").delete().in("id", made.modules);
+      const restored =
+        JSON.stringify(await riderState(riderId)) === JSON.stringify(snapshot.rider) &&
+        JSON.stringify(await riderState(controlRiderId)) === JSON.stringify(snapshot.controlRider) &&
+        (await familyStatus(familyId)) === snapshot.family &&
+        (await familyStatus(controlFamilyId)) === snapshot.controlFamily;
+      check("cleanup: fixture riders and clients restored exactly", restored);
+      const leftCourses = (await visibleIds(admin, "learning_modules")).ids.filter((id) => made.modules.includes(id));
+      const leftGrants = (await visibleIds(admin, "academy_grants")).ids.filter((id) => made.grants.includes(id));
+      check("cleanup: this section's courses and grants are gone", leftCourses.length === 0 && leftGrants.length === 0);
     }
   }
 

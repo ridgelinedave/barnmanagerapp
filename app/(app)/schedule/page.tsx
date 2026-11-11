@@ -9,7 +9,7 @@ import { ScheduleAdminMenu } from "@/components/ScheduleAdminMenu";
 import { BookRiderForm, OneOffLessonForm } from "@/components/ScheduleAdmin";
 import { FillSlotForm } from "@/components/FillSlotForm";
 import { Chip, ChipRow, EmptyState } from "@/components/ui/primitives";
-import { Button } from "@/components/ui/Button";
+import { Button, buttonClass } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { SheetTrigger } from "@/components/ui/Sheet";
 import { SubTabs } from "@/components/ui/SubTabs";
@@ -23,7 +23,9 @@ import {
   listLevels,
 } from "@/lib/lessons";
 import { listAssignableProfiles, nameMap } from "@/lib/tasks";
-import { calendarWindow, loadCalendar, loadCalendarExtrasForDay } from "@/lib/calendar";
+import { calendarWindow, loadCalendar, loadCalendarExtrasForDay, loadCalendarForRange } from "@/lib/calendar";
+import { WeekView, weekStart } from "@/components/WeekView";
+import { headers } from "next/headers";
 import { addBarnDays, barnToday, formatBarnDayLabel } from "@/lib/dates";
 import { featureEnabled } from "@/config/barn";
 import type { Role } from "@/lib/types";
@@ -49,19 +51,68 @@ export const metadata = { title: "Schedule" };
  * toggle would have to refetch anyway, and a link is shareable and survives a
  * back button.
  */
-type View = "day" | CalendarView;
+type View = "day" | "week" | CalendarView;
 
 const VIEWS: readonly (readonly [View, string])[] = [
   ["day", "Day"],
+  ["week", "Week"],
   ["month", "Month"],
   ["list", "Agenda"],
 ] as const;
 
 function viewHref(view: View, date: string): string {
-  // The day view is the default, so it needs no `view` param — and it keeps
-  // whichever day you were on. Month and Agenda span the window, so a date on
-  // them would be noise.
-  return view === "day" ? `/schedule?date=${date}` : `/schedule?view=${view}`;
+  // Day and Week keep whichever day you were on (Week shows the week holding
+  // it). Month and Agenda span the window, so a date on them would be noise.
+  if (view === "day") return `/schedule?view=day&date=${date}`;
+  if (view === "week") return `/schedule?view=week&date=${date}`;
+  return `/schedule?view=${view}`;
+}
+
+/**
+ * The view when the URL names none: Week on a desk, Day on a phone. Read from
+ * the browser's own "is this a phone" signals, because the server cannot see
+ * the screen. Wrong only for a phone browser asking for the desktop site,
+ * which gets Week — a tap away from Day.
+ */
+async function defaultView(): Promise<View> {
+  const h = await headers();
+  const mobileHint = h.get("sec-ch-ua-mobile");
+  if (mobileHint === "?1") return "day";
+  if (mobileHint === "?0") return "week";
+  return /Mobi|Android|iPhone|iPod/i.test(h.get("user-agent") ?? "") ? "day" : "week";
+}
+
+/** The week holding `date`: arrows a week back and on, and the seven days. */
+async function WeekBody({ date }: { date: string }) {
+  const today = barnToday();
+  const start = weekStart(date);
+  const end = addBarnDays(start, 6);
+  const items = await loadCalendarForRange(start, end);
+  const fmt = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+  const label = `${fmt.format(new Date(`${start}T12:00:00Z`))} – ${fmt.format(new Date(`${end}T12:00:00Z`))}`;
+  const thisWeek = weekStart(today) === start;
+  // The day view's own arrow buttons, so the two views read as one control.
+  const arrow =
+    "flex min-h-12 w-12 shrink-0 items-center justify-center rounded-control border border-ink/50 bg-transparent text-ink lg:hover:bg-surface";
+  return (
+    <>
+      <nav aria-label="Change week" className="flex items-center gap-2">
+        <Link href={`/schedule?view=week&date=${addBarnDays(start, -7)}`} aria-label="Previous week" className={arrow}>
+          <Icon name="chevron" className="size-5 rotate-180" strokeWidth={2} />
+        </Link>
+        <p className="min-w-0 flex-1 text-center font-display text-title text-ink">{label}</p>
+        {!thisWeek && (
+          <Link href={`/schedule?view=week&date=${today}`} className={buttonClass("ghost", "sm")}>
+            This week
+          </Link>
+        )}
+        <Link href={`/schedule?view=week&date=${addBarnDays(start, 7)}`} aria-label="Next week" className={arrow}>
+          <Icon name="chevron" className="size-5" strokeWidth={2} />
+        </Link>
+      </nav>
+      <WeekView start={start} items={items} today={today} />
+    </>
+  );
 }
 
 /**
@@ -329,7 +380,11 @@ export default async function SchedulePage({
   const params = await searchParams;
   const date = /^\d{4}-\d{2}-\d{2}$/.test(params.date ?? "") ? params.date! : barnToday();
   const view: View =
-    params.view === "month" || params.view === "list" ? params.view : "day";
+    params.view === "day" || params.view === "week" || params.view === "month" || params.view === "list"
+      ? params.view
+      : params.date
+        ? "day"
+        : await defaultView();
 
   return (
     <TabPage
@@ -340,6 +395,7 @@ export default async function SchedulePage({
         ) : undefined
       }
       tabs={<ViewSwitch view={view} date={date} />}
+      layout={view === "week" ? "wide" : undefined}
     >
 
       {/*
@@ -351,7 +407,13 @@ export default async function SchedulePage({
        * a second boundary here would only add a skeleton inside a skeleton for
        * the same wait.
        */}
-      {view === "day" ? <DayBody date={date} role={role} /> : <CalendarBody view={view} />}
+      {view === "day" ? (
+        <DayBody date={date} role={role} />
+      ) : view === "week" ? (
+        <WeekBody date={date} />
+      ) : (
+        <CalendarBody view={view} />
+      )}
     </TabPage>
   );
 }
