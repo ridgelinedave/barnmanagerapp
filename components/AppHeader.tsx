@@ -52,6 +52,8 @@ export function AppHeader({
   tabs,
   variant = "default",
   meta,
+  adornment,
+  titleInBody = false,
 }: {
   title: string;
   /** href to return to. Present = drilled-in screen. */
@@ -72,6 +74,10 @@ export function AppHeader({
   variant?: "default" | "board";
   /** A quiet right-hand fact in the header: the board's clock. */
   meta?: ReactNode;
+  /** Beside the title on the desk (a course's Draft / Published pill). */
+  adornment?: ReactNode;
+  /** The page shows its own title on the desk (under a banner): keep the h1 for screen readers only there. */
+  titleInBody?: boolean;
 }) {
   const board = variant === "board";
   const headerClass = board
@@ -151,8 +157,9 @@ export function AppHeader({
             </div>
           </div>
         ) : (
-          <div className="min-w-0 flex-1">
-            <h1 className={titleClass}>{title}</h1>
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <h1 className={`min-w-0 ${titleClass} ${titleInBody ? "lg:sr-only" : ""}`}>{title}</h1>
+            {adornment && <div className="hidden shrink-0 lg:block">{adornment}</div>}
           </div>
         )}
 

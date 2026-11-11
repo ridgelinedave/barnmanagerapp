@@ -42,12 +42,18 @@ export const BUCKET_FRAME: Record<LayoutBucket, string> = {
  *           player (video and its details) beside the course outline, 20rem,
  *           24rem from `xl`. At a 1280px window that leaves the video ~600px;
  *           the master shape would give it ~370px and the outline the rest.
+ *   authoring  the reverse of player: a narrow rail of facts on the left and
+ *           the wide working column on the right (the admin's course page).
  */
-export type SplitShape = "master" | "player";
+export type SplitShape = "master" | "player" | "authoring";
 
 export const SPLIT_COLUMNS: Record<SplitShape, string> = {
   master: "lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]",
   player: "lg:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_24rem]",
+  // The admin's course page: a narrow facts rail (cover, description,
+  // categories, totals, who is watching) and the wide curriculum. 18rem at a
+  // 1280px window leaves the curriculum ~640px — a lesson row on one line.
+  authoring: "lg:grid-cols-[18rem_minmax(0,1fr)] xl:grid-cols-[20rem_minmax(0,1fr)]",
 };
 
 /**

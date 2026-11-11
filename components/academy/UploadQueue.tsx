@@ -1,12 +1,12 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { CHUNK_BYTES, byFilename, maxDurationFor, titleFromFilename, uploadProblem } from "@/lib/academy-upload";
 import { forgetUpload, readSaved, rememberUpload, sameFile, stillUsable } from "@/lib/academy-upload-store";
-import { createLessonFromUpload, discardUpload, requestUploadLink, syncLessonDurations } from "@/app/(app)/lessons/learn/upload-actions";
+import { createLessonFromUpload, discardUpload, replaceLessonVideo, requestUploadLink, syncLessonDurations } from "@/app/(app)/lessons/learn/upload-actions";
 
 /**
  * The Academy upload queue — browser -> Cloudflare Stream, over tus.
@@ -35,7 +35,9 @@ import { createLessonFromUpload, discardUpload, requestUploadLink, syncLessonDur
  *      however long that takes, and carries on;
  *   4. when the last byte is in, the lesson is created at the end of its
  *      section, titled from the filename, and shows "Processing" until Stream
- *      has encoded it and reported a duration.
+ *      has encoded it and reported a duration. A REPLACEMENT (`replace`) goes
+ *      through the same steps and then points its existing lesson at the new
+ *      video instead (replaceLessonVideo), deleting the old one.
  *
  * LEAVING AND COMING BACK. Each running upload's link is remembered in this
  * browser (lib/academy-upload-store.ts). After a reload, a closed tab or a
@@ -74,9 +76,15 @@ type Item = {
   note: string | null;
   lessonId: string | null;
   link: Link | null;
+  /** Set when this upload replaces that lesson's video instead of adding a lesson. */
+  replaceLessonId: string | null;
 };
 
-type QueueApi = { enqueue: (sectionId: string, sectionTitle: string, files: File[]) => void };
+type QueueApi = {
+  enqueue: (sectionId: string, sectionTitle: string, files: File[]) => void;
+  /** Upload `file` as the new video of an existing lesson. */
+  replace: (lesson: { id: string; title: string; sectionId: string; sectionTitle: string }, file: File) => void;
+};
 
 const QueueContext = createContext<QueueApi | null>(null);
 
@@ -184,9 +192,11 @@ export function UploadQueueProvider({ enabled, children }: { enabled: boolean; c
 
   /** The last step, shared by a finished upload and one recovered after a reload. */
   const finish = useCallback(
-    async (key: string, sectionId: string, title: string, videoId: string) => {
+    async (key: string, sectionId: string, title: string, videoId: string, replaceLessonId: string | null) => {
       patch(key, { status: "finishing", note: null });
-      const lesson = await createLessonFromUpload({ sectionId, title, videoId });
+      const lesson = replaceLessonId
+        ? await replaceLessonVideo({ lessonId: replaceLessonId, videoId })
+        : await createLessonFromUpload({ sectionId, title, videoId });
       if (!lesson.ok) {
         patch(key, { status: "failed", note: lesson.error });
         return;
@@ -227,6 +237,7 @@ export function UploadQueueProvider({ enabled, children }: { enabled: boolean; c
           videoId: link.videoId,
           expiresAt: link.expiresAt,
           durationSeconds: item.durationSeconds,
+          replaceLessonId: item.replaceLessonId,
         });
         patch(key, { link, sent: 0 });
       }
@@ -287,7 +298,7 @@ export function UploadQueueProvider({ enabled, children }: { enabled: boolean; c
       }
 
       patch(key, { sent: file.size });
-      await finish(key, item.sectionId, item.title, link.videoId);
+      await finish(key, item.sectionId, item.title, link.videoId, item.replaceLessonId);
     },
     [patch, finish],
   );
@@ -351,6 +362,7 @@ export function UploadQueueProvider({ enabled, children }: { enabled: boolean; c
         note: null,
         lessonId: null,
         link: null,
+        replaceLessonId: null,
       }));
       setItems((list) => [...list, ...added]);
       setOpen(true);
@@ -365,6 +377,36 @@ export function UploadQueueProvider({ enabled, children }: { enabled: boolean; c
     },
     [patch, pump, resumeWith],
   );
+
+  const replace = useCallback<QueueApi["replace"]>(
+    (lesson, file) => {
+      if (file.size <= 0) return;
+      const item: Item = {
+        key: `replace:${lesson.id}:${file.name}:${file.size}:${Math.random().toString(36).slice(2)}`,
+        file,
+        name: file.name,
+        size: file.size,
+        sectionId: lesson.sectionId,
+        sectionTitle: lesson.sectionTitle,
+        title: lesson.title,
+        status: "reading",
+        sent: 0,
+        durationSeconds: null,
+        note: null,
+        lessonId: null,
+        link: null,
+        replaceLessonId: lesson.id,
+      };
+      setItems((list) => [...list, item]);
+      setOpen(true);
+      void readDuration(file).then((seconds) => {
+        patch(item.key, { status: "queued", durationSeconds: maxDurationFor(seconds).fromFile ? seconds : null });
+        pump();
+      });
+    },
+    [patch, pump],
+  );
+  const api = useMemo<QueueApi>(() => ({ enqueue, replace }), [enqueue, replace]);
 
   // COMING BACK: what this browser was uploading when it last left.
   useEffect(() => {
@@ -397,13 +439,14 @@ export function UploadQueueProvider({ enabled, children }: { enabled: boolean; c
           note: null,
           lessonId: null,
           link: { uploadUrl: saved.uploadUrl, videoId: saved.videoId, expiresAt: saved.expiresAt },
+          replaceLessonId: saved.replaceLessonId ?? null,
         });
       }
       if (stop || recovered.length === 0) return;
       setItems((list) => [...recovered.filter((r) => !list.some((i) => i.key === r.key)), ...list]);
       setOpen(true);
       for (const r of recovered) {
-        if (r.status === "finishing" && r.link) void finish(r.key, r.sectionId, r.title, r.link.videoId);
+        if (r.status === "finishing" && r.link) void finish(r.key, r.sectionId, r.title, r.link.videoId, r.replaceLessonId);
       }
     })();
     return () => {
@@ -449,7 +492,7 @@ export function UploadQueueProvider({ enabled, children }: { enabled: boolean; c
     const item = items.find((i) => i.key === key);
     if (item?.status === "failed" && !item.file && item.link) {
       // A recovered upload whose lesson failed to save: just save it again.
-      void finish(key, item.sectionId, item.title, item.link.videoId);
+      void finish(key, item.sectionId, item.title, item.link.videoId, item.replaceLessonId);
       return;
     }
     patch(key, { status: item?.file ? "queued" : "interrupted", note: null });
@@ -461,7 +504,7 @@ export function UploadQueueProvider({ enabled, children }: { enabled: boolean; c
   const finished = items.filter((i) => i.status === "processing").length;
 
   return (
-    <QueueContext.Provider value={enabled ? { enqueue } : null}>
+    <QueueContext.Provider value={enabled ? api : null}>
       {children}
       {enabled && total > 0 && (
         <aside
@@ -473,7 +516,7 @@ export function UploadQueueProvider({ enabled, children }: { enabled: boolean; c
               type="button"
               onClick={() => setOpen((o) => !o)}
               aria-expanded={open}
-              className="flex min-h-11 min-w-0 flex-1 items-center gap-2 text-left font-condensed text-label font-semibold uppercase tracking-[0.08em] text-ink"
+              className="flex min-h-11 min-w-0 flex-1 items-center gap-2 text-left text-[0.9375rem] font-semibold text-ink"
             >
               <Icon name="chevron" className={`size-4 shrink-0 transition-transform ${open ? "rotate-90" : "-rotate-90"}`} />
               Uploads · {finished} of {total}
@@ -531,7 +574,9 @@ function UploadRow({
           : item.status === "retrying" || item.status === "offline"
             ? `${pct}% · paused`
             : item.status === "finishing"
-              ? "Saving the lesson"
+              ? item.replaceLessonId
+                ? "Switching the lesson"
+                : "Saving the lesson"
               : item.status === "processing"
                 ? item.note === "Ready"
                   ? "Ready"
@@ -552,7 +597,10 @@ function UploadRow({
   return (
     <li className="flex flex-col gap-1.5 border-b border-line px-3 py-2.5 last:border-b-0">
       <div className="flex items-baseline gap-2">
-        <span className="min-w-0 flex-1 truncate font-sans text-body text-ink">{item.title}</span>
+        <span className="min-w-0 flex-1 truncate font-sans text-body text-ink">
+          {item.title}
+          {item.replaceLessonId && <span className="text-muted"> · new video</span>}
+        </span>
         <span className={`shrink-0 font-condensed text-label tabular-nums ${problem ? "text-danger" : "text-muted"}`}>{label}</span>
       </div>
       {["uploading", "retrying", "offline", "finishing", "interrupted"].includes(item.status) && (
@@ -571,7 +619,7 @@ function UploadRow({
         <div className="flex flex-wrap items-center gap-2">
           {note && <span className={`min-w-0 flex-1 basis-full text-caption ${problem ? "text-danger" : "text-muted"}`}>{note}</span>}
           {item.status === "interrupted" && (
-            <label className="inline-flex min-h-11 cursor-pointer items-center rounded-control border border-ink/50 px-3 font-condensed text-label font-semibold uppercase tracking-[0.08em] text-ink focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ink lg:min-h-9">
+            <label className="inline-flex min-h-11 cursor-pointer items-center rounded-control border border-ink/50 px-3 text-[0.9375rem] font-semibold text-ink focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ink lg:min-h-9">
               Choose file
               <input
                 type="file"

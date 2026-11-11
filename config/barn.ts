@@ -306,6 +306,13 @@ export const barn = {
     dangerSoft: "#F7E7E4",
 
     logoSrc: "/brand/crouse-logo.png",
+    /**
+     * A version of the logo made for a DARK ground, if the barn supplies one.
+     * Null: none supplied (Crouse has not), so the desktop sidebar shows the
+     * full-colour logo on a light panel. The app never recolours or filters a
+     * barn's logo to make it fit a background.
+     */
+    logoReversedSrc: null as string | null,
   },
 
   /** Lesson durations offered by the template wizard (Phase 1). */

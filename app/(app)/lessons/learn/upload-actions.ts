@@ -122,6 +122,50 @@ export async function createLessonFromUpload(input: {
 }
 
 /**
+ * Replace a lesson's video: once the NEW video's last byte is in, point the
+ * lesson at it and delete the old one at Stream. The lesson keeps its id,
+ * title and place, so everyone's progress on it is kept. The duration goes
+ * back to null ("Processing") until Stream reports the new one.
+ *
+ * Idempotent: a retried finish finds the lesson already on the new video.
+ * The old video is deleted only if no lesson points at it any more.
+ */
+export async function replaceLessonVideo(input: {
+  lessonId: string;
+  videoId: string;
+}): Promise<{ ok: true; lessonId: string } | { ok: false; error: string }> {
+  if ((await currentRole()) !== "admin") return { ok: false, error: "Only the barn admin can replace a lesson's video." };
+  if (!UUID.test(input.lessonId) || !STREAM_UID.test(input.videoId)) return { ok: false, error: "That upload could not be matched." };
+
+  const supabase = await createClient();
+  const { data: lesson } = await supabase.from("learning_lessons").select("id, video_id").eq("id", input.lessonId).maybeSingle();
+  if (!lesson) return { ok: false, error: "That lesson has been deleted. The new video wasn't used." };
+  if (lesson.video_id === input.videoId) return { ok: true, lessonId: lesson.id };
+
+  const { error } = await supabase
+    .from("learning_lessons")
+    .update({ video_provider: "cloudflare_stream", video_id: input.videoId, duration_seconds: null })
+    .eq("id", lesson.id);
+  if (error) return { ok: false, error: "The video is uploaded but the lesson wasn't switched to it. Press Retry." };
+
+  const old = lesson.video_id as string | null;
+  if (old && STREAM_UID.test(old)) {
+    const { data: still } = await supabase.from("learning_lessons").select("id").eq("video_id", old).limit(1);
+    if (!still?.length) {
+      try {
+        await streamDeleteVideo(old);
+      } catch {
+        // Best effort: the lesson already plays the new video. An undeleted
+        // old one costs storage, not correctness.
+      }
+    }
+  }
+
+  revalidatePath("/lessons/learn");
+  return { ok: true, lessonId: lesson.id };
+}
+
+/**
  * Durations come from Stream once processing finishes (3.4). For the given
  * lessons that have a video and no duration yet, ask Stream; store the
  * duration when it is ready. Returns how many are still processing.

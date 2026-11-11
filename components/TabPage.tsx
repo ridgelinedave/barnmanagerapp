@@ -38,6 +38,8 @@ export function TabPage({
   split = "master",
   header = "default",
   headerMeta,
+  titleAdornment,
+  lead,
   children,
 }: {
   title: string;
@@ -52,6 +54,14 @@ export function TabPage({
   /** `board` keeps the oxblood header at every width (the feed board). */
   header?: "default" | "board";
   headerMeta?: ReactNode;
+  /** Beside the title in the desktop header only (a status pill). */
+  titleAdornment?: ReactNode;
+  /**
+   * Full width, above the columns: a course's banner and its title row. When
+   * given, the header's own title is for screen readers only on the desk —
+   * the lead shows it.
+   */
+  lead?: ReactNode;
   children: ReactNode;
 }) {
   const gap = DENSITY_GAP[density];
@@ -67,9 +77,12 @@ export function TabPage({
         tabs={tabs}
         variant={header}
         meta={headerMeta}
+        adornment={titleAdornment}
+        titleInBody={Boolean(lead)}
       />
       <main id="main" className={bucketMainClass(layout)}>
-        {layout === "split" ? (
+        {lead && <div className={`flex flex-col ${gap} pb-6 lg:pb-8`}>{lead}</div>}
+        {layout === "split" && detail ? (
           <div className={`flex flex-col ${gap} lg:grid ${SPLIT_COLUMNS[split]} lg:items-start lg:gap-8`}>
             <div className={`flex min-w-0 flex-col ${gap}`}>
               {tabs && <div className="lg:hidden">{tabs}</div>}

@@ -23,6 +23,8 @@ function Ask({
   error,
   formAction,
   children,
+  startAsking = false,
+  onKeep,
 }: {
   name: string;
   pending: boolean;
@@ -30,8 +32,16 @@ function Ask({
   formAction: (formData: FormData) => void | Promise<void>;
   /** The hidden fields that say what is being deleted. */
   children: ReactNode;
+  /** Open on the question — the first step was a "Delete" in a ⋯ menu. */
+  startAsking?: boolean;
+  /** Keep was chosen (the menu's caller hides the question again). */
+  onKeep?: () => void;
 }) {
-  const [asking, setAsking] = useState(false);
+  const [asking, setAsking] = useState(startAsking);
+  const keep = () => {
+    setAsking(false);
+    onKeep?.();
+  };
 
   if (!asking) {
     return (
@@ -49,7 +59,7 @@ function Ask({
         {/* KEEP FIRST. It lands exactly where the first Delete was, so a
             double tap — or a tap that registers twice — keeps the item. With
             Delete in that spot, a double tap deleted (found in testing). */}
-        <Button autoFocus type="button" variant="secondary" onClick={() => setAsking(false)} disabled={pending}>
+        <Button autoFocus type="button" variant="secondary" onClick={keep} disabled={pending}>
           Keep
         </Button>
         <Button type="submit" variant="danger" disabled={pending}>
@@ -93,10 +103,14 @@ export function ConfirmDeleteForm({
   action,
   fields,
   name,
+  startAsking,
+  onKeep,
 }: {
   action: (formData: FormData) => Promise<void>;
   fields: Record<string, string>;
   name: string;
+  startAsking?: boolean;
+  onKeep?: () => void;
 }) {
   const [pending, setPending] = useState(false);
 
@@ -104,6 +118,8 @@ export function ConfirmDeleteForm({
     <Ask
       name={name}
       pending={pending}
+      startAsking={startAsking}
+      onKeep={onKeep}
       formAction={async (formData) => {
         setPending(true);
         try {

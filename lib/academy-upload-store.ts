@@ -25,6 +25,8 @@ export type SavedUpload = {
   /** ISO time the tus link stops working (Cloudflare refuses it after). */
   expiresAt: string;
   durationSeconds: number | null;
+  /** Set when this upload REPLACES a lesson's video rather than adding a lesson. */
+  replaceLessonId?: string | null;
 };
 
 const KEY = "monarch.academy.uploads.v1";

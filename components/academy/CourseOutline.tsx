@@ -63,7 +63,7 @@ export function CourseOutline({
             <button
               type="button"
               onClick={() => setOpen(allOpen ? new Set() : new Set(sections.map((s) => s.id)))}
-              className="-my-2 flex min-h-11 items-center font-condensed text-label font-semibold uppercase tracking-[0.08em] text-accent-text underline-offset-4 lg:hover:underline"
+              className="-my-2 flex min-h-11 items-center text-[0.9375rem] font-semibold text-accent-text underline-offset-4 lg:hover:underline"
             >
               {allOpen ? "Collapse all" : "Expand all"}
             </button>

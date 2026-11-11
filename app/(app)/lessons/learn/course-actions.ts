@@ -95,7 +95,8 @@ export async function createCourse(_prev: CourseState, formData: FormData): Prom
     .single();
   if (error || !course) return FAIL(error?.message ?? "The course was not created.");
 
-  await supabase.from("learning_sections").insert({ module_id: course.id, title: fields.title, position: 0 });
+  // The first section is "Section 1" (renamed in place), not a copy of the course title.
+  await supabase.from("learning_sections").insert({ module_id: course.id, title: "Section 1", position: 0 });
   await setCategories(course.id, categoriesFrom(formData));
   if (cover) {
     const uploaded = await uploadPhoto(MEDIA_BUCKETS.cover, course.id, cover);

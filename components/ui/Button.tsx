@@ -5,22 +5,20 @@ import { Icon, type IconName } from "@/components/ui/Icon";
 /**
  * Buttons.
  *
- * DE-AI'd, deliberately. The generated-app button is a full pill with a flat
- * fill and a centred sentence-case label, and it is the single most
- * recognisable tell in the whole interface. This one is built the other way:
+ * SENTENCE CASE (2026-11-11, David's UI pass). Barlow 15px semibold, no
+ * letter-spacing: "Publish", "Edit details", "Add videos". All-caps condensed
+ * type is ONLY for small labels — group labels, table headers, status pills —
+ * never for something you press. (It was condensed, uppercase and tracked
+ * like signage; at a button's size that read as shouting.)
  *
  *   SQUARED — 5px, not 999px. A pill is a lozenge; this is a made object.
- *   CONDENSED, UPPERCASE, TRACKED — Barlow Condensed 700 at 2px letter-spacing.
- *     The label reads like signage, which is what a barn is full of.
- *   TACTILE — a dark inset lip along the bottom edge, and on press the button
- *     drops 1px and the lip shortens, so the surface genuinely moves under a
- *     thumb rather than just changing colour.
- *   DIRECTIONAL — primary actions can carry a trailing arrow. It says the tap
- *     goes somewhere, which is true of almost every primary action here.
+ *   TACTILE — a dark inset lip along the bottom edge of the primary, and on
+ *     press it drops 1px, so the surface moves under a thumb.
+ *   DIRECTIONAL — a primary that goes somewhere can carry a trailing arrow.
  *
- * SECONDARY IS NOT A GREY PILL. A second filled button competes with the first
- * and neither wins; secondary is a ghost with a hairline, and tertiary is a
- * plain underline. There is exactly one filled gold button per screen.
+ * ONE PRIMARY PER SCREEN. A second filled button competes with the first and
+ * neither wins: everything else is secondary (an ink outline) or a text
+ * button (ghost).
  */
 type Variant = "primary" | "secondary" | "ghost" | "danger";
 
@@ -52,10 +50,8 @@ const BASE =
 /**
  * Two sizes, because a menu row is not a button that happens to be wide.
  *
- * `default` is the signage treatment described above — condensed, uppercase,
- * tracked, centred. It is right for "CANCEL THIS LESSON" and wrong for a plain
- * sentence: an uppercase tracked label of eight words wraps into a shouted
- * paragraph, which is exactly what the old cryptic controls did.
+ * `default` is the button: sentence case, centred, 48px on a phone and 44px
+ * on the desk.
  *
  * `menu` is what a quiet overflow sheet is built from — sentence case, left
  * aligned, in the reading face, so a long plain label ("Generate lessons from
@@ -64,10 +60,11 @@ const BASE =
 type Size = "default" | "menu" | "sm";
 
 const SIZES: Record<Size, string> = {
-  // 48px under a thumb; 40px on the desk, where a pointer does not need it.
+  // 48px under a thumb; 44px on the desk — the touch floor holds in both
+  // shells (David's UI pass, 2026-11-11: it was 40px there).
   default:
-    "min-h-12 justify-center px-5 lg:min-h-10 lg:px-4 lg:text-[0.9375rem] " +
-    "font-condensed text-[1.0625rem] font-bold uppercase tracking-[0.11em] leading-none",
+    "min-h-12 justify-center px-5 lg:min-h-11 lg:px-4 " +
+    "font-sans text-[0.9375rem] font-semibold leading-none tracking-normal",
   menu: "min-h-14 justify-start px-4 py-2.5 text-left text-body font-semibold leading-snug",
   // A control inside a desktop table row: 32px, the reading face, sentence
   // case. Only for the desktop register — the phone keeps its 44px+ targets.

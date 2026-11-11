@@ -172,7 +172,7 @@ function PhoneBoard({ rows, now }: { rows: BoardRow[]; now: Meal }) {
               type="button"
               aria-pressed={active}
               onClick={() => setMeal(m)}
-              className={`min-h-11 font-condensed text-[0.8125rem] uppercase tracking-[0.2em] ${
+              className={`min-h-11 text-[0.9375rem] ${
                 active ? "bg-accent-text font-semibold text-white" : "bg-transparent font-medium text-accent-text"
               }`}
             >

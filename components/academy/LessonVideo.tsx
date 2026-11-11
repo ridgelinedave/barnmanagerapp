@@ -103,7 +103,7 @@ export function LessonVideo({
                 type="button"
                 onClick={() => setCounting(false)}
                 autoFocus
-                className="inline-flex min-h-11 items-center rounded-control border border-white/70 px-4 font-condensed text-label font-semibold uppercase tracking-[0.08em] text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white lg:hover:bg-white/10"
+                className="inline-flex min-h-11 items-center rounded-control border border-white/70 px-4 text-[0.9375rem] font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white lg:hover:bg-white/10"
               >
                 Cancel
               </button>

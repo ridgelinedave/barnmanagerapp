@@ -23,14 +23,23 @@ import { currentHref, type SidebarIcon, type SidebarLink, type SidebarModel } fr
  * desktop app feels like an app rather than a site, and the loading fallback
  * only ever replaces the content area beside it.
  *
- * VISUAL. The masthead is the barn's deep oxblood plane under the gold
- * hairline — on the desktop shell the ONLY deep plane, since the page header
- * beside it is light. The rail is white with a hairline.
+ * VISUAL (2026-11-11, David's UI pass). The rail is the barn's deep oxblood
+ * (`deep`, #4A002A) from top to bottom; nav labels white, group labels small
+ * caps in the light tint. THE CURRENT PAGE is the accent fill (#6E1A3D) with
+ * white text, a 3px gold bar on the left (decorative — gold is never text),
+ * a full-white icon and `aria-current="page"` — not colour alone. Other icons
+ * are white at reduced opacity. Measured (WCAG, on #4A002A unless noted):
+ *   white label               15.85:1   (on the #6E1A3D current row 11.18:1)
+ *   tint group label #F1E9E9  13.27:1
+ *   white/70 icon              8.07:1   (6.77:1 on hover; a graphic needs 3:1)
+ *   white on the hover fill   13.31:1   (white/8 over the deep ground)
+ *   gold focus ring            7.22:1   (5.09:1 on the current row; 3:1 needed)
  *
- * DENSE, LIKE THE TOOL IT IS: group labels in the 11px uppercase label, rows
- * ~32px, 13px text. THE CURRENT PAGE is an oxblood left border plus the blush
- * tint, a weight change and `aria-current="page"` — not a pill, and not colour
- * alone. Ink on the blush tint is 15+:1; muted on white is 6.34:1.
+ * THE BRAND BLOCK is a LIGHT panel: the barn's full-colour crest is unreadable
+ * on oxblood, and a barn's logo is never recoloured or filtered. So: white
+ * panel, crest, the barn name in Marcellus in the accent text colour — as on
+ * the sign-in screen. If config supplies `brand.logoReversedSrc` (a logo made
+ * for a dark ground), that is used on the oxblood instead and the panel goes.
  *
  * 32px rows are below the 44px touch floor. That is deliberate and recorded:
  * this shell is the desk register, and the 44px rules belong to the mobile
@@ -52,20 +61,24 @@ export function Sidebar({
   );
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-line bg-surface lg:flex">
-      <div
-        data-plane="deep"
-        className="flex h-[4.5625rem] shrink-0 items-center gap-3 border-b-2 border-gold bg-deep px-4"
-      >
-        <Image src={barn.brand.logoSrc} alt="" width={36} height={36} priority className="size-9 shrink-0" />
-        <p className="min-w-0 truncate font-display text-heading text-white">{barn.name}</p>
-      </div>
+    <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col bg-deep lg:flex">
+      {barn.brand.logoReversedSrc ? (
+        <div data-plane="deep" className="flex h-[4.5625rem] shrink-0 items-center gap-3 border-b border-white/15 px-4">
+          <Image src={barn.brand.logoReversedSrc} alt="" width={36} height={36} priority className="size-9 shrink-0 object-contain" />
+          <p className="min-w-0 truncate font-display text-heading text-white">{barn.name}</p>
+        </div>
+      ) : (
+        <div className="flex h-[4.5625rem] shrink-0 items-center gap-3 border-b border-line bg-surface px-4">
+          <Image src={barn.brand.logoSrc} alt="" width={40} height={40} priority className="size-10 shrink-0 object-contain" />
+          <p className="min-w-0 truncate font-display text-heading text-accent-text">{barn.name}</p>
+        </div>
+      )}
 
-      <nav aria-label="Main" className="flex-1 overflow-y-auto pb-4 pt-3">
+      <nav aria-label="Main" data-plane="deep" className="flex-1 overflow-y-auto pb-4 pt-3 [scrollbar-color:rgb(255_255_255/0.25)_transparent]">
         {model.sections.map((section, index) => (
           <div key={section.title ?? `section-${index}`} className={index === 0 ? "" : "pt-5"}>
             {section.title && (
-              <h2 className="px-4 pb-1 font-condensed text-micro uppercase text-muted">{section.title}</h2>
+              <h2 className="px-4 pb-1 font-condensed text-micro uppercase text-accent-tint">{section.title}</h2>
             )}
             <ul className="flex flex-col">
               {section.links.map((link) => (
@@ -78,17 +91,17 @@ export function Sidebar({
         ))}
       </nav>
 
-      <div className="shrink-0 border-t border-line py-3">
+      <div data-plane="deep" className="shrink-0 border-t border-white/15 py-3">
         <div className="flex items-center gap-2.5 px-4 pb-2">
           <span
             aria-hidden="true"
-            className="flex size-8 shrink-0 items-center justify-center rounded-full bg-accent-tint font-display text-label text-accent-text"
+            className="flex size-8 shrink-0 items-center justify-center rounded-full bg-white/15 font-display text-label text-white"
           >
             {initialOf(account.name)}
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-table font-semibold text-ink">{account.name}</span>
-            <span className="block truncate font-condensed text-micro normal-case tracking-normal text-muted">
+            <span className="block truncate text-table font-semibold text-white">{account.name}</span>
+            <span className="block truncate font-condensed text-micro normal-case tracking-normal text-accent-tint">
               <span className="capitalize">{account.detail}</span>
             </span>
           </span>
@@ -114,12 +127,10 @@ export function Sidebar({
 }
 
 function rowClass(current: boolean): string {
-  // The border is always 2px so the label does not shift by 2px when a row
-  // becomes current; only its colour changes.
-  return `flex min-h-8 w-full items-center gap-2.5 border-l-2 py-1 pl-[0.875rem] pr-4 text-left text-table transition-colors duration-150 ease-out ${
-    current
-      ? "border-accent bg-accent-tint font-semibold text-ink"
-      : "border-transparent font-medium text-ink hover:bg-sunk"
+  // The bar is always 3px so the label does not shift when a row becomes
+  // current; only its colour changes (transparent → gold).
+  return `flex min-h-8 w-full items-center gap-2.5 border-l-[3px] py-1 pl-[0.8125rem] pr-4 text-left text-table text-white transition-colors duration-150 ease-out ${
+    current ? "border-gold bg-accent font-semibold" : "border-transparent font-medium hover:bg-white/8"
   }`;
 }
 
@@ -133,7 +144,7 @@ function SidebarRow({ link, current }: { link: SidebarLink; current: boolean }) 
 }
 
 function RowIcon({ icon, current }: { icon: SidebarIcon; current: boolean }) {
-  const tone = current ? "text-ink" : "text-muted";
+  const tone = current ? "text-white" : "text-white/70";
   if (icon.kind === "icon") {
     return <Icon name={icon.name} className={`size-4 shrink-0 ${tone}`} />;
   }
