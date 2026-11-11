@@ -6315,6 +6315,65 @@ async function main() {
   }
 
   // ===========================================================================
+  // INVITE TAGS (migration 0031) — the tags an invite carries, copied onto the
+  // new profile at claim. Admin only. (The claim itself runs server-side with
+  // the service role; its rule — tags from this table, for this invite, never
+  // from the claimant — is in app/invite/[token]/actions.ts and is exercised
+  // on a production build, not here.)
+  // ===========================================================================
+  console.log("\n\n═══ invite tags (0031) — tags an invite carries ═══\n");
+  {
+    const TAG = "[policytest-0031]";
+    const made = { tags: [], invites: [] };
+    try {
+      const tag = await admin.from("tags").insert({ name: `${TAG} ${Date.now()}` }).select("id").single();
+      if (tag.data?.id) made.tags.push(tag.data.id);
+      const tag2 = await admin.from("tags").insert({ name: `${TAG} second ${Date.now()}` }).select("id").single();
+      if (tag2.data?.id) made.tags.push(tag2.data.id);
+      const invite = await admin
+        .from("invites")
+        .insert({ role: "parent", full_name: `${TAG} invitee`, expires_at: new Date(Date.now() + 86_400_000).toISOString() })
+        .select("id")
+        .single();
+      if (invite.data?.id) made.invites.push(invite.data.id);
+      const inviteId = invite.data?.id;
+      check("control: admin makes two tags and an invite", Boolean(tag.data?.id && tag2.data?.id && inviteId), tag.error?.message ?? invite.error?.message);
+
+      const link = await admin.from("invite_tags").insert({ invite_id: inviteId, tag_id: tag.data?.id }).select("invite_id, tag_id");
+      check("control: admin puts a tag on the invite", !link.error && link.data?.length === 1, link.error?.message);
+      const linked = async (client) => (await client.from("invite_tags").select("tag_id").eq("invite_id", inviteId)).data ?? [];
+      check("control: admin reads it back", (await linked(admin)).length === 1);
+
+      check("a client CANNOT read an invite's tags", (await linked(parent)).length === 0);
+      check("staff CANNOT read an invite's tags", (await linked(staff)).length === 0);
+      check("anon CANNOT read an invite's tags", (await linked(anon)).length === 0);
+      check(
+        "a client CANNOT put a tag on an invite",
+        await writeRefused(parent.from("invite_tags").insert({ invite_id: inviteId, tag_id: tag2.data?.id }).select()),
+      );
+      check(
+        "a client CANNOT take a tag off an invite",
+        await writeRefused(parent.from("invite_tags").delete().eq("invite_id", inviteId).select()),
+      );
+      check("…the invite's tags are unchanged", (await linked(admin)).map((r) => r.tag_id).join() === tag.data?.id);
+
+      // Cascades: deleting the tag drops the link; deleting the invite drops its links.
+      await admin.from("invite_tags").insert({ invite_id: inviteId, tag_id: tag2.data?.id });
+      check("control: the invite now carries two tags", (await linked(admin)).length === 2);
+      await admin.from("tags").delete().eq("id", tag2.data?.id);
+      check("deleting a tag removes it from the invite", (await linked(admin)).map((r) => r.tag_id).join() === tag.data?.id);
+      await admin.from("invites").delete().eq("id", inviteId);
+      const { data: orphan } = await admin.from("invite_tags").select("tag_id").eq("invite_id", inviteId);
+      check("deleting the invite removes its tags", (orphan ?? []).length === 0);
+    } finally {
+      if (made.invites.length) await admin.from("invites").delete().in("id", made.invites);
+      if (made.tags.length) await admin.from("tags").delete().in("id", made.tags);
+      const left = (await visibleIds(admin, "tags")).ids.filter((id) => made.tags.includes(id));
+      check("cleanup: this section's tags and invites are gone", left.length === 0);
+    }
+  }
+
+  // ===========================================================================
   // STANDING GUARD — function exposure
   //
   // Data-driven from the migrations, so it covers functions added later without

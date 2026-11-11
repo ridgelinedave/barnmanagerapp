@@ -1,7 +1,7 @@
 -- 0031 — tags on an invite: the person is tagged the moment they accept.
 --
--- PRINTED FOR AUDIT, NOT APPLIED. After approval it moves to
--- supabase/migrations/, is applied with `npm run db:apply -- <file>`, then
+-- APPROVED 2026-11-10 (David) and applied as printed. Lives in
+-- supabase/migrations/; applied with `npm run db:apply -- <file>`, then
 -- `npm run db:gate`, with its assertions in tests/policies.test.mjs.
 --
 -- WHY. Belle is bringing her Circle members into the Academy. Without this,
