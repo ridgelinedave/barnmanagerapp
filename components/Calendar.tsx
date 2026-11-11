@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { Icon, type IconName } from "@/components/ui/Icon";
+import { Icon } from "@/components/ui/Icon";
+import { KIND_ICON, KIND_TONE } from "@/lib/calendar-kinds";
 import { EmptyState } from "@/components/ui/primitives";
 import { formatTime } from "@/lib/dates";
 import { addMonths, monthGrid, monthLabel, startOfMonth, WEEKDAY_INITIALS } from "@/lib/month";
-import type { CalendarItem, CalendarKind } from "@/lib/calendar";
+import type { CalendarItem } from "@/lib/calendar";
 
 /**
  * The barn calendar: a month grid and an agenda, over one set of items.
@@ -30,23 +31,6 @@ import type { CalendarItem, CalendarKind } from "@/lib/calendar";
  * a cookie, which would now be a second switcher fighting the first.
  */
 export type CalendarView = "month" | "list";
-
-const KIND_ICON: Record<CalendarKind, IconName> = {
-  lesson: "calendar",
-  event: "pin",
-  care: "alert",
-};
-
-/**
- * Outlined labels, deliberately close together — this is not a key. The
- * accent is not one of them: oxblood marks the active view and the selected
- * day, which answer "where am I", not what kind of thing a row is.
- */
-const KIND_TONE: Record<CalendarKind, string> = {
-  lesson: "border-muted/60 text-muted",
-  event: "border-ink/40 text-ink",
-  care: "border-danger/70 text-danger",
-};
 
 /** One row: time, title, kind. Also used by the day view for events and care. */
 export function CalendarItemRow({ item }: { item: CalendarItem }) {
