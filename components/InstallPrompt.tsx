@@ -31,7 +31,7 @@ export function InstallPrompt() {
       <p className="font-display text-heading text-ink">{barn.pwa.installTitle}</p>
       <p className="mt-0.5">{barn.pwa.installBody}</p>
       <div className="mt-3 flex gap-2">
-        <Button variant="primary" onClick={() => void promptInstall()} className="flex-1">
+        <Button variant="secondary" onClick={() => void promptInstall()} className="flex-1">
           Install
         </Button>
         <Button variant="ghost" onClick={dismiss}>
