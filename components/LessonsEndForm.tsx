@@ -83,7 +83,7 @@ export function LessonsEndForm({
       <Input id={id} name="lessons_end" type="date" required defaultValue={endDay ?? defaultDay} min={todayDay} />
       <p className="text-caption text-muted">Their Academy access ends at the end of this day.</p>
       <div className="flex flex-wrap gap-2">
-        <Button type="submit" variant="primary" arrow={false} disabled={pending}>
+        <Button type="submit" variant="secondary" arrow={false} disabled={pending}>
           Save
         </Button>
         <Button type="button" variant="ghost" arrow={false} onClick={() => setOpenedOn(null)}>

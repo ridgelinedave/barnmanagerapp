@@ -289,7 +289,6 @@ export default async function ManageFormsPage({
                   <SheetTrigger
                     label="Issue to…"
                     title={`Issue ${template.name}`}
-                    variant="primary"
                   >
                     <FormIssuer
                       templates={templates}

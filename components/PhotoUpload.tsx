@@ -322,7 +322,7 @@ export function PhotoUpload({
   const wideEmpty = (
     <span
       aria-hidden="true"
-      className="flex aspect-video w-full items-center justify-center gap-2 rounded-control border border-dashed border-ink/40 bg-sunk font-condensed text-label font-semibold uppercase tracking-[0.08em] text-ink"
+      className="flex aspect-video w-full items-center justify-center gap-2 rounded-control border border-dashed border-ink/40 bg-sunk text-[0.9375rem] font-semibold text-ink"
     >
       <Icon name="plus" className="size-4" strokeWidth={2.5} />
       {label}

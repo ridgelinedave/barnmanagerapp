@@ -34,7 +34,7 @@ export function CategoryChips({
                 href={hrefFor(chip.id)}
                 aria-current={current ? "page" : undefined}
                 scroll={false}
-                className={`flex min-h-11 items-center rounded-control border px-3.5 font-condensed text-label uppercase tracking-[0.08em] transition-colors duration-150 ${
+                className={`flex min-h-11 items-center rounded-control border px-3.5 text-[0.9375rem] font-semibold transition-colors duration-150 ${
                   current
                     ? "border-accent bg-accent font-semibold text-accent-on"
                     : "border-ink/50 bg-transparent font-medium text-ink lg:hover:bg-surface"

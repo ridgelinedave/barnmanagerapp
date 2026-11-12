@@ -424,7 +424,6 @@ export default async function ManageTeamPage({
                 <SheetTrigger
                   label="Add a rider"
                   title={`New rider — ${family.name}`}
-                  variant="primary"
                 >
                   <RiderForm familyId={family.id} levels={levels} />
                 </SheetTrigger>
@@ -436,7 +435,7 @@ export default async function ManageTeamPage({
           ))
         )}
 
-        <SheetTrigger label="Add a family" title="New family" variant="primary">
+        <SheetTrigger label="Add a family" title="New family">
           <FamilyForm />
         </SheetTrigger>
       </section>
@@ -486,7 +485,7 @@ export default async function ManageTeamPage({
           </ul>
         )}
 
-        <SheetTrigger label="Add a level" title="New level" variant="primary">
+        <SheetTrigger label="Add a level" title="New level">
           <LevelForm />
         </SheetTrigger>
       </section>

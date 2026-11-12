@@ -62,7 +62,21 @@ export function ProgressBar({ percent, label }: { percent: number; label?: strin
   );
 }
 
-export function CourseCover({ src, title, className = "" }: { src: string | null; title: string; className?: string }) {
+export function CourseCover({
+  src,
+  title,
+  className = "",
+  natural = false,
+}: {
+  src: string | null;
+  title: string;
+  className?: string;
+  /**
+   * The image at its OWN aspect ratio — never cropped, never stretched (the
+   * course page's hero). Off, the cover fills a 16:9 box (the course grid).
+   */
+  natural?: boolean;
+}) {
   const empty = (
     <span
       aria-hidden="true"
@@ -75,7 +89,9 @@ export function CourseCover({ src, title, className = "" }: { src: string | null
   return (
     <FaceImage
       src={src}
-      className={`aspect-video w-full rounded-control border border-rule object-cover ${className}`}
+      // A ring, not a border, on the natural cover: a border adds 2px to the
+      // height and the box would no longer be the image's exact ratio.
+      className={`${natural ? "block h-auto ring-1 ring-rule" : "aspect-video border border-rule object-cover"} w-full rounded-control ${className}`}
       fallback={empty}
     />
   );
