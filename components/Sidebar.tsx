@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useRef } from "react";
 import { barn } from "@/config/barn";
 import { Icon } from "@/components/ui/Icon";
 import { initialOf } from "@/components/ui/ListRow";
@@ -41,10 +42,13 @@ import { currentHref, type SidebarIcon, type SidebarLink, type SidebarModel } fr
  * the sign-in screen. If config supplies `brand.logoReversedSrc` (a logo made
  * for a dark ground), that is used on the oxblood instead and the panel goes.
  *
- * 32px rows are below the 44px touch floor. That is deliberate and recorded:
- * this shell is the desk register, and the 44px rules belong to the mobile
- * shell. An iPad in LANDSCAPE (1024px+) gets this shell; if Belle's staff use
- * one that way in the aisle, the breakpoint is the thing to move, not the rows.
+ * ROWS ARE 40px (David, 2026-11-11). The nav scrolls on its own when the list
+ * is taller than the window — the brand block stays at the top and the
+ * profile block stays pinned at the bottom — and on load the current page is
+ * scrolled into view inside it. 40px is below the 44px touch floor, by
+ * decision: this shell is the desk register, and the 44px rules belong to the
+ * mobile shell. An iPad in LANDSCAPE (1024px+) gets this shell; if Belle's
+ * staff use one that way in the aisle, the breakpoint is the thing to move.
  */
 export function Sidebar({
   model,
@@ -60,6 +64,20 @@ export function Sidebar({
     pathname,
   );
 
+  // The current row, scrolled into view inside the nav (never the page) when
+  // it is outside the visible part of the list.
+  const navRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const nav = navRef.current;
+    const row = nav?.querySelector<HTMLElement>('[aria-current="page"]');
+    if (!nav || !row) return;
+    const top = row.offsetTop; // the nav is the offset parent (`relative`)
+    const bottom = top + row.offsetHeight;
+    if (top < nav.scrollTop || bottom > nav.scrollTop + nav.clientHeight) {
+      nav.scrollTop = Math.max(0, top - (nav.clientHeight - row.offsetHeight) / 2);
+    }
+  }, [current]);
+
   return (
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col bg-deep lg:flex">
       {barn.brand.logoReversedSrc ? (
@@ -74,7 +92,7 @@ export function Sidebar({
         </div>
       )}
 
-      <nav aria-label="Main" data-plane="deep" className="flex-1 overflow-y-auto pb-4 pt-3 [scrollbar-color:rgb(255_255_255/0.25)_transparent]">
+      <nav ref={navRef} aria-label="Main" data-plane="deep" className="relative min-h-0 flex-1 overflow-y-auto pb-4 pt-3 [scrollbar-color:rgb(255_255_255/0.25)_transparent]">
         {model.sections.map((section, index) => (
           <div key={section.title ?? `section-${index}`} className={index === 0 ? "" : "pt-5"}>
             {section.title && (
@@ -129,7 +147,7 @@ export function Sidebar({
 function rowClass(current: boolean): string {
   // The bar is always 3px so the label does not shift when a row becomes
   // current; only its colour changes (transparent → gold).
-  return `flex min-h-8 w-full items-center gap-2.5 border-l-[3px] py-1 pl-[0.8125rem] pr-4 text-left text-table text-white transition-colors duration-150 ease-out ${
+  return `flex min-h-10 w-full items-center gap-2.5 border-l-[3px] py-1 pl-[0.8125rem] pr-4 text-left text-table text-white transition-colors duration-150 ease-out ${
     current ? "border-gold bg-accent font-semibold" : "border-transparent font-medium hover:bg-white/8"
   }`;
 }

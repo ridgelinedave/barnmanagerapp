@@ -30,14 +30,15 @@ export const dynamic = "force-dynamic";
  * the cover, the description, progress, ONE primary action (Start / Continue
  * / Watch again) and the outline — no authoring.
  *
- * THE ADMIN gets an AUTHORING page (David's UI pass, 2026-11-11): the header
- * carries the title, a Draft / Published pill, and Preview as member (text),
- * Edit details (secondary), Publish (the one primary). A narrow left rail has
- * the cover, description, categories, one totals line and Who is watching;
- * the wide right column is the curriculum (CourseEditor). Start and Enroll are
- * not here — they belong to the member view, which Preview shows. On a phone
- * the header is the oxblood bar, so the pill and the three actions open the
- * body instead, and Who is watching follows the curriculum.
+ * THE ADMIN gets an AUTHORING page (David's UI pass, 2026-11-11): a hero row
+ * (CourseHero — the cover uncropped, beside the title, a Draft / Published
+ * pill, description, one totals line, and Preview as member (text), Edit
+ * details (secondary), Publish (the one primary)). Below it a narrow left rail
+ * has the categories and Who is watching; the wide right column is the
+ * curriculum (CourseEditor). Start and Enroll are not here — they belong to
+ * the member view, which Preview shows. On a phone the title is in the
+ * oxblood bar, the pill and actions follow the cover, and Who is watching
+ * follows the curriculum.
  *
  * A member never reaches a draft: RLS does not return it, and this page 404s.
  */
@@ -174,23 +175,23 @@ export default async function CoursePage({
         split="authoring"
         density="normal"
         lead={
-          <>
-            <CourseBanner src={course.coverSrc} title={course.title} />
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-6">
-              <div className="flex min-w-0 flex-1 items-center justify-between gap-3 lg:justify-start">
-                <BannerTitle title={course.title} />
-                {statusPill}
-                {/* Phone: Preview shares the status row. */}
-                <span className="lg:hidden">{preview}</span>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="hidden lg:inline-flex">{preview}</span>
-                {/* One primary: Publish. On a phone it leads the row. */}
-                <span className="order-2 lg:order-none">{editDetails}</span>
-                <span className="order-1 lg:order-none">{publish}</span>
-              </div>
+          <CourseHero src={course.coverSrc} title={course.title}>
+            <div className="flex min-w-0 items-center justify-between gap-3 lg:justify-start">
+              <HeroTitle title={course.title} />
+              {statusPill}
+              {/* Phone: Preview shares the status row. */}
+              <span className="lg:hidden">{preview}</span>
             </div>
-          </>
+            {/* Phone: the actions come straight after the tag; description and totals follow. */}
+            {course.description && <p className={`${PHONE_LATER} whitespace-pre-line text-body leading-relaxed text-ink`}>{course.description}</p>}
+            <p className={`${PHONE_LATER} font-condensed text-label tabular-nums text-muted`}>{totals}</p>
+            <div className="order-2 flex flex-wrap items-center gap-2 lg:order-none">
+              <span className="hidden lg:inline-flex">{preview}</span>
+              {/* One primary: Publish. On a phone it leads the row. */}
+              <span className="order-2 lg:order-none">{editDetails}</span>
+              <span className="order-1 lg:order-none">{publish}</span>
+            </div>
+          </CourseHero>
         }
         detail={
           <>
@@ -215,7 +216,6 @@ export default async function CoursePage({
           </>
         }
       >
-        {course.description && <p className="whitespace-pre-line text-body leading-relaxed text-ink">{course.description}</p>}
         {categoryNames.length > 0 && (
           <ul aria-label="Categories" className="flex flex-wrap gap-1.5">
             {categoryNames.map((name) => (
@@ -225,7 +225,6 @@ export default async function CoursePage({
             ))}
           </ul>
         )}
-        <p className="font-condensed text-label tabular-nums text-muted">{totals}</p>
         <div className="hidden lg:block">{watching}</div>
       </TabPage>
     );
@@ -250,10 +249,9 @@ export default async function CoursePage({
   const label = course.percent >= 100 ? "Watch again" : course.completed > 0 ? "Continue" : "Start";
 
   // An empty section is the admin's work in progress, not the member's.
-  const outlineNode = <CourseOutline sections={outline.filter((s) => s.lessons.length > 0)} />;
-  const description = course.description ? (
-    <p className="whitespace-pre-line text-body leading-relaxed text-ink">{course.description}</p>
-  ) : null;
+  const visible = outline.filter((s) => s.lessons.length > 0);
+  const visibleLessons = visible.flatMap((s) => s.lessons);
+  const totals = outlineSummary(visible.length, visibleLessons.length, totalSeconds(visibleLessons));
 
   return (
     <TabPage
@@ -273,14 +271,13 @@ export default async function CoursePage({
               </ButtonLink>
             </div>
           )}
-          <CourseBanner src={course.coverSrc} title={course.title} />
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-6">
-            <div className="hidden min-w-0 flex-1 items-center lg:flex">
-              <BannerTitle title={course.title} />
-            </div>
+          <CourseHero src={course.coverSrc} title={course.title}>
+            <HeroTitle title={course.title} />
+            {course.description && <p className={`${PHONE_LATER} whitespace-pre-line text-body leading-relaxed text-ink`}>{course.description}</p>}
+            {visibleLessons.length > 0 && <p className={`${PHONE_LATER} font-condensed text-label tabular-nums text-muted`}>{totals}</p>}
             {course.lessonCount > 0 && (
               // ONE primary: Start / Continue / Watch again. Enroll is a text button.
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="order-2 flex flex-wrap items-center gap-2 lg:order-none">
                 {course.continueLessonId && (
                   <ButtonLink href={lessonHref(course.continueLessonId)} variant="primary">
                     {label}
@@ -296,39 +293,46 @@ export default async function CoursePage({
                 )}
               </div>
             )}
-          </div>
-          {course.enrolled && course.lessonCount > 0 && (
-            <div className="lg:max-w-md">
-              <ProgressBar percent={course.percent} label={`${course.title} progress`} />
-            </div>
-          )}
+            {course.enrolled && course.lessonCount > 0 && (
+              <div className="order-2 lg:order-none">
+                <ProgressBar percent={course.percent} label={`${course.title} progress`} />
+              </div>
+            )}
+          </CourseHero>
         </>
       }
-      // Description on the left, the outline on the right; with no
-      // description, the outline is the page.
-      detail={description ? outlineNode : undefined}
     >
-      {description ?? outlineNode}
+      <CourseOutline sections={visible} />
     </TabPage>
   );
 }
 
+/** On a phone, after the actions (flex order); on the desk, in source order. */
+const PHONE_LATER = "order-3 lg:order-none";
+
 /**
- * The course cover as a banner across the content area: the same 16:9 image,
- * cropped (object-cover, never stretched) to a wide band — about 4:1 on the
- * desk, the full 16:9 on a phone.
+ * The course page's hero row (David, 2026-11-11). Belle's cover is NEVER
+ * cropped: it renders at its own aspect ratio. On the desk the cover takes
+ * ~45% of the content width with the title, tag, description, totals and
+ * actions to its right; on a phone it is full width, and the tag and actions
+ * follow it (the children's `order` classes put description and totals after).
  */
-function CourseBanner({ src, title }: { src: string | null; title: string }) {
-  return <CourseCover src={src} title={title} className="lg:aspect-[4/1]" />;
+function CourseHero({ src, title, children }: { src: string | null; title: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,45fr)_minmax(0,55fr)] lg:items-start lg:gap-8">
+      <CourseCover src={src} title={title} natural />
+      <div className="flex min-w-0 flex-col gap-4">{children}</div>
+    </div>
+  );
 }
 
 /**
- * The title under the banner, on the desk. The page's h1 is in the header —
+ * The title beside the cover, on the desk. The page's h1 is in the header —
  * screen-reader-only there on the desk (TabPage `lead`), and the visible
  * title on a phone, where the oxblood bar shows it — so this one is
  * presentation only, never a second heading.
  */
-function BannerTitle({ title }: { title: string }) {
+function HeroTitle({ title }: { title: string }) {
   return (
     <p aria-hidden="true" className="hidden min-w-0 font-display text-[1.75rem] leading-tight text-ink lg:block">
       {title}
